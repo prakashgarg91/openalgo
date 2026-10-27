@@ -455,6 +455,16 @@ def sync_job(deployment_id: int) -> bool:
     if not dep or not dep["active"]:
         remove_job(deployment_id)
         return True
+    if dep["algo_id"] not in ALGOS:
+        # Renamed or removed in a later release. Leave it unscheduled and say so,
+        # so one stale row cannot stop the other algos from running.
+        logger.warning(
+            "Deployment %s names an algo this release does not know (%s); not scheduled",
+            deployment_id,
+            dep["algo_id"],
+        )
+        remove_job(deployment_id)
+        return False
     hour, minute = entry_hhmm(dep["algo_id"])
     sched.add_job(
         func=run_entry,
@@ -490,6 +500,9 @@ def sync_all_jobs() -> int:
     """
     count = 0
     for dep in algo_db.list_deployments(active_only=True):
-        if sync_job(dep["id"]):
-            count += 1
+        try:
+            if sync_job(dep["id"]):
+                count += 1
+        except Exception:
+            logger.exception("Could not schedule deployment %s", dep["id"])
     return count

@@ -31,7 +31,7 @@ claim about future profit.
 | Module | Role |
 | --- | --- |
 | `services/algos/context.py` | `MarketInputs` -> `RegimeResult` (label, bias, score, reasons, confidence). Pure. |
-| `services/algos/templates.py` | Algo registry. `build(algo_id, regime, capital, params)` -> `Plan` (config or skip with reason, max loss). Pure. |
+| `services/algos/templates.py` | Algo registry (Zen, Mirror Zen, Calm Condor, Morning Gap Fade; each has its own check time). `build(algo_id, regime, capital, params)` -> `Plan` (config or skip with reason, max loss). Pure. |
 | `services/algos/inputs.py` | Fetches GIFT Nifty, India VIX, Nifty (broker quotes) and US indices, crude, dollar index (public feed). Cached, bounded timeout. |
 | `blueprints/algos.py` | Session API: catalogue, regime, preview, deploy. |
 | `frontend/src/pages/Algos.tsx` | Catalogue, regime banner, capital input, max-loss preview, Start. |

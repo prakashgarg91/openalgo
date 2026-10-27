@@ -110,9 +110,9 @@ ALGOS: dict[str, AlgoSpec] = {
         status="experimental",
         evidence=(
             "Indicative test on Nifty data from 2018 to 2026 lost money: profit factor about "
-            "0.7 on data it was chosen on and about 0.6 on data it never saw. The opening "
-            "gap and the overnight US move did not predict the rest of the day. Use it in "
-            "Sandbox mode to study, not to trade."
+            "0.7 on the years it was chosen on and about 0.5 on the later years it never saw "
+            "(62 trades, a loss in every year). The opening gap and the overnight US move "
+            "did not predict the rest of the day. Use it in Sandbox mode to study, not to trade."
         ),
     ),
     "calm_condor": AlgoSpec(

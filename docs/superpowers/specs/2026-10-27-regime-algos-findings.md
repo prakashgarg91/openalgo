@@ -73,16 +73,79 @@ sanity check on the rules, not a forecast of returns.
 Zen, Mirror Zen and Calm Condor enter at 15:05 IST and hold overnight. The US
 session, and any overnight news, happens after entry. The regime can only use
 the previous US close, so **foreign-market impact cannot be known when these
-algos enter.** It is knowable by 09:00 to 09:15. Algos that use foreign cues
-properly should enter in the morning, after the gap is visible. That is the next
-algo to build, not a tuning of these three.
+algos enter.** It is knowable by 09:00 to 09:15. The obvious next step was a
+morning algo that waits for the gap. It was built and tested; see the next
+section for why it is not a recommended strategy.
+
+## Morning-gap research (day 4)
+
+Question: do the opening gap and the overnight US move predict how the day
+plays out after the open? If they do, a morning algo has something to trade. If
+they do not, no option structure will rescue it.
+
+Method (`scripts/algo_backtest/signal_power.py` and `run_morning_gap.py`): the
+same 2018 to October 2026 data, split into a train period (2018 to 2022) and a
+test period (2023 onward). The rule is chosen on the train period only and
+judged on the test period. Always-sell-puts and always-sell-calls baselines show
+whether any gap logic adds anything over plain premium and drift.
+
+Results:
+
+| Measure | Train | Test |
+| --- | --- | --- |
+| Mean open-to-close move | -0.076% | -0.039% |
+| Share of days up (open to close) | 48.4% | 47.0% |
+| Correlation, gap vs rest of day | -0.03 | -0.07 |
+| Correlation, US move vs rest of day | -0.04 | -0.06 |
+| Correlation, US move vs the gap itself | +0.50 | +0.41 |
+| Day moves the same way as a big US move | 49.4% | 46.2% |
+
+- **The open already holds the foreign-market move.** The US move and the gap
+  move together (+0.4 to +0.5). After the open, neither predicts the day: the
+  hit rates are coin flips and the correlations are slightly negative.
+- **No candidate rule made money.** Of the signal rules tried (fade the gap,
+  follow the gap, follow it only when the US agrees, fade it when the US
+  disagrees), none with 150 or more train trades had a positive total on the
+  train period. On the test period none of the rules with 80 or more trades had
+  a profit factor above 1.0.
+- **The baselines lose too.** Always selling puts intraday had a profit factor of
+  0.39 on train and 0.47 on test; always selling calls 0.60 and 0.59. Intraday
+  spreads earn little time decay in six hours against about 4 points of costs.
+- **Index return sat overnight in this sample.** Nifty averaged +0.10% overnight
+  and -0.06% from open to close. That favours holding positions overnight (what
+  Zen does) and argues against opening new ones in the morning.
+
+Decision: **no morning-gap rule has an edge, so it is not recommended.** The
+rule that ranked best on the train period alone was fading gaps of 0.75% or more
+(profit factor 0.67 on 163 train trades). On the test period it scored 0.47 on
+62 trades and lost money in each of 2023, 2024, 2025 and 2026. It is shipped as
+**Morning Gap Fade, Experimental**, because it was asked for and because the
+Sandbox record is the honest way to study it, with the evidence on its card. The
+Live gate means it cannot go Live without earning a profitable Sandbox record.
+
+What this does not show:
+
+- Not tested: stops and targets, volatility skew, the real intraday path, other
+  structures (debit spreads, straddles), or other instruments such as Bank Nifty.
+- The VIX "open" in the free data equals the previous close 97.8% of the time, so
+  the entry volatility is stale. This does not bias the direction of the
+  result, but it makes the pricing less exact.
+- The test period has 940 days and the winner only 62 trades, so the test figure
+  for the shipped rule is itself noisy. The finding that no rule beat the
+  baselines, and that the cues do not predict the day, does not depend on it.
+
+What did come out of it: each algo now has its own check time, and the feed
+carries the opening gap, so a future morning algo is a template and not a
+rebuild.
 
 ## What to do next, in order
 
 1. Run all three in Sandbox mode for at least a month and read the Sandbox
    record on the page. Sandbox fills are idealised, so this is a floor.
-2. Add a morning-gap algo that enters after 09:15 using the opening gap and the
-   overnight US move, and test it the same way before enabling it.
+2. Do not build more algos on the opening gap or the overnight US move; the
+   research above found no edge. Better candidates to test the same way (train
+   and test, with baselines) are a different instrument, a different structure,
+   or a rule that manages the overnight position using the morning gap.
 3. Add an event calendar so budget, policy and election days are stood aside on
    by date, not only after the gap appears.
 4. Replace Mirror Zen's definition with something that survived the test, or
