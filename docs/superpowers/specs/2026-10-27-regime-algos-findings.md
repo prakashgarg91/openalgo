@@ -3,13 +3,101 @@
 Date: 2026-10-27. Companion to
 [`2026-10-27-regime-algos-design.md`](2026-10-27-regime-algos-design.md).
 
-## Verdict
+## Verdict (updated after testing on real option prices)
 
-The platform side is built and tested: catalogue, regime scoring, daily entry,
-Sandbox-first deployment, a Live gate, a decision log. **Profit in every season
-and condition is not demonstrated, and should not be promised.** One algo
-(Mirror Zen, as first defined) lost money in the indicative test. The other two
-looked good in a test that is known to flatter them.
+**No algo in the catalogue has been shown to make money, and the earlier
+model-based results that said otherwise were wrong.** Priced with the actual
+closing and opening prices of Nifty option contracts from NSE (2023 to October
+2026), all three overnight algos lose after costs and earn about nothing before
+them. A search over 39 hold-to-expiry structures, and over overnight Nifty
+futures, also found nothing that was profitable after costs. All four algos are
+marked Experimental and say so on their cards.
+
+What is built and works: the catalogue, regime scoring, the daily entry, Sandbox
+first, the Live gate and its worst-case confirmation, the decision log, and a
+Lab that replays any algo over real history with no broker. What is not
+established: any profitable algo, and any real order through Upstox.
+
+## Real-price results (the ones to trust)
+
+Regime-gated, expiry-eve skipped, costs itemised, per lot of 75, 2023-01-02 to
+2026-10-23. "Gross" is the average per trade before costs.
+
+| Algo | Pricing | Trades | Win | Profit factor | Gross | Net per trade |
+| --- | --- | --- | --- | --- | --- | --- |
+| Calm Condor | calendar-clock model | 215 | 76% | 5.26 | 1,109 | +722 |
+| Calm Condor | trading-clock model | 215 | 74% | 4.13 | 900 | +486 |
+| Calm Condor | variance-clock model | 215 | 21% | 0.09 | 116 | -334 |
+| **Calm Condor** | **real option prices** | **213** | **30%** | **0.26** | **-50** | **-433** |
+| Zen | variance-clock model | 438 | 48% | 0.59 | 76 | -219 |
+| **Zen** | **real option prices** | **434** | **41%** | **0.54** | **14** | **-243** |
+| Mirror Zen | variance-clock model | 223 | 36% | 0.42 | -87 | -404 |
+| **Mirror Zen** | **real option prices** | **221** | **40%** | **0.62** | **40** | **-234** |
+
+On real prices Calm Condor and Zen lost in every year (2023 to 2026). Mirror Zen
+lost in three of four. Every condor shape (OTM1/3 to OTM3/5) and every bull-put
+shape tried also lost, with a gross edge near zero.
+
+### How the earlier numbers went wrong
+
+1. **A first "conservative" model charged far too much for costs** (a 3 percent
+   spread on every premium), which would have called every algo a loser. Found by
+   decomposing the model; costs were recalibrated for liquid Nifty weeklies.
+2. **The calendar clock paid weekends as time decay.** With it, Friday entries
+   produced 64 percent of the condor's profit. A trading-day clock fixed that.
+3. **Overnight positions earned a full day of decay for 39 percent of a day's
+   variance.** Nifty's overnight gap carries about 39 percent of daily variance, and
+   in this sample India VIX (16.9) matched realized volatility (17.0), so there was
+   no variance premium to collect. The variance-clock model fixed that, and it is
+   the one that tracked the real prices (condor 0.09 against 0.26 real, Zen 0.59
+   against 0.54). The first two models did not.
+4. **A model cannot settle this.** How fast option prices fall overnight decides the
+   result, and daily index history cannot show it. Only real option prices can.
+
+### Other real-price searches, all negative
+
+- **Hold-to-expiry, 39 configurations** (condors, put spreads, iron flies, entered
+  2, 3 or 4 sessions before expiry, settled in cash, entry costs only): none was
+  profitable after costs in both halves of 2023 to 2026; only 10 of 39 had any
+  positive edge before costs. The best was a loss of about Rs 25 per lot.
+- **A 50-configuration model search** (before real prices were used) picked "skip
+  the day before expiry" as the one robust improvement: it beat rolling to next
+  week's expiry in every matched pair. It is kept (overnight algos now wait out
+  expiry eve) because it reduces trades that earn almost no decay, but it did not
+  make any algo profitable on real prices.
+- **Nifty futures held overnight** (buy at the close, sell at the next open), real
+  futures prices: profit factor 0.84 over 2023 to 2026 and 0.87 over 2018 to 2022.
+  Nifty's index history shows +0.10 percent a day overnight, but that is not a
+  tradable price: on the futures themselves the edge before costs was about Rs 218
+  per lot against about Rs 625 of costs.
+- **"Buy futures overnight on volatile days"** looked strong in 2023 to 2026
+  (profit factor 2.16 over 103 nights). It was one slice out of about a dozen, so it
+  was tested once, untuned, on 2018 to 2022 (307 nights, including the 2020 crash):
+  profit factor 0.93. It did not replicate.
+- **Morning-gap rules** (daily data, modelled prices): the opening gap and the
+  overnight US move do not predict the rest of the day (correlations -0.03 to -0.07,
+  hit rates 46 to 51 percent). Intraday option prices are not in the daily files, so
+  this one could not be checked on real option prices.
+
+### What this does not show
+
+- Only 2023 to October 2026 has real option prices here (940 days); earlier years
+  are model-only for options. Futures were checked back to 2018.
+- Prices are daily closes and opens. Opening prints of far-strike options can be
+  thin, entry at the close is an average, and stops and targets are not simulated.
+- Costs are assumptions (about a quarter point or one percent of premium per fill,
+  Rs 40 brokerage per lot, statutory charges), not your contract note.
+- A different kind of strategy (for example one that uses information the daily
+  files do not carry) is untested. "Nothing found" is not "nothing exists".
+- Nothing here places or tests a real order. The Upstox plug-in is OpenAlgo's own and
+  was not exercised.
+
+## Earlier model-based results (superseded, kept for the record)
+
+The sections below were written before real option prices were used. Their
+conclusions about which algos looked profitable are **superseded by the section
+above**. They remain because the reasoning about what the signals do and do not
+predict still stands.
 
 ## How it was tested
 

@@ -12,6 +12,7 @@ from blueprints import algos
 from limiter import limiter
 from services.algos import lab
 from services.algos.lab import History, HistoryUnavailable
+from services.algos.lab import load_history as real_load_history  # bound before any stubbing
 
 USER = "lab_api_user"
 
@@ -170,3 +171,28 @@ def test_downsample_keeps_the_first_and_last_points():
     out = lab.downsample(curve, 50)
     assert len(out) == 50 and out[0] == curve[0] and out[-1] == curve[-1]
     assert lab.downsample(curve[:10], 50) == curve[:10]
+
+
+def test_the_result_cache_is_bounded_however_many_different_runs_are_made(client):
+    for i in range(45):
+        day = f"2024-{1 + i % 6:02d}-{1 + i % 27:02d}"
+        run(
+            client,
+            start=day,
+            algo_id=("zen", "calm_condor", "mirror_zen")[i % 3],
+            gated=bool(i % 2),
+        )
+    assert len(algos._lab_cache) <= 32
+    assert len(algos._history_cache) <= 1
+
+
+def test_the_history_folder_never_holds_more_than_one_file_per_series(tmp_path):
+    import time as _time
+
+    def fetch(symbol):
+        return _frame(abs(hash(symbol)) % 100, 100, 0.01, days=30)
+
+    for _ in range(3):
+        real_load_history(tmp_path, fetch=fetch, now=lambda: _time.time() + 99 * 3600)
+    files = sorted(p.name for p in tmp_path.iterdir())
+    assert files == sorted(f"{name}.csv" for name in lab.SERIES), files  # no .tmp leftovers

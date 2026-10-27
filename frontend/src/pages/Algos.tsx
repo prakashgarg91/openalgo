@@ -82,7 +82,7 @@ function RegimeBanner({ names }: { names: Record<string, string> }) {
         {regime.isLoading && <p className="text-sm text-muted-foreground">Reading the market...</p>}
         {regime.isError && <p className="text-sm text-destructive">{errorText(regime.error)}</p>}
         {data && !data.reliable && (
-          <div className="space-y-2" role="status">
+          <output className="block space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400">
                 Not enough data
@@ -100,7 +100,7 @@ function RegimeBanner({ names }: { names: Record<string, string> }) {
                 No data for: {data.missing_labels.join(', ')}.
               </p>
             )}
-          </div>
+          </output>
         )}
         {data?.reliable && (
           <>
