@@ -10,6 +10,7 @@ Nothing here places an order: orders belong to ``services/strategy_module/``.
 from __future__ import annotations
 
 import os
+from datetime import date
 from typing import Any
 
 from flask import Blueprint, jsonify, request, session
@@ -17,7 +18,7 @@ from flask import Blueprint, jsonify, request, session
 from database import algo_db
 from database import strategy_module_db as sm_store
 from limiter import limiter
-from services.algos import runner
+from services.algos import lab, runner
 from services.algos.templates import ALGOS
 from services.algos.templates import coverage as coverage_matrix
 from utils.logging import get_logger
@@ -37,6 +38,13 @@ MAX_CAPITAL = 1_000_000_000
 #: Gathering the regime makes several outbound calls, so one snapshot is shared
 #: for a minute instead of being rebuilt on every page refresh.
 _regime_cache = LockedTTLCache(maxsize=8, ttl=60)
+
+#: Replays are CPU work and the first one downloads history, so they get a tighter
+#: limit than the rest of the page, and results are cached for a few minutes.
+_lab_limit = limiter.shared_limit("12 per minute", scope="algos_lab")
+_history_cache = LockedTTLCache(maxsize=1, ttl=3600)
+_lab_cache = LockedTTLCache(maxsize=32, ttl=600)
+LAB_FIRST_YEAR = 2015
 
 NOT_FOUND = "Algo not found"
 
@@ -162,6 +170,65 @@ def coverage():
     if not _user():
         return _error("Not authenticated", 401)
     return _ok({"data": coverage_matrix()})
+
+
+def _lab_date(value: Any, label: str) -> tuple[str | None, str | None]:
+    if value in (None, ""):
+        return None, None
+    if not isinstance(value, str):
+        return None, f"{label} must be a date like 2023-01-31"
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError:
+        return None, f"{label} must be a date like 2023-01-31"
+    if not (LAB_FIRST_YEAR <= parsed.year <= date.today().year):
+        return None, f"{label} must be between {LAB_FIRST_YEAR} and this year"
+    return parsed.isoformat(), None
+
+
+@algos_bp.route("/api/lab/run", methods=["POST"])
+@check_session_validity
+@_lab_limit
+def lab_run():
+    """Replay an algo over real history, with no broker. Nothing is traded or saved."""
+    if not _user():
+        return _error("Not authenticated", 401)
+    data, error = _body()
+    if error:
+        return error
+    algo_id = data.get("algo_id")
+    if algo_id not in ALGOS:
+        return _error("Unknown algo", 400)
+    model = data.get("model", "conservative")
+    if model not in lab.MODELS:
+        return _error("model must be standard or conservative", 400)
+    gated = data.get("gated", True)
+    if not isinstance(gated, bool):
+        return _error("gated must be true or false", 400)
+    start, message = _lab_date(data.get("start"), "start")
+    if message:
+        return _error(message, 400)
+    end, message = _lab_date(data.get("end"), "end")
+    if message:
+        return _error(message, 400)
+    if start and end and start > end:
+        return _error("start must be before end", 400)
+
+    key = (algo_id, model, gated, start, end)
+
+    def run():
+        history = _history_cache.get_or_load("history", lab.load_history)
+        result = lab.run_lab(history, algo_id, start=start, end=end, model=model, gated=gated)
+        return lab.to_payload(result, gated=gated)
+
+    try:
+        payload = _lab_cache.get_or_load(key, run)
+    except lab.HistoryUnavailable as exc:
+        return _error(str(exc), 503)
+    except Exception:
+        logger.exception("Lab run failed for %s", key)
+        return _error("The Lab could not finish this run. Nothing was changed. Try again.", 500)
+    return _ok({"data": payload})
 
 
 @algos_bp.route("/api/preview", methods=["POST"])

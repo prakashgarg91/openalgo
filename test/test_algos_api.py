@@ -260,7 +260,7 @@ def test_coverage_endpoint(client):
 def test_catalogue_exposes_evidence_and_status(client):
     items = {a["id"]: a for a in client.get("/algos/api/catalogue").get_json()["data"]}
     assert items["mirror_zen"]["status"] == "experimental"
-    assert "Indicative test" in items["zen"]["evidence"]
+    assert "real NSE option prices" in items["zen"]["evidence"]
 
 
 def test_catalogue_tells_the_page_when_each_algo_checks(client):

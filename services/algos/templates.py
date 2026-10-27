@@ -70,10 +70,11 @@ ALGOS: dict[str, AlgoSpec] = {
         allowed_labels=("calm", "trending"),
         min_confidence=MIN_CONFIDENCE,
         overnight=True,
+        status="experimental",
         evidence=(
-            "Indicative test on Nifty data from 2018 to 2026, using modelled option prices "
-            "and not real fills: 62% of nights won, profit factor about 1.5, worst night "
-            "about Rs 8,300 per lot. That period was mostly a rising market."
+            "Tested on real NSE option prices from 2023 to October 2026, after costs: lost "
+            "money. Profit factor 0.54 over 434 nights, and a loss in every year. Before "
+            "costs it earned about nothing, so costs decided the result."
         ),
     ),
     "mirror_zen": AlgoSpec(
@@ -89,9 +90,9 @@ ALGOS: dict[str, AlgoSpec] = {
         overnight=True,
         status="experimental",
         evidence=(
-            "Indicative test on Nifty data from 2018 to 2026 lost money: 42% of nights won, "
-            "profit factor about 0.8, deepest drawdown about Rs 1,06,000 per lot. Selling "
-            "calls against a rising market was the cause. Keep it in Sandbox mode."
+            "Tested on real NSE option prices from 2023 to October 2026, after costs: lost "
+            "money. Profit factor 0.62 over 221 nights. Before costs it earned about nothing. "
+            "Keep it in Sandbox mode."
         ),
     ),
     "morning_gap": AlgoSpec(
@@ -128,10 +129,12 @@ ALGOS: dict[str, AlgoSpec] = {
         allowed_labels=("calm",),
         min_confidence=0.6,
         overnight=True,
+        status="experimental",
         evidence=(
-            "Indicative test on Nifty data from 2018 to 2026, using modelled option prices: "
-            "60% of nights won and a very high profit factor. Modelled prices flatter a "
-            "premium-selling algo, so expect real results to be much lower."
+            "Tested on real NSE option prices from 2023 to October 2026, after costs: lost "
+            "money. Profit factor 0.26 over 213 nights, and a loss in every year. Before costs "
+            "it earned about nothing. An earlier model-based test showed a profit; real prices "
+            "did not confirm it."
         ),
     ),
 }

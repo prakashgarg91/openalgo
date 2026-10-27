@@ -151,10 +151,13 @@ def test_coverage_names_the_days_the_platform_stands_aside():
     assert cov["stands_aside_on"] == ["volatile", "event"]
 
 
-def test_every_algo_carries_evidence_and_mirror_zen_is_marked_experimental():
+def test_every_algo_carries_evidence_and_none_is_called_tested_without_a_profit():
+    # Real option prices (2023 to 2026) showed no net edge for any of them.
     assert all(spec.evidence for spec in ALGOS.values())
-    assert ALGOS["mirror_zen"].status == "experimental"
-    assert ALGOS["zen"].status == "tested" and ALGOS["calm_condor"].status == "tested"
+    assert all(spec.status == "experimental" for spec in ALGOS.values())
+    for algo in ("zen", "mirror_zen", "calm_condor"):
+        assert "real NSE option prices" in ALGOS[algo].evidence
+        assert "lost money" in ALGOS[algo].evidence
 
 
 def _gap(pct, **kw):

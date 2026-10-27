@@ -8,11 +8,15 @@ download can be stopped and resumed.
 Two formats exist: the old one until early July 2024 and the UDiFF one after. Both
 are normalised to: date, expiry, strike, kind, open, close, volume, oi.
 
+Set FETCH_KIND=futures to keep the Nifty index FUTURES rows instead (the same columns,
+with strike and kind empty), for testing overnight futures positions.
+
 Usage:
     uv run python scripts/algo_backtest/fetch_nse_options.py <history_dir> <out_dir> [start] [end]
 """
 
 import io
+import os
 import sys
 import time
 import zipfile
@@ -30,14 +34,19 @@ OLD = "https://nsearchives.nseindia.com/content/historical/DERIVATIVES/{d:%Y}/{m
 KEEP_DAYS = 45
 
 
+FUTURES = os.getenv("FETCH_KIND", "options") == "futures"
+
+
 def parse_new(frame: pd.DataFrame, day: pd.Timestamp) -> pd.DataFrame:
-    rows = frame[(frame["TckrSymb"] == "NIFTY") & (frame["FinInstrmTp"] == "IDO")]
+    rows = frame[
+        (frame["TckrSymb"] == "NIFTY") & (frame["FinInstrmTp"] == ("IDF" if FUTURES else "IDO"))
+    ]
     return pd.DataFrame(
         {
             "date": day,
             "expiry": pd.to_datetime(rows["XpryDt"]),
             "strike": rows["StrkPric"],
-            "kind": rows["OptnTp"].map({"CE": "CE", "PE": "PE"}),
+            "kind": rows["OptnTp"].map({"CE": "CE", "PE": "PE"}),  # empty for futures
             "open": rows["OpnPric"],
             "close": rows["ClsPric"],
             "volume": rows["TtlTradgVol"],
@@ -47,7 +56,9 @@ def parse_new(frame: pd.DataFrame, day: pd.Timestamp) -> pd.DataFrame:
 
 
 def parse_old(frame: pd.DataFrame, day: pd.Timestamp) -> pd.DataFrame:
-    rows = frame[(frame["INSTRUMENT"] == "OPTIDX") & (frame["SYMBOL"] == "NIFTY")]
+    rows = frame[
+        (frame["INSTRUMENT"] == ("FUTIDX" if FUTURES else "OPTIDX")) & (frame["SYMBOL"] == "NIFTY")
+    ]
     return pd.DataFrame(
         {
             "date": day,

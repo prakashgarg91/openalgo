@@ -629,6 +629,66 @@ def run_lab(
     )
 
 
+def caveats(model: Model, overnight: bool) -> list[str]:
+    """What a trader must read beside any Lab number, in plain words."""
+    notes = [
+        "This is a replay on daily prices with modelled option prices, not real fills. "
+        "Real results will differ.",
+        "Stops and targets are not simulated. Each trade is held until its exit time.",
+    ]
+    if model.name == "standard":
+        notes.append(
+            "The standard model flatters sellers of options: it lets an overnight position "
+            "earn a full day of time decay. Judge an algo on the conservative model."
+        )
+    else:
+        notes.append(
+            "Even the conservative model is not real option prices. Only a record of real "
+            "fills in Sandbox mode and then Live can show whether an algo makes money."
+        )
+    if overnight and model.name != "standard":
+        notes.append(
+            "How fast option prices fall overnight decides the result for overnight algos, "
+            "and daily index history cannot show it. Treat these numbers as a floor of "
+            "doubt, not a forecast."
+        )
+    return notes
+
+
+def downsample(curve: list[list[Any]], limit: int = 300) -> list[list[Any]]:
+    """At most ``limit`` points, always keeping the first and the last."""
+    if len(curve) <= limit:
+        return curve
+    step = (len(curve) - 1) / (limit - 1)
+    picked = [curve[round(i * step)] for i in range(limit)]
+    picked[-1] = curve[-1]
+    return picked
+
+
+def to_payload(
+    result: LabResult, *, gated: bool, max_points: int = 300, max_trades: int = 100
+) -> dict[str, Any]:
+    """The result in the shape the page shows, with its caveats attached."""
+    spec = ALGOS[result.algo_id]
+    model = MODELS[result.model]
+    return {
+        "algo_id": result.algo_id,
+        "algo_name": spec.name,
+        "model": {"name": model.name, "label": model.label},
+        "gated": gated,
+        "start": result.start,
+        "end": result.end,
+        "days": result.days,
+        "metrics": result.metrics,
+        "yearly": [{"year": y, **m} for y, m in result.yearly.items()],
+        "curve": downsample(result.curve, max_points),
+        "trades": result.trades[-max_trades:],
+        "skipped": [{"reason": k, "days": v} for k, v in result.skipped.items()],
+        "notes": result.notes,
+        "caveats": caveats(model, spec.overnight),
+    }
+
+
 __all__ = [
     "CONSERVATIVE",
     "MODELS",
@@ -637,8 +697,11 @@ __all__ = [
     "HistoryUnavailable",
     "LabResult",
     "Model",
+    "caveats",
+    "downsample",
     "load_history",
     "parse_chart",
+    "to_payload",
     "run_lab",
     "summarize",
     "trade_cost",
