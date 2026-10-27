@@ -300,3 +300,13 @@ def test_one_deployment_with_an_unknown_algo_does_not_stop_the_others_being_sche
         assert installed == 1
     finally:
         sm_scheduler.shutdown()
+
+
+def test_the_regime_dict_flags_a_reading_built_on_too_little_data():
+    from services.algos.context import RegimeResult
+
+    thin = RegimeResult("trending", "bullish", 0.4, 0.42, ("Cues point up",), ("vix", "gap_pct"))
+    d = runner.regime_to_dict(thin)
+    assert d["reliable"] is False
+    assert d["missing_labels"] == ["India VIX", "today's Nifty move"]
+    assert runner.regime_to_dict(_regime(confidence=0.9))["reliable"] is True

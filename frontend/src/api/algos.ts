@@ -20,6 +20,8 @@ export interface Regime {
   confidence: number
   reasons: string[]
   missing: string[]
+  missing_labels: string[]
+  reliable: boolean
 }
 
 export interface Plan {

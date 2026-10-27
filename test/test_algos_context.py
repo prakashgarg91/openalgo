@@ -83,3 +83,27 @@ def test_everything_missing_is_zero_confidence_calm_neutral():
 def test_reasons_explain_the_label():
     r = score_regime(_inputs(gap_pct=1.5))
     assert any("gap" in s.lower() for s in r.reasons)
+
+
+def test_missing_data_is_named_in_words_a_trader_reads_not_in_variable_names():
+    r = score_regime(MarketInputs(sp500_pct=0.1))
+    text = " ".join(r.reasons)
+    for internal in ("gap_pct", "vix_change_pct", "nifty_vs_ma20_pct", "sp500_pct"):
+        assert internal not in text
+    assert "India VIX" in text and "Nifty trend" in text
+
+
+def test_every_input_has_a_readable_name():
+    from services.algos.context import INPUT_LABELS
+
+    assert set(INPUT_LABELS) >= {
+        "gap_pct",
+        "sp500_pct",
+        "nasdaq_pct",
+        "crude_pct",
+        "dxy_pct",
+        "vix",
+        "vix_change_pct",
+        "nifty_vs_ma20_pct",
+    }
+    assert all(label and "_" not in label for label in INPUT_LABELS.values())

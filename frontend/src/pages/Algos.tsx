@@ -49,7 +49,7 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Please try again.'
 }
 
-function RegimeBanner() {
+function RegimeBanner({ names }: { names: Record<string, string> }) {
   const regime = useQuery({
     queryKey: algoQueryKeys.regime(),
     queryFn: fetchRegime,
@@ -81,7 +81,28 @@ function RegimeBanner() {
       <CardContent className="space-y-3">
         {regime.isLoading && <p className="text-sm text-muted-foreground">Reading the market...</p>}
         {regime.isError && <p className="text-sm text-destructive">{errorText(regime.error)}</p>}
-        {data && (
+        {data && !data.reliable && (
+          <div className="space-y-2" role="status">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                Not enough data
+              </Badge>
+              <Badge variant="outline">
+                {Math.round(data.confidence * 100)}% of market data available
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              There is too little market data to say what kind of day this is, so the algos stand
+              aside until there is more. Check that your broker is connected, then refresh.
+            </p>
+            {data.missing_labels.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                No data for: {data.missing_labels.join(', ')}.
+              </p>
+            )}
+          </div>
+        )}
+        {data?.reliable && (
           <>
             <div className="flex flex-wrap items-center gap-2">
               <Badge className={cn('border-transparent', REGIME_TONE[data.label])}>
@@ -108,7 +129,9 @@ function RegimeBanner() {
                 <div className="font-medium">{REGIME_COPY[label]}</div>
                 <div className="text-muted-foreground">
                   {coverage.data.regimes[label].length
-                    ? coverage.data.regimes[label].join(', ').replaceAll('_', ' ')
+                    ? coverage.data.regimes[label]
+                        .map((id) => names[id] ?? id.replaceAll('_', ' '))
+                        .join(', ')
                     : 'Stands aside'}
                 </div>
               </div>
@@ -393,7 +416,7 @@ export default function Algos() {
         </p>
       </div>
 
-      <RegimeBanner />
+      <RegimeBanner names={Object.fromEntries((catalogue.data ?? []).map((a) => [a.id, a.name]))} />
 
       {catalogue.isLoading && <p className="text-sm text-muted-foreground">Loading algos...</p>}
       {catalogue.isError && (

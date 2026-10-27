@@ -83,6 +83,8 @@ beforeEach(() => {
     confidence: 0.9,
     reasons: ['No large gap'],
     missing: [],
+    missing_labels: [],
+    reliable: true,
   })
   api.fetchCoverage.mockResolvedValue({
     regimes: { calm: ['zen'], trending: ['zen'], volatile: [], event: [] },
@@ -155,6 +157,42 @@ describe('Algos page', () => {
     api.fetchCatalogue.mockResolvedValue([algo(deployment())])
     renderPage()
     expect(await screen.findByText(/exits at 09:45 the next morning/)).toBeTruthy()
+  })
+
+  it('refuses to name the market when too little data is available, in words a trader reads', async () => {
+    api.fetchRegime.mockResolvedValue({
+      label: 'trending',
+      bias: 'bullish',
+      score: 0.4,
+      confidence: 0.42,
+      reasons: ['Cues point up'],
+      missing: ['vix', 'gap_pct'],
+      missing_labels: ['India VIX', "today's Nifty move"],
+      reliable: false,
+    })
+    api.fetchCatalogue.mockResolvedValue([algo(null)])
+    renderPage()
+    expect(await screen.findByText('Not enough data')).toBeTruthy()
+    expect(screen.getByText(/stand aside until there is more/)).toBeTruthy()
+    expect(screen.getByText(/No data for: India VIX, today's Nifty move/)).toBeTruthy()
+    expect(screen.queryByText(/Bullish lean/i)).toBeNull()
+    expect(screen.queryByText('Cues point up')).toBeNull()
+    expect(document.body.textContent).not.toMatch(/gap_pct|vix_change|nifty_vs_ma20/)
+  })
+
+  it('shows algo names, not ids, in the coverage row', async () => {
+    api.fetchCoverage.mockResolvedValue({
+      regimes: { calm: ['calm_condor'], trending: ['mirror_zen'], volatile: [], event: [] },
+      stands_aside_on: ['volatile', 'event'],
+    })
+    api.fetchCatalogue.mockResolvedValue([
+      { ...algo(null), id: 'calm_condor', name: 'Calm Condor' },
+      { ...algo(null), id: 'mirror_zen', name: 'Mirror Zen' },
+    ])
+    renderPage()
+    expect(await screen.findByText('No large gap')).toBeTruthy()
+    expect(await screen.findAllByText(/Calm Condor/)).not.toHaveLength(0)
+    expect(document.body.textContent).not.toMatch(/calm_condor|mirror_zen/)
   })
 
   it("shows the algo's own check time, not a fixed one", async () => {

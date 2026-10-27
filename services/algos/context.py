@@ -26,6 +26,22 @@ _CUE_CLIP = 2.0
 _BIAS_EDGE = 0.15
 _TREND_SCORE = 0.30
 
+#: Names a trader reads. The internal field names never reach a screen.
+INPUT_LABELS = {
+    "gap_pct": "today's Nifty move",
+    "sp500_pct": "S&P 500",
+    "nasdaq_pct": "Nasdaq",
+    "crude_pct": "crude oil",
+    "dxy_pct": "dollar index",
+    "vix": "India VIX",
+    "vix_change_pct": "India VIX change",
+    "nifty_vs_ma20_pct": "Nifty trend",
+    "open_gap_pct": "opening gap",
+}
+
+#: Below this share of inputs the label is a guess and is not presented as a reading.
+RELIABLE_CONFIDENCE = 0.5
+
 EVENT_GAP_PCT = 1.2
 EVENT_VIX = 28.0
 VOLATILE_VIX = 20.0
@@ -134,7 +150,9 @@ def score_regime(inputs: MarketInputs) -> RegimeResult:
         reasons.append("No large gap, no volatility spike and mixed or flat global cues")
 
     if missing:
-        reasons.append("Missing inputs: " + ", ".join(missing))
+        reasons.append(
+            "No data for: " + ", ".join(INPUT_LABELS.get(name, name) for name in missing)
+        )
 
     return RegimeResult(
         label=label,

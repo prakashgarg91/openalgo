@@ -16,7 +16,12 @@ from typing import Any
 from database import algo_db
 from database import strategy_module_db as sm_store
 from services.algos import inputs as feed
-from services.algos.context import RegimeResult, score_regime
+from services.algos.context import (
+    INPUT_LABELS,
+    RELIABLE_CONFIDENCE,
+    RegimeResult,
+    score_regime,
+)
 from services.algos.templates import ALGOS, PLACEHOLDER_INPUTS, Plan, build
 from utils.db_sessions import releases_scoped_sessions
 from utils.logging import get_logger
@@ -47,6 +52,9 @@ def regime_to_dict(regime: RegimeResult) -> dict[str, Any]:
         "confidence": regime.confidence,
         "reasons": list(regime.reasons),
         "missing": list(regime.missing),
+        "missing_labels": [INPUT_LABELS.get(name, name) for name in regime.missing],
+        # Below half the inputs the label is a guess, and the page says so.
+        "reliable": regime.confidence >= RELIABLE_CONFIDENCE,
     }
 
 
