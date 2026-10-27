@@ -620,6 +620,12 @@ def react_admin_remote_mcp():
     return serve_react_app()
 
 
+# Algos - regime-aware algo catalogue (Zen, Mirror Zen, Calm Condor)
+@react_bp.route("/algos", strict_slashes=False)
+def react_algos():
+    return serve_react_app()
+
+
 # Leverage Configuration (Crypto)
 @react_bp.route("/leverage", strict_slashes=False)
 def react_leverage():
