@@ -81,14 +81,33 @@ is within 1 day), lots from capital and margin per lot.
   action.
 - No profit figure is ever shown without a Sandbox track record behind it.
 
-## Open items to verify while building
+## Open items (status after day 2)
 
-1. Overnight runs: confirm the scheduler start and stop jobs across the
-   day boundary (entry 15:05 day D, stop 09:45 day D+1, Friday to Monday).
-2. Percent risk units on short legs: confirm the engine reads the sl and target
-   percent against entry premium for a short position.
-3. GIFT Nifty and US index availability on Upstox. The public feed is the
-   fallback and is isolated in `inputs.py`.
+1. Overnight runs: resolved. The engine cannot save an overnight start and stop
+   pair (the validators require start before stop). So the strategy is
+   positional with no `entry_time`, and its `exit_time` of 09:45 installs a
+   weekday square-off job with no scheduler config (pinned by a test). The
+   entry is owned by `services/algos/runner.py`: a 15:05 weekday cron job on the
+   strategy scheduler re-scores the market on fresh data, rewrites the legs for
+   the chosen side and lots, and starts a normal run.
+2. Percent risk units on short legs: resolved by reading
+   `services/strategy_module/risk_adapter.py`. A percent is a percent of the
+   entry price, so a 30 percent stop on a short leg sits 30 percent above the
+   sold premium.
+3. GIFT Nifty and US index availability on Upstox: still open. The Zen entry
+   at 15:05 uses Nifty's move since the previous close, so GIFT Nifty is not
+   needed for these two algos; it matters for morning-entry algos. US indices,
+   crude and the dollar index come from the public feed in `inputs.py`.
+4. Upstox token expiry: an overnight position needs a fresh Upstox login before
+   the 09:45 exit, because broker tokens expire around 3 AM. The page must say
+   so before a Live start.
+
+## Safety additions made while building
+
+- Going Live needs `confirm_max_loss` equal to the worst-case rupee loss shown.
+- A deployment never starts a second run while the previous position is open.
+- A market holiday, a missing API key, a missing lot size and an engine refusal
+  are each recorded as a plain-language decision, never raised.
 
 ## Testing
 

@@ -201,3 +201,21 @@ def test_boot_time_sync_releases_its_database_session():
     algo_db.db_session.remove()
     runner.sync_all_jobs()
     assert algo_db.db_session.registry.has() is False
+
+
+def test_a_deployed_algo_gets_the_0945_weekday_square_off_job():
+    """The overnight exit rests on exit_time alone, with no scheduler config."""
+    sm_scheduler.start(paused=True)
+    try:
+        dep = _deploy(active=False)
+        installed = sm_scheduler.sync_strategy_jobs(dep["strategy_id"])
+        stop_id = sm_scheduler.stop_job_id(dep["strategy_id"])
+        assert stop_id in installed
+        job = sm_scheduler.get_scheduler().get_job(stop_id)
+        fields = {f.name: str(f) for f in job.trigger.fields}
+        assert fields["hour"] == "9" and fields["minute"] == "45"
+        assert fields["day_of_week"] == "mon,tue,wed,thu,fri"
+        assert sm_scheduler.start_job_id(dep["strategy_id"]) not in installed
+    finally:
+        sm_scheduler.remove_strategy_jobs(dep["strategy_id"])
+        sm_scheduler.shutdown()
