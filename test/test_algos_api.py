@@ -255,3 +255,9 @@ def test_live_is_allowed_after_a_profitable_sandbox_record(client, monkeypatch):
 def test_coverage_endpoint(client):
     body = client.get("/algos/api/coverage").get_json()["data"]
     assert body["stands_aside_on"] == ["volatile", "event"]
+
+
+def test_catalogue_exposes_evidence_and_status(client):
+    items = {a["id"]: a for a in client.get("/algos/api/catalogue").get_json()["data"]}
+    assert items["mirror_zen"]["status"] == "experimental"
+    assert "Indicative test" in items["zen"]["evidence"]

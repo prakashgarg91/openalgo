@@ -31,6 +31,11 @@ class AlgoSpec:
     allowed_labels: tuple[str, ...]
     min_confidence: float
     overnight: bool
+    #: "tested" or "experimental". Experimental means the indicative test below
+    #: lost money, and the catalogue says so on the card.
+    status: str = "tested"
+    #: One plain sentence of what an indicative test of the rules found.
+    evidence: str = ""
 
 
 @dataclass(frozen=True)
@@ -57,6 +62,11 @@ ALGOS: dict[str, AlgoSpec] = {
         allowed_labels=("calm", "trending"),
         min_confidence=MIN_CONFIDENCE,
         overnight=True,
+        evidence=(
+            "Indicative test on Nifty data from 2018 to 2026, using modelled option prices "
+            "and not real fills: 62% of nights won, profit factor about 1.5, worst night "
+            "about Rs 8,300 per lot. That period was mostly a rising market."
+        ),
     ),
     "mirror_zen": AlgoSpec(
         id="mirror_zen",
@@ -69,6 +79,12 @@ ALGOS: dict[str, AlgoSpec] = {
         allowed_labels=("trending",),
         min_confidence=0.6,
         overnight=True,
+        status="experimental",
+        evidence=(
+            "Indicative test on Nifty data from 2018 to 2026 lost money: 42% of nights won, "
+            "profit factor about 0.8, deepest drawdown about Rs 1,06,000 per lot. Selling "
+            "calls against a rising market was the cause. Keep it in Sandbox mode."
+        ),
     ),
     "calm_condor": AlgoSpec(
         id="calm_condor",
@@ -83,6 +99,11 @@ ALGOS: dict[str, AlgoSpec] = {
         allowed_labels=("calm",),
         min_confidence=0.6,
         overnight=True,
+        evidence=(
+            "Indicative test on Nifty data from 2018 to 2026, using modelled option prices: "
+            "60% of nights won and a very high profit factor. Modelled prices flatter a "
+            "premium-selling algo, so expect real results to be much lower."
+        ),
     ),
 }
 

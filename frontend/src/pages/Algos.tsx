@@ -399,11 +399,22 @@ export default function Algos() {
               <Badge variant="outline" className="capitalize">
                 {algo.risk} risk
               </Badge>
+              {algo.status === 'experimental' && <Badge variant="destructive">Experimental</Badge>}
               <Badge variant="outline">
                 Trades on: {algo.allowed_regimes.map((label) => REGIME_COPY[label]).join(', ')}
               </Badge>
             </div>
             <CardDescription>{algo.summary}</CardDescription>
+            {algo.evidence && (
+              <p
+                className={cn(
+                  'text-sm',
+                  algo.status === 'experimental' ? 'text-destructive' : 'text-muted-foreground'
+                )}
+              >
+                {algo.evidence}
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             {algo.deployment ? (

@@ -79,6 +79,8 @@ export interface AlgoItem {
   risk: 'low' | 'medium' | 'high'
   allowed_regimes: RegimeLabel[]
   overnight: boolean
+  status: 'tested' | 'experimental'
+  evidence: string
   deployment: Deployment | null
 }
 

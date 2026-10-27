@@ -58,6 +58,8 @@ function algo(deployed: Deployment | null): AlgoItem {
     risk: 'medium',
     allowed_regimes: ['calm', 'trending'],
     overnight: true,
+    status: 'tested',
+    evidence: 'Indicative test on Nifty data.',
     deployment: deployed,
   }
 }
@@ -137,6 +139,15 @@ describe('Algos page', () => {
     })
     fireEvent.click(confirm)
     await waitFor(() => expect(api.setAlgoLive).toHaveBeenCalledWith(1, true, 45000))
+  })
+
+  it('marks an experimental algo and shows its evidence', async () => {
+    api.fetchCatalogue.mockResolvedValue([
+      { ...algo(null), status: 'experimental', evidence: 'Lost money in the test.' },
+    ])
+    renderPage()
+    expect(await screen.findByText('Experimental')).toBeTruthy()
+    expect(screen.getByText('Lost money in the test.')).toBeTruthy()
   })
 
   it('warns about the next-morning exit for an overnight algo', async () => {

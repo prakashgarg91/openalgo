@@ -142,3 +142,9 @@ def test_coverage_names_the_days_the_platform_stands_aside():
     assert "mirror_zen" in cov["regimes"]["trending"]
     assert cov["regimes"]["volatile"] == [] and cov["regimes"]["event"] == []
     assert cov["stands_aside_on"] == ["volatile", "event"]
+
+
+def test_every_algo_carries_evidence_and_mirror_zen_is_marked_experimental():
+    assert all(spec.evidence for spec in ALGOS.values())
+    assert ALGOS["mirror_zen"].status == "experimental"
+    assert ALGOS["zen"].status == "tested" and ALGOS["calm_condor"].status == "tested"
