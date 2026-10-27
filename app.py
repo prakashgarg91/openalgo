@@ -50,6 +50,7 @@ from flask_wtf.csrf import CSRFProtect  # Import CSRF protection
 from blueprints.admin import admin_bp  # Import the admin blueprint
 from blueprints.agent import agent_bp  # Import the agent blueprint
 from blueprints.alerts import alerts_bp  # Import the chart alert log blueprint
+from blueprints.algos import algos_bp  # Regime-aware algo catalogue (Zen, Mirror Zen)
 from blueprints.analyzer import analyzer_bp  # Import the analyzer blueprint
 from blueprints.apikey import api_key_bp
 from blueprints.arbitrage import arbitrage_bp  # Import the Arbitrage blueprint
@@ -120,6 +121,7 @@ from csp import apply_csp_middleware  # Import the CSP middleware
 from database.action_center_db import init_db as ensure_action_center_tables_exists
 from database.agent_db import init_db as ensure_agent_tables_exists
 from database.alert_log_db import init_db as ensure_alert_log_tables_exists
+from database.algo_db import init_db as ensure_algo_tables_exists
 from database.analyzer_db import init_db as ensure_analyzer_tables_exists
 from database.apilog_db import init_db as ensure_api_log_tables_exists
 from database.apscheduler_jobstore_db import ensure_jobstore_tables_exist
@@ -133,7 +135,6 @@ from database.sandbox_db import init_db as ensure_sandbox_tables_exists
 from database.scalping_db import init_db as ensure_scalping_tables_exists
 from database.settings_db import init_db as ensure_settings_tables_exists
 from database.strategy_module_db import init_db as ensure_strategy_module_tables_exists
-from database.algo_db import init_db as ensure_algo_tables_exists
 from database.symbol import init_db as ensure_master_contract_tables_exists
 from database.telegram_db import get_bot_config
 from database.traffic_db import init_logs_db as ensure_traffic_logs_exists
@@ -317,6 +318,7 @@ def create_app():
     app.register_blueprint(leverage_bp)  # Register Leverage blueprint
     app.register_blueprint(health_bp)  # Register Health monitoring blueprint
     app.register_blueprint(strategy_module_bp)  # Register Strategy Module blueprint
+    app.register_blueprint(algos_bp)  # Register Algo Catalogue blueprint
     app.register_blueprint(master_contract_status_bp)
     app.register_blueprint(websocket_bp)  # Register WebSocket example blueprint
     app.register_blueprint(chart_test_bp)  # Register standalone chart test page (dev/testing only)

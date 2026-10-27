@@ -194,3 +194,10 @@ def test_entry_job_is_installed_for_active_and_removed_for_stopped():
         assert sm_scheduler.get_scheduler().get_job(runner.job_id(dep["id"])) is None
     finally:
         sm_scheduler.shutdown()
+
+
+def test_boot_time_sync_releases_its_database_session():
+    """sync_all_jobs runs on the boot thread, where no request teardown fires."""
+    algo_db.db_session.remove()
+    runner.sync_all_jobs()
+    assert algo_db.db_session.registry.has() is False

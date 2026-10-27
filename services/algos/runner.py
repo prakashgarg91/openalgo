@@ -119,6 +119,20 @@ def _is_holiday(day: date) -> bool:
         return False
 
 
+def max_loss_ceiling(algo_id: str, capital: float) -> float | None:
+    """The worst-case rupee loss this algo can be sized to at this capital.
+
+    Shown to the trader before Live and typed back to confirm. It comes from the
+    same sizing rule the entry uses, so the number they confirm is the one the
+    algo will not exceed.
+    """
+    lot = nifty_lot_size()
+    if lot is None or algo_id not in ALGOS:
+        return None
+    plan = build(algo_id, _PLACEHOLDER_REGIME, capital=capital, lot_size=lot, days_to_expiry=4)
+    return plan.max_loss_inr
+
+
 def preview(
     algo_id: str, capital: float, api_key: str, *, max_loss_pct: float | None = None
 ) -> dict[str, Any]:
@@ -372,8 +386,13 @@ def remove_job(deployment_id: int) -> None:
         pass
 
 
+@releases_scoped_sessions
 def sync_all_jobs() -> int:
-    """Rebuild every entry job from the database. Called once after the scheduler starts."""
+    """Rebuild every entry job from the database. Called once after the scheduler starts.
+
+    Runs on the boot thread, where no request teardown fires, so it releases
+    its own sessions.
+    """
     count = 0
     for dep in algo_db.list_deployments(active_only=True):
         if sync_job(dep["id"]):
