@@ -19,6 +19,7 @@ from database import strategy_module_db as sm_store
 from limiter import limiter
 from services.algos import runner
 from services.algos.templates import ALGOS
+from services.algos.templates import coverage as coverage_matrix
 from utils.logging import get_logger
 from utils.session import check_session_validity
 from utils.thread_safe_cache import LockedTTLCache
@@ -92,6 +93,7 @@ def _deployment_view(dep: dict, *, decisions: int = 5) -> dict[str, Any]:
     view["position_open"] = bool(row and row.status == "running")
     view["max_loss_ceiling_inr"] = runner.max_loss_ceiling(dep["algo_id"], dep["capital"])
     view["recent_decisions"] = algo_db.list_decisions(dep["id"], decisions)
+    view["live_gate"] = runner.live_gate(dep["strategy_id"])
     return view
 
 
@@ -147,6 +149,16 @@ def regime():
         return runner.regime_to_dict(result)
 
     return _ok({"data": _regime_cache.get_or_load(user, load)})
+
+
+@algos_bp.route("/api/coverage", methods=["GET"])
+@check_session_validity
+@_api_limit
+def coverage():
+    """Which algos trade in which regimes, and the days the platform stands aside."""
+    if not _user():
+        return _error("Not authenticated", 401)
+    return _ok({"data": coverage_matrix()})
 
 
 @algos_bp.route("/api/preview", methods=["POST"])
@@ -255,6 +267,9 @@ def set_live(deployment_id):
         return _error("Wait for the open position to close before changing the mode.", 409)
 
     if enabled:
+        gate = runner.live_gate(dep["strategy_id"])
+        if not gate["allowed"]:
+            return _error(gate["reason"], 403, {"live_gate": gate})
         ceiling = runner.max_loss_ceiling(dep["algo_id"], dep["capital"])
         confirm = data.get("confirm_max_loss")
         if ceiling is None:

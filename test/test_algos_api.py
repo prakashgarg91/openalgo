@@ -37,6 +37,7 @@ def stubs(monkeypatch):
     monkeypatch.setattr(runner, "_sync_strategy_jobs", lambda *a, **k: None)
     monkeypatch.setattr(runner, "sync_job", lambda *a, **k: True)
     monkeypatch.setattr(runner, "remove_job", lambda *a, **k: None)
+    monkeypatch.setenv("ALGO_LIVE_MIN_SANDBOX_RUNS", "0")
     algos._regime_cache.clear()
     _wipe()
     yield
@@ -92,7 +93,7 @@ def test_logged_out_is_refused(app):
 
 def test_catalogue_lists_both_algos_undeployed(client):
     body = client.get("/algos/api/catalogue").get_json()
-    assert [a["id"] for a in body["data"]] == ["zen", "mirror_zen"]
+    assert [a["id"] for a in body["data"]] == ["zen", "mirror_zen", "calm_condor"]
     assert all(a["deployment"] is None for a in body["data"])
 
 
@@ -203,3 +204,54 @@ def test_remove_deletes_the_algo(client):
     dep_id = _deploy(client).get_json()["data"]["id"]
     assert client.delete(f"/algos/api/deployments/{dep_id}").status_code == 200
     assert client.get(f"/algos/api/deployments/{dep_id}").status_code == 404
+
+
+def _closed_run(strategy_id, pnl):
+    from datetime import UTC
+    from datetime import datetime as dt
+
+    now = dt.now(UTC).replace(tzinfo=None)
+    run = sm_store.SmStrategyRun(
+        strategy_id=strategy_id, mode="sandbox", started_at=now, stopped_at=now, pnl_realized=pnl
+    )
+    sm_store.db_session.add(run)
+    sm_store.db_session.commit()
+
+
+def _go_live(client, dep_id):
+    return client.post(
+        f"/algos/api/deployments/{dep_id}/live", json={"enabled": True, "confirm_max_loss": CEILING}
+    )
+
+
+def test_live_is_refused_without_a_sandbox_record(client, monkeypatch):
+    monkeypatch.setenv("ALGO_LIVE_MIN_SANDBOX_RUNS", "3")
+    dep = _deploy(client).get_json()["data"]
+    assert dep["live_gate"]["allowed"] is False
+    r = _go_live(client, dep["id"])
+    assert r.status_code == 403 and "Sandbox" in r.get_json()["message"]
+    assert algo_db.get_deployment(dep["id"])["mode"] == "sandbox"
+
+
+def test_live_is_refused_when_the_sandbox_record_loses_money(client, monkeypatch):
+    monkeypatch.setenv("ALGO_LIVE_MIN_SANDBOX_RUNS", "3")
+    dep = _deploy(client).get_json()["data"]
+    for pnl in (500, -900, 100):
+        _closed_run(dep["strategy_id"], pnl)
+    r = _go_live(client, dep["id"])
+    assert r.status_code == 403 and "not profitable" in r.get_json()["message"]
+
+
+def test_live_is_allowed_after_a_profitable_sandbox_record(client, monkeypatch):
+    monkeypatch.setenv("ALGO_LIVE_MIN_SANDBOX_RUNS", "3")
+    dep = _deploy(client).get_json()["data"]
+    for pnl in (500, -200, 900):
+        _closed_run(dep["strategy_id"], pnl)
+    r = _go_live(client, dep["id"])
+    assert r.status_code == 200 and r.get_json()["data"]["mode"] == "live"
+    assert r.get_json()["data"]["live_gate"]["record"]["runs"] == 3
+
+
+def test_coverage_endpoint(client):
+    body = client.get("/algos/api/coverage").get_json()["data"]
+    assert body["stands_aside_on"] == ["volatile", "event"]

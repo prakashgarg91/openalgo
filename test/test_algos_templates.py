@@ -112,3 +112,33 @@ def test_every_emitted_config_passes_the_engine_validator(algo, bias):
     config, error = validate_strategy_config(plan.config)
     assert error is None, error
     assert config["strategy_type"] == "positional"
+
+
+def test_calm_condor_is_a_four_leg_overnight_condor_on_calm_days_only():
+    plan = build("calm_condor", _regime("calm", "neutral", 0.9), **KW)
+    assert plan.action == "trade" and plan.side == "iron_condor"
+    legs = plan.config["legs"]
+    assert [leg["position"] for leg in legs] == ["B", "B", "S", "S"]
+    assert {leg["option_type"] for leg in legs if leg["position"] == "S"} == {"CE", "PE"}
+    assert all("sl_pts" not in leg for leg in legs if leg["position"] == "B")
+    assert plan.config["strategy_type"] == "positional" and plan.config["exit_time"] == "09:45"
+    assert plan.max_loss_inr == plan.lots * 75 * 150
+    for label in ("trending", "volatile", "event"):
+        assert build("calm_condor", _regime(label, "neutral", 0.9), **KW).action == "skip"
+    assert build("calm_condor", _regime("calm", "neutral", 0.55), **KW).action == "skip"
+
+
+def test_calm_condor_passes_the_engine_validator():
+    plan = build("calm_condor", _regime("calm", "neutral", 0.9), **KW)
+    config, error = validate_strategy_config(plan.config)
+    assert error is None, error
+
+
+def test_coverage_names_the_days_the_platform_stands_aside():
+    from services.algos.templates import coverage
+
+    cov = coverage()
+    assert "calm_condor" in cov["regimes"]["calm"] and "zen" in cov["regimes"]["calm"]
+    assert "mirror_zen" in cov["regimes"]["trending"]
+    assert cov["regimes"]["volatile"] == [] and cov["regimes"]["event"] == []
+    assert cov["stands_aside_on"] == ["volatile", "event"]

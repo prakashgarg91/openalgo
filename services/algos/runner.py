@@ -9,6 +9,7 @@ strategy and starts a normal run.
 
 from __future__ import annotations
 
+import os
 from datetime import date, datetime
 from typing import Any
 
@@ -117,6 +118,79 @@ def _is_holiday(day: date) -> bool:
     except Exception:
         logger.exception("Could not check the market calendar")
         return False
+
+
+def _min_sandbox_runs() -> int:
+    """Closed Sandbox runs needed before Live. 0 turns the gate off."""
+    try:
+        return max(0, int(os.getenv("ALGO_LIVE_MIN_SANDBOX_RUNS", "10")))
+    except ValueError:
+        return 10
+
+
+def track_record(strategy_id: int) -> dict[str, Any]:
+    """What this strategy has actually done in Sandbox, from its closed runs."""
+    try:
+        rows = (
+            sm_store.db_session.query(sm_store.SmStrategyRun)
+            .filter(
+                sm_store.SmStrategyRun.strategy_id == strategy_id,
+                sm_store.SmStrategyRun.mode == "sandbox",
+                sm_store.SmStrategyRun.stopped_at.isnot(None),
+            )
+            .all()
+        )
+    except Exception:
+        logger.exception("Could not read the track record for strategy %s", strategy_id)
+        return {"runs": 0, "wins": 0, "net_pnl": 0.0, "worst_run": 0.0, "available": False}
+    pnls = [float(r.pnl_realized or 0) for r in rows]
+    return {
+        "runs": len(pnls),
+        "wins": sum(1 for p in pnls if p > 0),
+        "net_pnl": round(sum(pnls), 2),
+        "worst_run": round(min(pnls), 2) if pnls else 0.0,
+        "available": True,
+    }
+
+
+def live_gate(strategy_id: int) -> dict[str, Any]:
+    """Whether this algo has earned Live, with the reason in plain words.
+
+    Needs enough closed Sandbox runs and a positive net result. Sandbox fills
+    are idealised, so this is a floor and never a promise of Live profit.
+    """
+    record = track_record(strategy_id)
+    needed = _min_sandbox_runs()
+    if needed == 0:
+        return {"allowed": True, "needed_runs": 0, "reason": "", "record": record}
+    if not record["available"]:
+        return {
+            "allowed": False,
+            "needed_runs": needed,
+            "reason": "The Sandbox record could not be read. Try again shortly.",
+            "record": record,
+        }
+    if record["runs"] < needed:
+        return {
+            "allowed": False,
+            "needed_runs": needed,
+            "reason": (
+                f"Run this algo in Sandbox for {needed} trades first. "
+                f"It has completed {record['runs']} so far."
+            ),
+            "record": record,
+        }
+    if record["net_pnl"] <= 0:
+        return {
+            "allowed": False,
+            "needed_runs": needed,
+            "reason": (
+                f"The Sandbox record is not profitable yet "
+                f"(net {record['net_pnl']:,.0f} rupees over {record['runs']} trades)."
+            ),
+            "record": record,
+        }
+    return {"allowed": True, "needed_runs": needed, "reason": "", "record": record}
 
 
 def max_loss_ceiling(algo_id: str, capital: float) -> float | None:

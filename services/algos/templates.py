@@ -41,7 +41,7 @@ class Plan:
     config: dict[str, Any] | None
     lots: int
     max_loss_inr: float | None
-    side: str | None  # bull_put | bear_call
+    side: str | None  # bull_put | bear_call | iron_condor
 
 
 ALGOS: dict[str, AlgoSpec] = {
@@ -67,6 +67,20 @@ ALGOS: dict[str, AlgoSpec] = {
         ),
         risk="medium",
         allowed_labels=("trending",),
+        min_confidence=0.6,
+        overnight=True,
+    ),
+    "calm_condor": AlgoSpec(
+        id="calm_condor",
+        name="Calm Condor",
+        summary=(
+            "Overnight iron condor on Nifty for quiet markets: sells both sides near the "
+            "money and buys protection further out, to collect premium while the market "
+            "drifts. Runs only on calm days, and stands aside the moment markets get "
+            "directional or nervous. Exits next morning at 09:45."
+        ),
+        risk="medium",
+        allowed_labels=("calm",),
         min_confidence=0.6,
         overnight=True,
     ),
@@ -117,6 +131,48 @@ def _spread_config(name: str, side: str, lots: int, expiry: str) -> dict[str, An
     }
 
 
+CONDOR_SHORT_OFFSET = "OTM2"
+CONDOR_LONG_OFFSET = "OTM5"
+CONDOR_SL_PCT = 50
+CONDOR_TARGET_PCT = 70
+
+
+def _condor_config(name: str, lots: int, expiry: str) -> dict[str, Any]:
+    def leg(leg_id: int, position: str, option_type: str, offset: str, **risk: Any):
+        return {
+            "id": leg_id,
+            "segment": "options",
+            "position": position,
+            "lots": lots,
+            "option_type": option_type,
+            "strike_mode": "atm",
+            "atm_offset": offset,
+            "expiry": expiry,
+            **risk,
+        }
+
+    short_risk = {"sl_pts": CONDOR_SL_PCT, "target_pts": CONDOR_TARGET_PCT, "risk_unit": "percent"}
+    return {
+        "name": name,
+        "strategy_kind": "batch",
+        "universe_tab": "weekly_monthly",
+        "underlying": "NIFTY",
+        "underlying_exchange": "NSE_INDEX",
+        "strategy_type": "positional",
+        "entry_time": None,
+        "exit_time": "09:45",
+        "product": "NRML",
+        "pricetype": "MARKET",
+        # Both protective legs first, so neither short sits naked.
+        "legs": [
+            leg(1, "B", "PE", CONDOR_LONG_OFFSET),
+            leg(2, "B", "CE", CONDOR_LONG_OFFSET),
+            leg(3, "S", "PE", CONDOR_SHORT_OFFSET, **short_risk),
+            leg(4, "S", "CE", CONDOR_SHORT_OFFSET, **short_risk),
+        ],
+    }
+
+
 def _skip(algo_id: str, reason: str) -> Plan:
     return Plan(algo_id, "skip", reason, None, 0, None, None)
 
@@ -146,8 +202,11 @@ def build(
             f"available, {spec.name} needs {spec.min_confidence:.0%}).",
         )
 
-    zen_side = _zen_side(regime.bias)
-    side = zen_side if algo_id == "zen" else _opposite(zen_side)
+    if algo_id == "calm_condor":
+        side = "iron_condor"
+    else:
+        zen_side = _zen_side(regime.bias)
+        side = zen_side if algo_id == "zen" else _opposite(zen_side)
 
     loss_per_lot = SPREAD_WIDTH_PTS * lot_size
     lots = int((capital * max_loss_pct / 100.0) // loss_per_lot)
@@ -161,8 +220,12 @@ def build(
         )
 
     expiry = "next_week" if days_to_expiry is not None and days_to_expiry <= 1 else "weekly"
-    label = "Bull Put Spread" if side == "bull_put" else "Bear Call Spread"
-    config = _spread_config(f"{spec.name} - {label}", side, lots, expiry)
+    if side == "iron_condor":
+        label = "Iron Condor"
+        config = _condor_config(f"{spec.name} - {label}", lots, expiry)
+    else:
+        label = "Bull Put Spread" if side == "bull_put" else "Bear Call Spread"
+        config = _spread_config(f"{spec.name} - {label}", side, lots, expiry)
     max_loss = float(lots * loss_per_lot)
     config["daily_loss_limit_inr"] = max_loss
 
@@ -175,3 +238,31 @@ def build(
         max_loss_inr=max_loss,
         side=side,
     )
+
+
+def coverage(
+    *, capital: float = 500_000, lot_size: int = 75, days_to_expiry: int | None = 4
+) -> dict[str, Any]:
+    """Which algos trade in which market regimes, from the real build rules.
+
+    Reports what the catalogue will actually do, so a gap is visible rather than
+    assumed away. A regime with no algo is a day the platform stands aside.
+    """
+    labels = ("calm", "trending", "volatile", "event")
+    matrix: dict[str, list[str]] = {}
+    for label in labels:
+        regime = RegimeResult(
+            label=label, bias="neutral", score=0.0, confidence=1.0, reasons=(), missing=()
+        )
+        matrix[label] = [
+            algo_id
+            for algo_id in ALGOS
+            if build(
+                algo_id, regime, capital=capital, lot_size=lot_size, days_to_expiry=days_to_expiry
+            ).action
+            == "trade"
+        ]
+    return {
+        "regimes": matrix,
+        "stands_aside_on": [label for label, algos in matrix.items() if not algos],
+    }
