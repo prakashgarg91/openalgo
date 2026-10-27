@@ -133,6 +133,7 @@ from database.sandbox_db import init_db as ensure_sandbox_tables_exists
 from database.scalping_db import init_db as ensure_scalping_tables_exists
 from database.settings_db import init_db as ensure_settings_tables_exists
 from database.strategy_module_db import init_db as ensure_strategy_module_tables_exists
+from database.algo_db import init_db as ensure_algo_tables_exists
 from database.symbol import init_db as ensure_master_contract_tables_exists
 from database.telegram_db import get_bot_config
 from database.traffic_db import init_logs_db as ensure_traffic_logs_exists
@@ -759,6 +760,7 @@ def setup_environment(app):
                 ("Latency DB", ensure_latency_tables_exists),
                 ("Sandbox DB", ensure_sandbox_tables_exists),
                 ("Strategy Module DB", ensure_strategy_module_tables_exists),
+                ("Algo DB", ensure_algo_tables_exists),
                 ("Action Center DB", ensure_action_center_tables_exists),
                 ("Chart Prefs DB", ensure_chart_prefs_tables_exists),
                 ("Market Calendar DB", ensure_market_calendar_tables_exists),

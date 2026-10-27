@@ -112,6 +112,14 @@ def _start_scheduler() -> None:
 
     scheduler.start()
     scheduler.sync_all_jobs()
+    # The regime algos add their own daily entry jobs to this scheduler. Their
+    # failure must not stop the strategy module, so it is contained here.
+    try:
+        from services.algos import runner
+
+        runner.sync_all_jobs()
+    except Exception:
+        logger.exception("Could not install the algo entry jobs")
 
 
 def stop_strategy_module() -> None:
