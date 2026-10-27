@@ -46,6 +46,9 @@ class MarketInputs:
     vix: float | None = None
     vix_change_pct: float | None = None
     nifty_vs_ma20_pct: float | None = None
+    #: Today's open against the previous close. Not scored; read by the morning
+    #: algo, which needs the opening gap and not the move since the open.
+    open_gap_pct: float | None = None
 
 
 @dataclass(frozen=True)

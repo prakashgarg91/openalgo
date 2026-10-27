@@ -77,6 +77,7 @@ def assemble_inputs(
         vix=float(vix_now) if vix_now else None,
         vix_change_pct=pct_change(vix_now, vix.get("prev_close")),
         nifty_vs_ma20_pct=sma_distance_pct(closes),
+        open_gap_pct=pct_change(nifty.get("open"), nifty.get("prev_close")),
     )
 
 

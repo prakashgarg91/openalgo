@@ -91,9 +91,9 @@ def test_logged_out_is_refused(app):
     assert app.test_client().get("/algos/api/catalogue").status_code in (401, 302)
 
 
-def test_catalogue_lists_both_algos_undeployed(client):
+def test_catalogue_lists_every_algo_undeployed(client):
     body = client.get("/algos/api/catalogue").get_json()
-    assert [a["id"] for a in body["data"]] == ["zen", "mirror_zen", "calm_condor"]
+    assert [a["id"] for a in body["data"]] == ["zen", "mirror_zen", "morning_gap", "calm_condor"]
     assert all(a["deployment"] is None for a in body["data"])
 
 
@@ -261,3 +261,10 @@ def test_catalogue_exposes_evidence_and_status(client):
     items = {a["id"]: a for a in client.get("/algos/api/catalogue").get_json()["data"]}
     assert items["mirror_zen"]["status"] == "experimental"
     assert "Indicative test" in items["zen"]["evidence"]
+
+
+def test_catalogue_tells_the_page_when_each_algo_checks(client):
+    items = {a["id"]: a for a in client.get("/algos/api/catalogue").get_json()["data"]}
+    assert items["zen"]["entry_time"] == "15:05"
+    assert items["morning_gap"]["entry_time"] == "09:25"
+    assert items["morning_gap"]["overnight"] is False

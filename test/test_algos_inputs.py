@@ -56,3 +56,21 @@ def test_assemble_maps_everything():
 def test_assemble_survives_missing_sources():
     m = assemble_inputs(nifty=None, vix=None, closes=None, globals_={})
     assert m.gap_pct is None and m.vix is None and m.sp500_pct is None
+
+
+def test_assemble_carries_the_opening_gap_separately_from_the_day_move():
+    m = assemble_inputs(
+        nifty={"ltp": 100.0, "open": 101.5, "prev_close": 100.0},
+        vix=None,
+        closes=None,
+        globals_={},
+    )
+    assert m.open_gap_pct == pytest.approx(1.5)
+    assert m.gap_pct == pytest.approx(0.0)
+
+
+def test_assemble_leaves_the_opening_gap_unknown_when_the_quote_has_no_open():
+    m = assemble_inputs(
+        nifty={"ltp": 100.0, "prev_close": 99.0}, vix=None, closes=None, globals_={}
+    )
+    assert m.open_gap_pct is None

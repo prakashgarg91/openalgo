@@ -17,14 +17,12 @@ from database import algo_db
 from database import strategy_module_db as sm_store
 from services.algos import inputs as feed
 from services.algos.context import RegimeResult, score_regime
-from services.algos.templates import ALGOS, Plan, build
+from services.algos.templates import ALGOS, PLACEHOLDER_INPUTS, Plan, build
 from utils.db_sessions import releases_scoped_sessions
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-ENTRY_HOUR = 15
-ENTRY_MINUTE = 5
 JOB_PREFIX = "algo:"
 FALLBACK_LOT_SIZE_KEY = "NIFTY"
 
@@ -33,6 +31,12 @@ FALLBACK_LOT_SIZE_KEY = "NIFTY"
 _PLACEHOLDER_REGIME = RegimeResult(
     label="calm", bias="neutral", score=0.0, confidence=1.0, reasons=(), missing=()
 )
+
+
+def entry_hhmm(algo_id: str) -> tuple[int, int]:
+    """The algo's daily check time as (hour, minute) in IST."""
+    hour, minute = ALGOS[algo_id].entry_time.split(":")
+    return int(hour), int(minute)
 
 
 def regime_to_dict(regime: RegimeResult) -> dict[str, Any]:
@@ -203,7 +207,14 @@ def max_loss_ceiling(algo_id: str, capital: float) -> float | None:
     lot = nifty_lot_size()
     if lot is None or algo_id not in ALGOS:
         return None
-    plan = build(algo_id, _PLACEHOLDER_REGIME, capital=capital, lot_size=lot, days_to_expiry=4)
+    plan = build(
+        algo_id,
+        _PLACEHOLDER_REGIME,
+        capital=capital,
+        lot_size=lot,
+        days_to_expiry=4,
+        inputs=PLACEHOLDER_INPUTS,
+    )
     return plan.max_loss_inr
 
 
@@ -211,7 +222,7 @@ def preview(
     algo_id: str, capital: float, api_key: str, *, max_loss_pct: float | None = None
 ) -> dict[str, Any]:
     """What the algo would do right now, without saving or starting anything."""
-    regime, _ = current_regime(api_key)
+    regime, snapshot = current_regime(api_key)
     lot = nifty_lot_size()
     if lot is None:
         return {
@@ -232,6 +243,7 @@ def preview(
         capital=capital,
         lot_size=lot,
         days_to_expiry=days_to_expiry(api_key),
+        inputs=snapshot,
         **kwargs,
     )
     return {"regime": regime_to_dict(regime), "plan": plan_to_dict(plan)}
@@ -247,7 +259,14 @@ def deploy(user_id: str, algo_id: str, capital: float) -> tuple[dict | None, str
     if lot is None:
         return None, "The Nifty lot size is not available. Download the master contract first."
 
-    plan = build(algo_id, _PLACEHOLDER_REGIME, capital=capital, lot_size=lot, days_to_expiry=4)
+    plan = build(
+        algo_id,
+        _PLACEHOLDER_REGIME,
+        capital=capital,
+        lot_size=lot,
+        days_to_expiry=4,
+        inputs=PLACEHOLDER_INPUTS,
+    )
     if plan.action != "trade":
         return None, plan.reason
 
@@ -343,7 +362,7 @@ def run_entry(deployment_id: int, *, today: date | None = None) -> dict[str, Any
                 "No OpenAlgo API key found. Generate one on the API Key page.",
             )
 
-        regime, _ = current_regime(api_key)
+        regime, snapshot = current_regime(api_key)
         regime_fields = {
             "regime_label": regime.label,
             "bias": regime.bias,
@@ -366,6 +385,7 @@ def run_entry(deployment_id: int, *, today: date | None = None) -> dict[str, Any
             capital=dep["capital"],
             lot_size=lot,
             days_to_expiry=days_to_expiry(api_key, today),
+            inputs=snapshot,
         )
         if plan.action != "trade":
             return _record(deployment_id, "skip", plan.reason, **regime_fields)
@@ -435,11 +455,12 @@ def sync_job(deployment_id: int) -> bool:
     if not dep or not dep["active"]:
         remove_job(deployment_id)
         return True
+    hour, minute = entry_hhmm(dep["algo_id"])
     sched.add_job(
         func=run_entry,
         args=[deployment_id],
         trigger=CronTrigger(
-            day_of_week="mon-fri", hour=ENTRY_HOUR, minute=ENTRY_MINUTE, timezone=scheduler.IST
+            day_of_week="mon-fri", hour=hour, minute=minute, timezone=scheduler.IST
         ),
         id=job_id(deployment_id),
         name=f"Algo {deployment_id} daily entry check",

@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from services.algos.context import RegimeResult
+from services.algos.context import MarketInputs, RegimeResult
 
 STRIKE_STEP = 50  # NIFTY strike gap in points
 SHORT_OFFSET = "OTM1"
@@ -20,6 +20,11 @@ SPREAD_WIDTH_PTS = 3 * STRIKE_STEP  # OTM1 to OTM4
 MAX_ENGINE_LOTS = 50
 DEFAULT_MAX_LOSS_PCT = 10.0
 MIN_CONFIDENCE = 0.5
+MORNING_GAP_MIN_PCT = 0.75  # smallest opening gap the morning algo acts on
+
+#: Inputs used only to shape a strategy row at deploy time and to size the
+#: worst case, never to trade. A 0.9 percent gap up is a representative day.
+PLACEHOLDER_INPUTS = MarketInputs(gap_pct=0.9, open_gap_pct=0.9)
 
 
 @dataclass(frozen=True)
@@ -31,6 +36,9 @@ class AlgoSpec:
     allowed_labels: tuple[str, ...]
     min_confidence: float
     overnight: bool
+    #: When the daily check runs, IST HH:MM. Overnight algos check late in the
+    #: session; a morning algo checks once the opening gap is visible.
+    entry_time: str = "15:05"
     #: "tested" or "experimental". Experimental means the indicative test below
     #: lost money, and the catalogue says so on the card.
     status: str = "tested"
@@ -86,6 +94,27 @@ ALGOS: dict[str, AlgoSpec] = {
             "calls against a rising market was the cause. Keep it in Sandbox mode."
         ),
     ),
+    "morning_gap": AlgoSpec(
+        id="morning_gap",
+        name="Morning Gap Fade",
+        summary=(
+            "Intraday hedged credit spread on Nifty, entered at 09:25 after a large opening "
+            "gap. Sells the side the gap moved towards, expecting it not to extend, and "
+            "closes by 15:15 the same day. Skips expiry day and event days."
+        ),
+        risk="high",
+        allowed_labels=("calm", "trending"),
+        min_confidence=0.6,
+        overnight=False,
+        entry_time="09:25",
+        status="experimental",
+        evidence=(
+            "Indicative test on Nifty data from 2018 to 2026 lost money: profit factor about "
+            "0.7 on data it was chosen on and about 0.6 on data it never saw. The opening "
+            "gap and the overnight US move did not predict the rest of the day. Use it in "
+            "Sandbox mode to study, not to trade."
+        ),
+    ),
     "calm_condor": AlgoSpec(
         id="calm_condor",
         name="Calm Condor",
@@ -116,7 +145,9 @@ def _opposite(side: str) -> str:
     return "bull_put" if side == "bear_call" else "bear_call"
 
 
-def _spread_config(name: str, side: str, lots: int, expiry: str) -> dict[str, Any]:
+def _spread_config(
+    name: str, side: str, lots: int, expiry: str, *, intraday: bool = False
+) -> dict[str, Any]:
     option_type = "PE" if side == "bull_put" else "CE"
 
     def leg(leg_id: int, position: str, offset: str, **risk: Any) -> dict[str, Any]:
@@ -138,10 +169,10 @@ def _spread_config(name: str, side: str, lots: int, expiry: str) -> dict[str, An
         "universe_tab": "weekly_monthly",
         "underlying": "NIFTY",
         "underlying_exchange": "NSE_INDEX",
-        "strategy_type": "positional",
-        "entry_time": None,
-        "exit_time": "09:45",
-        "product": "NRML",
+        "strategy_type": "intraday" if intraday else "positional",
+        "entry_time": "09:25" if intraday else None,
+        "exit_time": "15:15" if intraday else "09:45",
+        "product": "MIS" if intraday else "NRML",
         "pricetype": "MARKET",
         # Protection first, so the short never sits naked while the hedge is
         # still working.
@@ -206,8 +237,13 @@ def build(
     lot_size: int,
     days_to_expiry: int | None,
     max_loss_pct: float = DEFAULT_MAX_LOSS_PCT,
+    inputs: MarketInputs | None = None,
 ) -> Plan:
-    """Turn a regime into a plan. Raises ``KeyError`` for an unknown algo."""
+    """Turn a regime into a plan. Raises ``KeyError`` for an unknown algo.
+
+    ``inputs`` is the raw market snapshot. Only the morning algo reads it, for
+    the opening gap, which the regime label alone does not carry.
+    """
     spec = ALGOS[algo_id]
 
     if regime.label not in spec.allowed_labels:
@@ -223,7 +259,21 @@ def build(
             f"available, {spec.name} needs {spec.min_confidence:.0%}).",
         )
 
-    if algo_id == "calm_condor":
+    gap = inputs.open_gap_pct if inputs is not None else None
+    if algo_id == "morning_gap":
+        if gap is None:
+            return _skip(algo_id, "The opening gap is not available yet.")
+        if days_to_expiry == 0:
+            return _skip(algo_id, f"Today is expiry day, so {spec.name} does not trade.")
+        if abs(gap) < MORNING_GAP_MIN_PCT:
+            return _skip(
+                algo_id,
+                f"The opening gap of {gap:+.2f} percent is too small to trade "
+                f"({spec.name} needs {MORNING_GAP_MIN_PCT} percent or more).",
+            )
+        # Fade: sell the side the gap moved towards, expecting it not to extend.
+        side = "bear_call" if gap > 0 else "bull_put"
+    elif algo_id == "calm_condor":
         side = "iron_condor"
     else:
         zen_side = _zen_side(regime.bias)
@@ -240,20 +290,29 @@ def build(
             f"limit. {spec.name} needs about {need:,.0f} rupees.",
         )
 
-    expiry = "next_week" if days_to_expiry is not None and days_to_expiry <= 1 else "weekly"
+    if algo_id == "morning_gap":
+        expiry = "weekly"
+    else:
+        expiry = "next_week" if days_to_expiry is not None and days_to_expiry <= 1 else "weekly"
     if side == "iron_condor":
         label = "Iron Condor"
         config = _condor_config(f"{spec.name} - {label}", lots, expiry)
     else:
         label = "Bull Put Spread" if side == "bull_put" else "Bear Call Spread"
-        config = _spread_config(f"{spec.name} - {label}", side, lots, expiry)
+        config = _spread_config(
+            f"{spec.name} - {label}", side, lots, expiry, intraday=algo_id == "morning_gap"
+        )
     max_loss = float(lots * loss_per_lot)
     config["daily_loss_limit_inr"] = max_loss
+    if algo_id == "morning_gap":
+        reason = f"Opening gap of {gap:+.2f} percent: {label.lower()}."
+    else:
+        reason = f"{regime.label.capitalize()} market, {regime.bias} bias: {label.lower()}."
 
     return Plan(
         algo_id=algo_id,
         action="trade",
-        reason=f"{regime.label.capitalize()} market, {regime.bias} bias: {label.lower()}.",
+        reason=reason,
         config=config,
         lots=lots,
         max_loss_inr=max_loss,
@@ -279,7 +338,12 @@ def coverage(
             algo_id
             for algo_id in ALGOS
             if build(
-                algo_id, regime, capital=capital, lot_size=lot_size, days_to_expiry=days_to_expiry
+                algo_id,
+                regime,
+                capital=capital,
+                lot_size=lot_size,
+                days_to_expiry=days_to_expiry,
+                inputs=PLACEHOLDER_INPUTS,
             ).action
             == "trade"
         ]

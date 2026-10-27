@@ -21,11 +21,15 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from common import bs, expiry_after  # noqa: E402
+from common import num as _num
+
 from services.algos.context import MarketInputs, RegimeResult, score_regime
 from services.algos.templates import build
 
 D = sys.argv[1]
-LOT, CAP, COST_PER_LOT, R = 75, 500_000, 300.0, 0.065
+LOT, CAP, COST_PER_LOT = 75, 500_000, 300.0
 
 
 def load(n):
@@ -52,30 +56,6 @@ gap = close.pct_change() * 100
 vchg = vclose.pct_change() * 100
 ma20 = close.rolling(20).mean()
 trend = (close / ma20 - 1) * 100
-
-
-def _num(x):
-    return None if x is None or (isinstance(x, float) and math.isnan(x)) else float(x)
-
-
-def ncdf(x):
-    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
-
-
-def bs(S, K, T, sig, kind):
-    if T <= 0 or sig <= 0:
-        return max(S - K, 0) if kind == "CE" else max(K - S, 0)
-    d1 = (math.log(S / K) + (R + 0.5 * sig * sig) * T) / (sig * math.sqrt(T))
-    d2 = d1 - sig * math.sqrt(T)
-    if kind == "CE":
-        return S * ncdf(d1) - K * math.exp(-R * T) * ncdf(d2)
-    return K * math.exp(-R * T) * ncdf(-d2) - S * ncdf(-d1)
-
-
-def expiry_after(t):
-    wd = 1 if t >= pd.Timestamp("2025-09-01") else 3  # Tue since Sep 2025, else Thu
-    ahead = (wd - t.weekday()) % 7
-    return t + timedelta(days=ahead)
 
 
 rows = []

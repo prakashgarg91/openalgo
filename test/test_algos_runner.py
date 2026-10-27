@@ -219,3 +219,61 @@ def test_a_deployed_algo_gets_the_0945_weekday_square_off_job():
     finally:
         sm_scheduler.remove_strategy_jobs(dep["strategy_id"])
         sm_scheduler.shutdown()
+
+
+def test_each_algo_is_scheduled_at_its_own_check_time():
+    sm_scheduler.start(paused=True)
+    try:
+        zen = _deploy("zen")
+        gap = _deploy("morning_gap")
+        runner.sync_job(zen["id"])
+        runner.sync_job(gap["id"])
+
+        def clock(dep):
+            job = sm_scheduler.get_scheduler().get_job(runner.job_id(dep["id"]))
+            fields = {f.name: str(f) for f in job.trigger.fields}
+            return fields["hour"], fields["minute"], fields["day_of_week"]
+
+        assert clock(zen) == ("15", "5", "mon-fri")
+        assert clock(gap) == ("9", "25", "mon-fri")
+    finally:
+        sm_scheduler.shutdown()
+
+
+def _snapshot(open_gap):
+    from services.algos.context import MarketInputs
+
+    return MarketInputs(open_gap_pct=open_gap)
+
+
+def test_morning_gap_runs_as_an_intraday_mis_spread_on_a_big_gap(monkeypatch, env):
+    dep = _deploy("morning_gap")
+    monkeypatch.setattr(
+        runner, "current_regime", lambda k: (_regime("trending", "bullish"), _snapshot(1.0))
+    )
+    out = runner.run_entry(dep["id"], today=WEEKDAY)
+    assert out["action"] == "trade" and out["side"] == "bear_call"
+    assert env == [(dep["strategy_id"], "sandbox", "scheduler")]
+    row = sm_store.get_strategy(dep["strategy_id"], USER)
+    assert row.strategy_type == "intraday" and row.product == "MIS"
+    assert {leg["option_type"] for leg in row.legs} == {"CE"}
+
+
+def test_morning_gap_stands_aside_on_a_small_gap_and_says_why(monkeypatch, env):
+    dep = _deploy("morning_gap")
+    monkeypatch.setattr(
+        runner, "current_regime", lambda k: (_regime("calm", "neutral"), _snapshot(0.2))
+    )
+    out = runner.run_entry(dep["id"], today=WEEKDAY)
+    assert out["action"] == "skip" and "too small" in out["reason"] and env == []
+
+
+def test_morning_gap_stands_aside_when_the_quote_has_no_opening_gap(env):
+    dep = _deploy("morning_gap")
+    out = runner.run_entry(dep["id"], today=WEEKDAY)  # the stub snapshot is None
+    assert out["action"] == "skip" and "not available" in out["reason"] and env == []
+
+
+def test_morning_gap_can_be_deployed_and_has_a_worst_case_to_confirm():
+    dep = _deploy("morning_gap")
+    assert runner.max_loss_ceiling("morning_gap", dep["capital"]) == 45000.0

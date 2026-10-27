@@ -83,6 +83,7 @@ def _spec(algo_id: str) -> dict[str, Any]:
         "risk": spec.risk,
         "allowed_regimes": list(spec.allowed_labels),
         "overnight": spec.overnight,
+        "entry_time": spec.entry_time,
         "status": spec.status,
         "evidence": spec.evidence,
     }

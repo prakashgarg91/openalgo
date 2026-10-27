@@ -148,3 +148,85 @@ def test_every_algo_carries_evidence_and_mirror_zen_is_marked_experimental():
     assert all(spec.evidence for spec in ALGOS.values())
     assert ALGOS["mirror_zen"].status == "experimental"
     assert ALGOS["zen"].status == "tested" and ALGOS["calm_condor"].status == "tested"
+
+
+def _gap(pct, **kw):
+    from services.algos.context import MarketInputs
+
+    return MarketInputs(open_gap_pct=pct, **kw)
+
+
+MORNING = {"capital": 500_000, "lot_size": 75, "days_to_expiry": 3}
+
+
+def test_morning_gap_fades_a_large_gap_up_with_a_bear_call_spread():
+    plan = build("morning_gap", _regime("trending", "bullish", 0.9), inputs=_gap(0.9), **MORNING)
+    assert plan.action == "trade" and plan.side == "bear_call"
+    assert {leg["option_type"] for leg in plan.config["legs"]} == {"CE"}
+
+
+def test_morning_gap_fades_a_large_gap_down_with_a_bull_put_spread():
+    plan = build("morning_gap", _regime("trending", "bearish", 0.9), inputs=_gap(-0.9), **MORNING)
+    assert plan.action == "trade" and plan.side == "bull_put"
+    assert {leg["option_type"] for leg in plan.config["legs"]} == {"PE"}
+
+
+def test_morning_gap_is_an_intraday_mis_spread_closed_before_the_session_ends():
+    plan = build("morning_gap", _regime("trending", "bullish", 0.9), inputs=_gap(0.9), **MORNING)
+    cfg = plan.config
+    assert cfg["strategy_type"] == "intraday" and cfg["product"] == "MIS"
+    assert cfg["entry_time"] == "09:25" and cfg["exit_time"] == "15:15"
+    assert [leg["position"] for leg in cfg["legs"]] == ["B", "S"]
+    assert {leg["expiry"] for leg in cfg["legs"]} == {"weekly"}
+
+
+def test_morning_gap_config_passes_the_engine_validator():
+    plan = build("morning_gap", _regime("trending", "bullish", 0.9), inputs=_gap(0.9), **MORNING)
+    config, error = validate_strategy_config(plan.config)
+    assert error is None, error
+
+
+@pytest.mark.parametrize("pct", [0.0, 0.3, -0.5, 0.74])
+def test_morning_gap_stands_aside_on_a_small_gap(pct):
+    plan = build("morning_gap", _regime("calm", "neutral", 0.9), inputs=_gap(pct), **MORNING)
+    assert plan.action == "skip" and "too small" in plan.reason
+
+
+def test_morning_gap_needs_the_gap_to_be_known():
+    for inputs in (None, _gap(None)):
+        plan = build("morning_gap", _regime("calm", "neutral", 0.9), inputs=inputs, **MORNING)
+        assert plan.action == "skip" and "not available" in plan.reason
+
+
+def test_morning_gap_skips_expiry_day_and_event_and_volatile_days():
+    base = {"capital": 500_000, "lot_size": 75}
+    expiry = build(
+        "morning_gap",
+        _regime("trending", "bullish", 0.9),
+        inputs=_gap(0.9),
+        days_to_expiry=0,
+        **base,
+    )
+    assert expiry.action == "skip" and "expiry day" in expiry.reason
+    for label in ("event", "volatile"):
+        plan = build(
+            "morning_gap",
+            _regime(label, "bullish", 0.9),
+            inputs=_gap(0.9),
+            days_to_expiry=3,
+            **base,
+        )
+        assert plan.action == "skip"
+
+
+def test_other_algos_ignore_the_inputs_argument():
+    a = build("zen", _regime(), **KW)
+    b = build("zen", _regime(), inputs=_gap(5.0), **KW)
+    assert a.config == b.config
+
+
+def test_morning_gap_is_experimental_and_checks_at_0925():
+    spec = ALGOS["morning_gap"]
+    assert spec.status == "experimental" and spec.entry_time == "09:25" and not spec.overnight
+    assert "lost money" in spec.evidence
+    assert all(a.entry_time == "15:05" for a in ALGOS.values() if a.overnight)
