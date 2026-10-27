@@ -209,7 +209,7 @@ EQUIV_DIR = os.getenv("ALGO_LAB_EQUIV_DIR")
 
 
 @pytest.mark.skipif(not EQUIV_DIR, reason="needs the 2018-2026 CSVs from scripts/algo_backtest")
-def test_standard_model_reproduces_the_original_backtest():
+def test_standard_model_still_gives_the_recorded_result_on_the_real_history():
     def load(name):
         df = pd.read_csv(f"{EQUIV_DIR}/{name}.csv", index_col=0, parse_dates=True)
         df.index = df.index.tz_localize(None) if df.index.tz else df.index
@@ -229,7 +229,9 @@ def test_standard_model_reproduces_the_original_backtest():
         }
     )
     zen = run_lab(h, "zen", model="standard", start="2018-01-01").metrics
-    assert zen["trades"] == 1360 and zen["win_rate"] == 62.5 and zen["profit_factor"] == 1.49
+    # The original script gave 1360 trades, 62.5 percent and 1.49 before overnight algos
+    # skipped the days before expiry; with that rule the same data gives these.
+    assert zen["trades"] == 798 and zen["win_rate"] == 70.1 and zen["profit_factor"] == 1.91
 
 
 def test_every_trade_reports_its_cost_and_the_break_even_is_the_gross_edge(history):
@@ -263,3 +265,136 @@ def test_the_trading_clock_gives_a_weekend_one_session_of_decay_not_three_days()
 
 def test_only_the_conservative_model_uses_the_trading_clock():
     assert CONSERVATIVE.trading_clock and not STANDARD.trading_clock
+
+
+def test_a_research_plan_function_replaces_the_catalogue_rules(history):
+    from services.algos.templates import Plan, condor_config
+
+    calls = []
+
+    def plan_fn(regime, inputs, dte, extra):
+        calls.append(extra)
+        cfg = condor_config("x", 1, "weekly", short_offset="OTM1", long_offset="OTM3")
+        return Plan("calm_condor", "trade", "r", cfg, 1, 0.0, "iron_condor")
+
+    result = run_lab(history, "calm_condor", plan_fn=plan_fn, model="standard")
+    assert result.metrics["trades"] > 0 and not result.skipped
+    assert all({"date", "vix_rank"} <= set(extra) for extra in calls)
+
+
+def test_iv_scale_cheapens_every_option_and_defaults_to_the_vix_level():
+    import dataclasses
+
+    assert STANDARD.iv_scale == 1.0 and CONSERVATIVE.iv_scale == 1.0
+    cheaper = dataclasses.replace(STANDARD, iv_scale=0.8)
+    assert lab._leg_vol(cheaper, 0.15, "PE", 2) == pytest.approx(0.12)
+    assert lab._leg_vol(STANDARD, 0.15, "PE", 2) == pytest.approx(0.15)
+
+
+def test_overnight_variance_share_is_a_fraction_and_matches_a_known_series():
+    idx = pd.bdate_range("2024-01-01", periods=4)
+    # Overnight moves of +1 percent, intraday moves of zero: all variance is overnight.
+    frame = pd.DataFrame(
+        {"Open": [100.0, 101.0, 102.01, 103.03], "Close": [100.0, 101.0, 102.01, 103.03]}, index=idx
+    )
+    assert lab.overnight_variance_share(frame) > 0.99
+    # Every open equals the previous close, so nothing happens overnight.
+    closes = [100.0, 101.0, 100.0, 102.0, 101.0]
+    no_gaps = pd.DataFrame(
+        {"Open": [100.0] + closes[:-1], "Close": closes},
+        index=pd.bdate_range("2024-01-01", periods=5),
+    )
+    assert lab.overnight_variance_share(no_gaps) == pytest.approx(0.0, abs=1e-12)
+
+
+def test_only_the_conservative_model_uses_the_variance_clock():
+    assert CONSERVATIVE.variance_clock and not STANDARD.variance_clock
+
+
+def test_the_variance_clock_cuts_what_an_overnight_seller_earns(history):
+    import dataclasses
+
+    base = dataclasses.replace(CONSERVATIVE, name="vc_off", variance_clock=False)
+    lab.MODELS["vc_off"] = base
+    try:
+        with_clock = run_lab(history, "calm_condor", model="conservative", gated=False)
+        without = run_lab(history, "calm_condor", model="vc_off", gated=False)
+    finally:
+        del lab.MODELS["vc_off"]
+    assert with_clock.metrics["avg_gross"] < without.metrics["avg_gross"]
+
+
+# --- real option prices ----------------------------------------------------
+
+
+def _real_day(day, expiry, rows):
+    """rows: (strike, kind, open, close, volume)."""
+    return pd.DataFrame(
+        [
+            {
+                "date": pd.Timestamp(day),
+                "expiry": pd.Timestamp(expiry),
+                "strike": k,
+                "kind": kind,
+                "open": o,
+                "close": c,
+                "volume": v,
+            }
+            for k, kind, o, c, v in rows
+        ]
+    )
+
+
+def test_real_prices_mark_is_close_on_entry_day_and_open_on_exit_day():
+    real = lab.RealPrices(
+        {
+            pd.Timestamp("2024-03-01"): _real_day(
+                "2024-03-01", "2024-03-07", [(22000, "PE", 90.0, 80.0, 500)]
+            ),
+            pd.Timestamp("2024-03-04"): _real_day(
+                "2024-03-04", "2024-03-07", [(22000, "PE", 70.0, 60.0, 400)]
+            ),
+        }
+    )
+    assert real.mark("2024-03-01", "2024-03-04", "2024-03-07", 22000, "PE") == (80.0, 70.0)
+    assert real.expiries("2024-03-01") == [pd.Timestamp("2024-03-07")]
+
+
+@pytest.mark.parametrize(
+    "entry_row,exit_row",
+    [
+        ((22000, "PE", 90.0, 0.0, 500), (22000, "PE", 70.0, 60.0, 400)),  # no entry close
+        ((22000, "PE", 90.0, 80.0, 0), (22000, "PE", 70.0, 60.0, 400)),  # entry day not traded
+        ((22000, "PE", 90.0, 80.0, 500), (22000, "PE", 0.0, 60.0, 400)),  # no opening print
+        ((22000, "PE", 90.0, 80.0, 500), (22050, "PE", 70.0, 60.0, 400)),  # contract absent
+    ],
+)
+def test_a_contract_without_a_real_print_is_missing_never_filled_in(entry_row, exit_row):
+    real = lab.RealPrices(
+        {
+            pd.Timestamp("2024-03-01"): _real_day("2024-03-01", "2024-03-07", [entry_row]),
+            pd.Timestamp("2024-03-04"): _real_day("2024-03-04", "2024-03-07", [exit_row]),
+        }
+    )
+    assert real.mark("2024-03-01", "2024-03-04", "2024-03-07", 22000, "PE") is None
+
+
+def test_a_real_price_replay_uses_only_actual_prices_and_counts_what_it_cannot_price(history):
+    # One real day pair covering the first usable date; everything else has no option data.
+    nifty = history.frames["nifty"]
+    d0, d1 = nifty.index[40], nifty.index[41]
+    spot = float(nifty["Close"].iloc[40])
+    atm = round(spot / 50) * 50
+    expiry = d0 + pd.Timedelta(days=4)
+    rows0 = [(atm - 50 * n, "PE", 0, 10.0 + n, 100) for n in (1, 4)] + [
+        (atm + 50 * n, "CE", 0, 10.0 + n, 100) for n in (1, 4)
+    ]
+    rows1 = [(atm - 50 * n, "PE", 5.0, 0, 0) for n in (1, 4)] + [
+        (atm + 50 * n, "CE", 5.0, 0, 0) for n in (1, 4)
+    ]
+    real = lab.RealPrices({d0: _real_day(d0, expiry, rows0), d1: _real_day(d1, expiry, rows1)})
+    result = run_lab(history, "zen", model="conservative", gated=False, real=real)
+    assert sum(result.skipped.values()) + len(result.trades) <= result.days
+    assert result.skipped.get("No option prices for this day", 0) > 0
+    for trade in result.trades:  # any priced trade must come from the two real days
+        assert trade["date"] == d0.strftime("%Y-%m-%d")

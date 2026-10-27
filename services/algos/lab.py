@@ -69,6 +69,15 @@ class Model:
     skew_call_per_step: float = 0.0
     #: Share of the day's VIX change applied to volatility at the exit mark.
     vol_follows_day: float = 0.0
+    #: Multiplier on the volatility used to price every option. 1.0 assumes
+    #: weekly Nifty options trade at India VIX; below 1.0 assumes they trade
+    #: cheaper, which shrinks what a premium seller can collect.
+    iv_scale: float = 1.0
+    #: Let time decay accrue in proportion to the variance actually borne. An
+    #: overnight position faces only the overnight gap, about 39 percent of a
+    #: day's variance in Nifty history, so it should earn that share of a day's
+    #: decay and not all of it. A morning position earns the rest.
+    variance_clock: bool = False
     #: Measure time to expiry in trading days (252 a year) instead of calendar
     #: days. Option markets price variance by trading day, so a weekend is not
     #: three days of free time decay; the calendar clock says it is.
@@ -87,14 +96,80 @@ class Model:
 STANDARD = Model("standard", "Standard (flat volatility, flat costs)")
 CONSERVATIVE = Model(
     "conservative",
-    "Conservative (trading-day clock, skew, volatility moves, itemised costs)",
+    "Conservative (variance clock, skew, volatility moves, itemised costs)",
     skew_put_per_step=0.015,
     skew_call_per_step=-0.01,
     vol_follows_day=0.5,
     trading_clock=True,
+    variance_clock=True,
     flat_cost=None,
 )
 MODELS = {m.name: m for m in (STANDARD, CONSERVATIVE)}
+
+
+class RealPrices:
+    """Actual Nifty option prices by day, from NSE's daily files.
+
+    Each day is a frame with ``expiry``, ``strike``, ``kind`` (CE or PE), ``open``,
+    ``close`` and ``volume``. An overnight trade is priced from the contract's
+    close on the entry day and its open on the next trading day, so no pricing
+    model is involved. A contract with no usable print on either day is missing,
+    and the trade that needs it is skipped and counted, never filled in.
+    """
+
+    def __init__(self, days: dict[pd.Timestamp, pd.DataFrame]):
+        self._days = {
+            pd.Timestamp(day): frame.set_index(["expiry", "strike", "kind"]).sort_index()
+            for day, frame in days.items()
+            if len(frame)
+        }
+
+    def __len__(self) -> int:
+        return len(self._days)
+
+    def has_day(self, day: pd.Timestamp) -> bool:
+        return pd.Timestamp(day) in self._days
+
+    def expiries(self, day: pd.Timestamp) -> list[pd.Timestamp]:
+        """Expiry dates listed on ``day`` that are not before it, earliest first."""
+        frame = self._days.get(pd.Timestamp(day))
+        if frame is None:
+            return []
+        found = frame.index.get_level_values("expiry").unique()
+        return sorted(e for e in found if e >= pd.Timestamp(day))
+
+    def _price(self, day, expiry, strike, kind, field) -> float | None:
+        frame = self._days.get(pd.Timestamp(day))
+        if frame is None:
+            return None
+        try:
+            row = frame.loc[(pd.Timestamp(expiry), float(strike), kind)]
+        except KeyError:
+            return None
+        if isinstance(row, pd.DataFrame):
+            row = row.iloc[0]
+        value = num(row[field])
+        if value is None or value <= 0:
+            return None
+        if field == "close" and (num(row["volume"]) or 0) <= 0:
+            return None
+        return value
+
+    def mark(self, entry_day, exit_day, expiry, strike, kind) -> tuple[float, float] | None:
+        """(close on the entry day, open on the exit day) for one contract, or None."""
+        entry = self._price(entry_day, expiry, strike, kind, "close")
+        exit_ = self._price(exit_day, expiry, strike, kind, "open")
+        return None if entry is None or exit_ is None else (entry, exit_)
+
+
+def load_real_prices(directory: Path) -> RealPrices:
+    """Read the per-day CSVs written by ``scripts/algo_backtest/fetch_nse_options.py``."""
+    days: dict[pd.Timestamp, pd.DataFrame] = {}
+    for path in sorted(Path(directory).glob("*.csv")):
+        frame = pd.read_csv(path, parse_dates=["date", "expiry"])
+        if len(frame):
+            days[frame["date"].iloc[0]] = frame
+    return RealPrices(days)
 
 
 @dataclass
@@ -283,6 +358,15 @@ def trade_cost(model: Model, entry: list[float], exit_: list[float], sells: list
     )
 
 
+def overnight_variance_share(nifty: pd.DataFrame) -> float:
+    """Share of Nifty's daily variance that happens overnight (close to open)."""
+    frame = nifty[nifty["Close"] > 0].dropna(subset=["Open", "Close"])
+    overnight = np.log(frame["Open"] / frame["Close"].shift(1)).dropna()
+    intraday = np.log(frame["Close"] / frame["Open"]).dropna()
+    total = overnight.var() + intraday.var()
+    return float(overnight.var() / total) if total > 0 else 0.4
+
+
 def _years(model: Model, start: pd.Timestamp, end: pd.Timestamp) -> float:
     """Time from ``start`` to ``end`` in years, on the model's clock."""
     if model.trading_clock:
@@ -292,7 +376,7 @@ def _years(model: Model, start: pd.Timestamp, end: pd.Timestamp) -> float:
 
 def _leg_vol(model: Model, sigma: float, kind: str, steps: int) -> float:
     skew = model.skew_put_per_step if kind == "PE" else model.skew_call_per_step
-    return max(0.01, sigma * (1 + skew * steps))
+    return max(0.01, sigma * model.iv_scale * (1 + skew * steps))
 
 
 def _price_trade(
@@ -324,6 +408,35 @@ def _price_trade(
     return pts * LOT_SIZE - cost, cost
 
 
+def _real_trade(
+    model: Model,
+    legs: list[dict[str, Any]],
+    real: RealPrices,
+    t: pd.Timestamp,
+    t1: pd.Timestamp,
+    expiry: pd.Timestamp,
+    spot: float,
+) -> tuple[float, float] | None:
+    """(net, cost) per lot from actual prices, or None when any contract has no print."""
+    atm = round(spot / 50) * 50
+    entry, exit_, sells, pts = [], [], [], 0.0
+    for leg in legs:
+        steps = int(str(leg["atm_offset"]).replace("OTM", "") or 0)
+        kind = leg["option_type"]
+        strike = atm + 50 * steps if kind == "CE" else atm - 50 * steps
+        marks = real.mark(t, t1, expiry, strike, kind)
+        if marks is None:
+            return None
+        e, x = marks
+        short = leg["position"] == "S"
+        pts += (e - x) if short else (x - e)
+        entry.append(e)
+        exit_.append(x)
+        sells.append(short)
+    cost = trade_cost(model, entry, exit_, sells)
+    return pts * LOT_SIZE - cost, cost
+
+
 def run_lab(
     history: History,
     algo_id: str,
@@ -335,8 +448,18 @@ def run_lab(
     capital: float = CAPITAL,
     lot_size: int = LOT_SIZE,
     overrides: dict[str, Any] | None = None,
+    plan_fn: Callable[..., Any] | None = None,
+    real: RealPrices | None = None,
 ) -> LabResult:
-    """Replay one algo over the history. Raises ``KeyError`` for an unknown algo or model."""
+    """Replay one algo over the history. Raises ``KeyError`` for an unknown algo or model.
+
+    ``plan_fn(regime, inputs, dte, extra)`` replaces ``build`` for research on
+    structures the catalogue does not offer. ``extra`` carries the date and the
+    VIX rank (its percentile in the last 250 sessions) for filters.
+
+    ``real`` prices overnight trades from actual option prices instead of the
+    model. Days without option data are skipped and counted.
+    """
     spec = ALGOS[algo_id]
     pricing = MODELS[model]
     frames = history.frames
@@ -354,6 +477,10 @@ def run_lab(
 
     sp, nd, cr, dx = (us_ret(n) for n in ("spx", "ndx", "crude", "dxy"))
     ma20 = cls.rolling(20).mean()
+    night_share = overnight_variance_share(nifty)
+    vix_rank = vclose.rolling(250, min_periods=60).apply(
+        lambda w: float((w <= w.iloc[-1]).mean() * 100), raw=False
+    )
     t_start = pd.Timestamp(start) if start else dates[WARMUP_DAYS]
     t_end = pd.Timestamp(end) if end else dates[-1]
 
@@ -396,26 +523,51 @@ def run_lab(
             # the regime gate is worth.
             regime = RegimeResult(spec.allowed_labels[0], regime.bias, regime.score, 1.0, (), ())
         expiry = expiry_after(t)
+        if real is not None and spec.overnight:
+            listed = real.expiries(t)
+            if not listed or not real.has_day(dates[i + 1]):
+                skipped["No option prices for this day"] = (
+                    skipped.get("No option prices for this day", 0) + 1
+                )
+                continue
+            expiry = listed[0]
         dte = (expiry - t).days
-        plan = build(
-            algo_id,
-            regime,
-            capital=capital,
-            lot_size=lot_size,
-            days_to_expiry=dte,
-            inputs=inputs,
-            **(overrides or {}),
-        )
+        if plan_fn is not None:
+            plan = plan_fn(regime, inputs, dte, {"date": t, "vix_rank": num(vix_rank.iloc[i])})
+        else:
+            plan = build(
+                algo_id,
+                regime,
+                capital=capital,
+                lot_size=lot_size,
+                days_to_expiry=dte,
+                inputs=inputs,
+                **(overrides or {}),
+            )
         if plan.action != "trade":
             key = plan.reason.split(".")[0][:70]
             skipped[key] = skipped.get(key, 0) + 1
             continue
 
-        if spec.overnight:
+        priced = False
+        if real is not None and spec.overnight:
+            outcome = _real_trade(
+                pricing, plan.config["legs"], real, t, dates[i + 1], expiry, float(cls.iloc[i])
+            )
+            if outcome is None:
+                skipped["A contract had no opening price"] = (
+                    skipped.get("A contract had no opening price", 0) + 1
+                )
+                continue
+            pnl, cost = outcome
+            priced = True
+        elif spec.overnight:
             t1 = dates[i + 1]
             use_expiry = expiry if dte > 1 else expiry + timedelta(days=7)
             S0, S1 = float(cls.iloc[i]), float(opn.iloc[i + 1])
             T0, T1 = _years(pricing, t, use_expiry), _years(pricing, t1, use_expiry)
+            if pricing.variance_clock:
+                T1 = T0 - night_share / 252
             sig0 = float(vclose.iloc[i]) / 100
             v_open = num(vopen.iloc[i + 1])
             sig1 = (v_open if v_open and v_open > 0 else float(vclose.iloc[i])) / 100
@@ -425,13 +577,17 @@ def run_lab(
         else:
             S0, S1 = float(opn.iloc[i]), float(cls.iloc[i])
             T0 = _years(pricing, t, expiry)
-            T1 = T0 - (0.96 / 252 if pricing.trading_clock else MORNING_HOLD_YEARS)
+            if pricing.variance_clock:
+                T1 = T0 - (1 - night_share) / 252
+            else:
+                T1 = T0 - (0.96 / 252 if pricing.trading_clock else MORNING_HOLD_YEARS)
             v0 = num(vopen.iloc[i])
             sig0 = (v0 if v0 and v0 > 0 else float(vclose.iloc[i - 1])) / 100
             sig1 = float(vclose.iloc[i]) / 100
-        pnl, cost = _price_trade(
-            pricing, plan.config["legs"], S0=S0, S1=S1, T0=T0, T1=T1, sig0=sig0, sig1=sig1
-        )
+        if not priced:
+            pnl, cost = _price_trade(
+                pricing, plan.config["legs"], S0=S0, S1=S1, T0=T0, T1=T1, sig0=sig0, sig1=sig1
+            )
         trades.append(
             {
                 "date": t.strftime("%Y-%m-%d"),

@@ -145,8 +145,15 @@ def _opposite(side: str) -> str:
     return "bull_put" if side == "bear_call" else "bear_call"
 
 
-def _spread_config(
-    name: str, side: str, lots: int, expiry: str, *, intraday: bool = False
+def spread_config(
+    name: str,
+    side: str,
+    lots: int,
+    expiry: str,
+    *,
+    intraday: bool = False,
+    short_offset: str = SHORT_OFFSET,
+    long_offset: str = LONG_OFFSET,
 ) -> dict[str, Any]:
     option_type = "PE" if side == "bull_put" else "CE"
 
@@ -177,8 +184,8 @@ def _spread_config(
         # Protection first, so the short never sits naked while the hedge is
         # still working.
         "legs": [
-            leg(1, "B", LONG_OFFSET),
-            leg(2, "S", SHORT_OFFSET, sl_pts=30, target_pts=90, risk_unit="percent"),
+            leg(1, "B", long_offset),
+            leg(2, "S", short_offset, sl_pts=30, target_pts=90, risk_unit="percent"),
         ],
     }
 
@@ -189,7 +196,14 @@ CONDOR_SL_PCT = 50
 CONDOR_TARGET_PCT = 70
 
 
-def _condor_config(name: str, lots: int, expiry: str) -> dict[str, Any]:
+def condor_config(
+    name: str,
+    lots: int,
+    expiry: str,
+    *,
+    short_offset: str = CONDOR_SHORT_OFFSET,
+    long_offset: str = CONDOR_LONG_OFFSET,
+) -> dict[str, Any]:
     def leg(leg_id: int, position: str, option_type: str, offset: str, **risk: Any):
         return {
             "id": leg_id,
@@ -217,10 +231,10 @@ def _condor_config(name: str, lots: int, expiry: str) -> dict[str, Any]:
         "pricetype": "MARKET",
         # Both protective legs first, so neither short sits naked.
         "legs": [
-            leg(1, "B", "PE", CONDOR_LONG_OFFSET),
-            leg(2, "B", "CE", CONDOR_LONG_OFFSET),
-            leg(3, "S", "PE", CONDOR_SHORT_OFFSET, **short_risk),
-            leg(4, "S", "CE", CONDOR_SHORT_OFFSET, **short_risk),
+            leg(1, "B", "PE", long_offset),
+            leg(2, "B", "CE", long_offset),
+            leg(3, "S", "PE", short_offset, **short_risk),
+            leg(4, "S", "CE", short_offset, **short_risk),
         ],
     }
 
@@ -259,6 +273,17 @@ def build(
             f"available, {spec.name} needs {spec.min_confidence:.0%}).",
         )
 
+    if spec.overnight and days_to_expiry is not None and days_to_expiry <= 1:
+        # Rolling to next week's expiry for one night earns almost no time decay
+        # and pays full costs. Skipping these days beat rolling in every matched
+        # pair of a 50-configuration test, on the years it was chosen on and the
+        # later years it never saw.
+        return _skip(
+            algo_id,
+            f"Expiry is today or tomorrow, so {spec.name} waits: next week's options earn "
+            "too little time decay for one night.",
+        )
+
     gap = inputs.open_gap_pct if inputs is not None else None
     if algo_id == "morning_gap":
         if gap is None:
@@ -290,16 +315,13 @@ def build(
             f"limit. {spec.name} needs about {need:,.0f} rupees.",
         )
 
-    if algo_id == "morning_gap":
-        expiry = "weekly"
-    else:
-        expiry = "next_week" if days_to_expiry is not None and days_to_expiry <= 1 else "weekly"
+    expiry = "weekly"
     if side == "iron_condor":
         label = "Iron Condor"
-        config = _condor_config(f"{spec.name} - {label}", lots, expiry)
+        config = condor_config(f"{spec.name} - {label}", lots, expiry)
     else:
         label = "Bull Put Spread" if side == "bull_put" else "Bear Call Spread"
-        config = _spread_config(
+        config = spread_config(
             f"{spec.name} - {label}", side, lots, expiry, intraday=algo_id == "morning_gap"
         )
     max_loss = float(lots * loss_per_lot)

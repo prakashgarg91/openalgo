@@ -92,11 +92,18 @@ def test_lots_never_exceed_the_engine_limit():
     assert plan.lots == 50
 
 
-def test_expiry_within_a_day_rolls_to_next_week():
-    near = build("zen", _regime(), capital=500_000, lot_size=75, days_to_expiry=1)
-    far = build("zen", _regime(), capital=500_000, lot_size=75, days_to_expiry=4)
-    assert {leg["expiry"] for leg in near.config["legs"]} == {"next_week"}
-    assert {leg["expiry"] for leg in far.config["legs"]} == {"weekly"}
+def test_overnight_algos_wait_out_the_days_before_expiry_instead_of_rolling():
+    for algo, regime in (
+        ("zen", _regime()),
+        ("calm_condor", _regime("calm", "neutral", 0.9)),
+        ("mirror_zen", _regime("trending", "bullish", 0.9)),
+    ):
+        for dte in (0, 1):
+            plan = build(algo, regime, capital=500_000, lot_size=75, days_to_expiry=dte)
+            assert plan.action == "skip" and "Expiry is today or tomorrow" in plan.reason
+        far = build(algo, regime, capital=500_000, lot_size=75, days_to_expiry=2)
+        assert far.action == "trade"
+        assert {leg["expiry"] for leg in far.config["legs"]} == {"weekly"}
 
 
 def test_unknown_algo_raises():
