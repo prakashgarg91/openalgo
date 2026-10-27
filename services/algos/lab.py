@@ -24,6 +24,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from services.algos.context import MarketInputs, RegimeResult, score_regime
@@ -68,11 +69,17 @@ class Model:
     skew_call_per_step: float = 0.0
     #: Share of the day's VIX change applied to volatility at the exit mark.
     vol_follows_day: float = 0.0
+    #: Measure time to expiry in trading days (252 a year) instead of calendar
+    #: days. Option markets price variance by trading day, so a weekend is not
+    #: three days of free time decay; the calendar clock says it is.
+    trading_clock: bool = False
     #: Flat rupees per lot per trade. None means use the itemised costs below.
     flat_cost: float | None = 300.0
-    spread_floor_pts: float = 0.5
-    spread_pct: float = 0.03
-    brokerage: float = 80.0
+    #: Market orders pay about half the bid-ask spread per fill. For liquid Nifty
+    #: weekly options that is a quarter point, or about 1 percent of a large premium.
+    spread_floor_pts: float = 0.25
+    spread_pct: float = 0.01
+    brokerage: float = 40.0  # per lot, assuming about four lots share each order
     stt_pct: float = 0.001
     exchange_pct: float = 0.000345
 
@@ -80,10 +87,11 @@ class Model:
 STANDARD = Model("standard", "Standard (flat volatility, flat costs)")
 CONSERVATIVE = Model(
     "conservative",
-    "Conservative (skew, volatility moves, costs that grow on far strikes)",
+    "Conservative (trading-day clock, skew, volatility moves, itemised costs)",
     skew_put_per_step=0.015,
     skew_call_per_step=-0.01,
     vol_follows_day=0.5,
+    trading_clock=True,
     flat_cost=None,
 )
 MODELS = {m.name: m for m in (STANDARD, CONSERVATIVE)}
@@ -275,6 +283,13 @@ def trade_cost(model: Model, entry: list[float], exit_: list[float], sells: list
     )
 
 
+def _years(model: Model, start: pd.Timestamp, end: pd.Timestamp) -> float:
+    """Time from ``start`` to ``end`` in years, on the model's clock."""
+    if model.trading_clock:
+        return int(np.busday_count(start.date(), end.date())) / 252
+    return (end - start).days / 365
+
+
 def _leg_vol(model: Model, sigma: float, kind: str, steps: int) -> float:
     skew = model.skew_put_per_step if kind == "PE" else model.skew_call_per_step
     return max(0.01, sigma * (1 + skew * steps))
@@ -290,8 +305,8 @@ def _price_trade(
     T1: float,
     sig0: float,
     sig1: float,
-) -> float:
-    """Rupees per lot made by the legs between entry and exit marks."""
+) -> tuple[float, float]:
+    """(net, cost) in rupees per lot for the legs between the entry and exit marks."""
     atm = round(S0 / 50) * 50
     entry, exit_, sells, pts = [], [], [], 0.0
     for leg in legs:
@@ -305,7 +320,8 @@ def _price_trade(
         entry.append(e)
         exit_.append(x)
         sells.append(short)
-    return pts * LOT_SIZE - trade_cost(model, entry, exit_, sells)
+    cost = trade_cost(model, entry, exit_, sells)
+    return pts * LOT_SIZE - cost, cost
 
 
 def run_lab(
@@ -399,7 +415,7 @@ def run_lab(
             t1 = dates[i + 1]
             use_expiry = expiry if dte > 1 else expiry + timedelta(days=7)
             S0, S1 = float(cls.iloc[i]), float(opn.iloc[i + 1])
-            T0, T1 = (use_expiry - t).days / 365, (use_expiry - t1).days / 365
+            T0, T1 = _years(pricing, t, use_expiry), _years(pricing, t1, use_expiry)
             sig0 = float(vclose.iloc[i]) / 100
             v_open = num(vopen.iloc[i + 1])
             sig1 = (v_open if v_open and v_open > 0 else float(vclose.iloc[i])) / 100
@@ -408,12 +424,12 @@ def run_lab(
                 sig1 = sig0 * (1 + pricing.vol_follows_day * move)
         else:
             S0, S1 = float(opn.iloc[i]), float(cls.iloc[i])
-            T0 = (expiry - t).days / 365
-            T1 = T0 - MORNING_HOLD_YEARS
+            T0 = _years(pricing, t, expiry)
+            T1 = T0 - (0.96 / 252 if pricing.trading_clock else MORNING_HOLD_YEARS)
             v0 = num(vopen.iloc[i])
             sig0 = (v0 if v0 and v0 > 0 else float(vclose.iloc[i - 1])) / 100
             sig1 = float(vclose.iloc[i]) / 100
-        pnl = _price_trade(
+        pnl, cost = _price_trade(
             pricing, plan.config["legs"], S0=S0, S1=S1, T0=T0, T1=T1, sig0=sig0, sig1=sig1
         )
         trades.append(
@@ -422,10 +438,19 @@ def run_lab(
                 "regime": regime.label,
                 "side": plan.side,
                 "pnl": round(pnl, 1),
+                "cost": round(cost, 1),
             }
         )
 
     pnls = [tr["pnl"] for tr in trades]
+    metrics = summarize(pnls)
+    if trades:
+        avg_cost = sum(tr["cost"] for tr in trades) / len(trades)
+        metrics["avg_cost"] = round(avg_cost, 1)
+        # Before costs. The most a trader could pay per lot per trade and still
+        # break even, which is the number to compare with their own costs.
+        metrics["avg_gross"] = round(metrics["avg"] + avg_cost, 1)
+        metrics["break_even_cost"] = round(max(0.0, metrics["avg_gross"]), 1)
     yearly: dict[int, dict[str, Any]] = {}
     for year in sorted({int(tr["date"][:4]) for tr in trades}):
         yearly[year] = summarize([tr["pnl"] for tr in trades if int(tr["date"][:4]) == year])
@@ -440,7 +465,7 @@ def run_lab(
         end=t_end.strftime("%Y-%m-%d"),
         days=days,
         trades=trades,
-        metrics=summarize(pnls),
+        metrics=metrics,
         yearly=yearly,
         curve=curve,
         skipped=dict(sorted(skipped.items(), key=lambda kv: -kv[1])),

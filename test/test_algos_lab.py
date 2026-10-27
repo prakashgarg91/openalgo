@@ -146,10 +146,10 @@ def test_flat_cost_ignores_the_legs_and_the_conservative_cost_grows_with_premium
     assert cheap > 0 and dear > cheap
 
 
-def test_conservative_costs_are_not_below_the_flat_rate_for_a_normal_condor():
+def test_itemised_cost_of_a_cheap_condor_is_a_realistic_nifty_figure():
     entry, exit_ = [4.0, 4.0, 40.0, 40.0], [3.0, 3.0, 30.0, 30.0]
-    sells = [False, False, True, True]
-    assert trade_cost(CONSERVATIVE, entry, exit_, sells) >= 300.0
+    cost = trade_cost(CONSERVATIVE, entry, exit_, [False, False, True, True])
+    assert 150 <= cost <= 400
 
 
 # --- replay ----------------------------------------------------------------
@@ -230,3 +230,36 @@ def test_standard_model_reproduces_the_original_backtest():
     )
     zen = run_lab(h, "zen", model="standard", start="2018-01-01").metrics
     assert zen["trades"] == 1360 and zen["win_rate"] == 62.5 and zen["profit_factor"] == 1.49
+
+
+def test_every_trade_reports_its_cost_and_the_break_even_is_the_gross_edge(history):
+    result = run_lab(history, "calm_condor", model="conservative", gated=False)
+    assert result.trades and all(t["cost"] > 0 for t in result.trades)
+    m = result.metrics
+    assert m["avg_gross"] == pytest.approx(m["avg"] + m["avg_cost"], abs=0.2)
+    assert m["break_even_cost"] == max(0.0, m["avg_gross"])
+
+
+def test_conservative_cost_for_a_condor_is_a_realistic_nifty_figure():
+    # Four legs, shorts near 70 points, longs near 12. Liquid weekly Nifty options:
+    # a few hundred rupees per lot, not thousands.
+    cost = trade_cost(
+        CONSERVATIVE, [12.0, 12.0, 70.0, 70.0], [10.0, 10.0, 55.0, 55.0], [False, False, True, True]
+    )
+    assert 250 <= cost <= 700
+
+
+def test_the_trading_clock_gives_a_weekend_one_session_of_decay_not_three_days():
+    fri, mon, thu = (
+        pd.Timestamp("2024-03-01"),
+        pd.Timestamp("2024-03-04"),
+        pd.Timestamp("2024-03-07"),
+    )
+    assert lab._years(STANDARD, fri, mon) == pytest.approx(3 / 365)
+    assert lab._years(CONSERVATIVE, fri, mon) == pytest.approx(1 / 252)
+    # Friday to the next Thursday is four sessions on the trading clock.
+    assert lab._years(CONSERVATIVE, fri, thu) == pytest.approx(4 / 252)
+
+
+def test_only_the_conservative_model_uses_the_trading_clock():
+    assert CONSERVATIVE.trading_clock and not STANDARD.trading_clock
