@@ -10,6 +10,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AlgoItem, Deployment } from '@/api/algos'
 import Algos from './Algos'
@@ -24,6 +25,7 @@ const api = vi.hoisted(() => ({
   setAlgoLive: vi.fn(),
   checkAlgoNow: vi.fn(),
   removeAlgo: vi.fn(),
+  fetchReadiness: vi.fn(),
 }))
 
 vi.mock('@/api/algos', async (importOriginal) => ({
@@ -69,7 +71,9 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
-      <Algos />
+      <MemoryRouter>
+        <Algos />
+      </MemoryRouter>
     </QueryClientProvider>
   )
 }
@@ -86,6 +90,21 @@ beforeEach(() => {
     missing_labels: [],
     reliable: true,
   })
+  api.fetchReadiness.mockResolvedValue({
+    ready_for_sandbox: true,
+    ready_for_live: false,
+    next: 'broker',
+    steps: [
+      { id: 'api_key', label: 'OpenAlgo API key', state: 'done', detail: 'Created.', path: null },
+      {
+        id: 'broker',
+        label: 'Upstox login for today',
+        state: 'todo',
+        detail: 'Log in to your broker again. Broker logins expire every morning.',
+        path: '/broker',
+      },
+    ],
+  })
   api.fetchCoverage.mockResolvedValue({
     regimes: { calm: ['zen'], trending: ['zen'], volatile: [], event: [] },
     stands_aside_on: ['volatile', 'event'],
@@ -93,6 +112,14 @@ beforeEach(() => {
 })
 
 describe('Algos page', () => {
+  it('tells the trader what blocks Live and links to the fix', async () => {
+    api.fetchCatalogue.mockResolvedValue([algo(null)])
+    renderPage()
+    expect(await screen.findByText('Before you can go Live')).toBeTruthy()
+    expect(screen.getByText('Upstox login for today')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Open' }).getAttribute('href')).toBe('/broker')
+  })
+
   it('shows the regime and the days the platform stands aside', async () => {
     api.fetchCatalogue.mockResolvedValue([algo(null)])
     renderPage()

@@ -137,6 +137,7 @@ export const algoQueryKeys = {
   catalogue: () => [...algoQueryKeys.all, 'catalogue'] as const,
   regime: () => [...algoQueryKeys.all, 'regime'] as const,
   coverage: () => [...algoQueryKeys.all, 'coverage'] as const,
+  readiness: () => [...algoQueryKeys.all, 'readiness'] as const,
 }
 
 export async function fetchCatalogue(): Promise<AlgoItem[]> {
@@ -205,5 +206,25 @@ export async function removeAlgo(id: number): Promise<void> {
 
 export async function runLab(request: LabRequest): Promise<LabResult> {
   const response = await webClient.post<{ data: LabResult }>(`${BASE}/lab/run`, request)
+  return response.data.data
+}
+
+export interface ReadinessStep {
+  id: string
+  label: string
+  state: 'done' | 'todo' | 'confirm'
+  detail: string
+  path: string | null
+}
+
+export interface Readiness {
+  steps: ReadinessStep[]
+  ready_for_sandbox: boolean
+  ready_for_live: boolean
+  next: string | null
+}
+
+export async function fetchReadiness(): Promise<Readiness> {
+  const response = await webClient.get<{ data: Readiness }>(`${BASE}/readiness`)
   return response.data.data
 }

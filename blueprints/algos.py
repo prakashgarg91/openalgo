@@ -18,7 +18,7 @@ from flask import Blueprint, jsonify, request, session
 from database import algo_db
 from database import strategy_module_db as sm_store
 from limiter import limiter
-from services.algos import lab, runner
+from services.algos import lab, readiness, runner
 from services.algos.templates import ALGOS
 from services.algos.templates import coverage as coverage_matrix
 from utils.logging import get_logger
@@ -160,6 +160,27 @@ def regime():
         return runner.regime_to_dict(result)
 
     return _ok({"data": _regime_cache.get_or_load(user, load)})
+
+
+@algos_bp.route("/api/readiness", methods=["GET"])
+@check_session_validity
+@_api_limit
+def readiness_check():
+    """What stands between this installation and a Live order, in plain words."""
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    from database.auth_db import get_api_key, get_auth_token
+    from database.master_contract_status_db import check_if_ready
+
+    broker = session.get("broker")
+    facts = readiness.Facts(
+        broker=broker,
+        has_api_key=bool(get_api_key(user)),
+        broker_logged_in=bool(broker and get_auth_token(user)),
+        master_contract_ready=bool(broker and check_if_ready(broker)),
+    )
+    return _ok({"data": readiness.evaluate(facts)})
 
 
 @algos_bp.route("/api/coverage", methods=["GET"])
