@@ -43,7 +43,13 @@ export function ReadinessPanel() {
                 />
                 <div>
                   <span className="font-medium">{step.label}</span>
-                  <span className="sr-only">{step.state === 'done' ? ' (done)' : ' (to do)'}</span>
+                  <span className="sr-only">
+                    {step.state === 'done'
+                      ? ' (done)'
+                      : step.state === 'todo'
+                        ? ' (to do)'
+                        : ' (please check)'}
+                  </span>
                   <p className="text-muted-foreground">
                     {step.detail}{' '}
                     {step.path && (
@@ -57,6 +63,26 @@ export function ReadinessPanel() {
             )
           })}
         </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function StartHere() {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Start in three steps</CardTitle>
+        <CardDescription>
+          Nothing here places a real order until you switch it Live.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ol className="list-decimal space-y-1 pl-5 text-sm">
+          <li>Pick an algo below and read what it has and has not been shown to do.</li>
+          <li>Enter the capital it may use and press Add. It starts in Sandbox.</li>
+          <li>Turn it on. It checks the market once a day and its decisions are logged.</li>
+        </ol>
       </CardContent>
     </Card>
   )

@@ -112,6 +112,17 @@ beforeEach(() => {
 })
 
 describe('Algos page', () => {
+  it('shows the three-step guide only until something is deployed', async () => {
+    api.fetchCatalogue.mockResolvedValue([algo(null)])
+    const first = renderPage()
+    expect(await screen.findByText('Start in three steps')).toBeTruthy()
+    first.unmount()
+    api.fetchCatalogue.mockResolvedValue([algo(deployment())])
+    renderPage()
+    await screen.findByText('Before you can go Live')
+    expect(screen.queryByText('Start in three steps')).toBeNull()
+  })
+
   it('tells the trader what blocks Live and links to the fix', async () => {
     api.fetchCatalogue.mockResolvedValue([algo(null)])
     renderPage()

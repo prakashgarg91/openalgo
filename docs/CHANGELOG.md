@@ -8,6 +8,22 @@ fix, live in [docs/releases](releases/).
 
 ## [Unreleased]
 
+### Added
+
+- New Algos page (/algos): ready-made regime algos (Zen, Mirror Zen, Calm
+  Condor, Morning Gap) that you add with a capital amount and turn on. Each
+  starts in Sandbox. Going Live needs the Live checklist to pass and you to
+  type back the worst-case loss in rupees. A Lab replays any algo over past
+  years with itemised costs. None of the four was profitable after costs on
+  real NSE option prices (2022 to October 2026); the page says so on every
+  card. Read docs/algos/README.md before turning anything Live.
+- The Algos page shows what stands between your install and a Live order: API
+  key, broker login for today, instrument list. The static IP your broker must
+  have registered cannot be checked from OpenAlgo, so it is listed as
+  something for you to confirm.
+- Existing installs need `cd upgrade && uv run migrate_all.py` once, which adds
+  the two Algos tables.
+
 ### Changed
 
 - The Scalping Terminal charts are now drawn by openalgo-charts, the engine

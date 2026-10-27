@@ -19,7 +19,7 @@ import {
   setAlgoLive,
 } from '@/api/algos'
 import { LabPanel } from '@/components/algos/LabPanel'
-import { ReadinessPanel } from '@/components/algos/ReadinessPanel'
+import { ReadinessPanel, StartHere } from '@/components/algos/ReadinessPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -416,6 +416,8 @@ export default function Algos() {
           mode and has to prove itself there before it can go Live.
         </p>
       </div>
+
+      {catalogue.data && !catalogue.data.some((a) => a.deployment) && <StartHere />}
 
       <ReadinessPanel />
 

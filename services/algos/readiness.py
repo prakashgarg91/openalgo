@@ -56,7 +56,7 @@ def evaluate(facts: Facts) -> dict:
             "done" if facts.master_contract_ready else "todo",
             "Ready."
             if facts.master_contract_ready
-            else "The instrument list is still downloading. Wait a minute after login, then refresh.",
+            else "The instrument list is not ready yet. It downloads after you log in; if this stays, open the page and download it again.",
             None if facts.master_contract_ready else "/master-contract",
         ),
         Step(
