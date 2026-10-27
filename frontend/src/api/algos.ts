@@ -90,6 +90,46 @@ export interface Coverage {
   stands_aside_on: RegimeLabel[]
 }
 
+export type LabModel = 'standard' | 'conservative'
+
+export interface LabMetrics {
+  trades: number
+  win_rate: number
+  avg: number
+  total: number
+  max_drawdown: number
+  profit_factor: number | null
+  worst: number
+  best: number
+  avg_cost?: number
+  avg_gross?: number
+  break_even_cost?: number
+}
+
+export interface LabResult {
+  algo_id: string
+  algo_name: string
+  model: { name: LabModel; label: string }
+  gated: boolean
+  start: string
+  end: string
+  days: number
+  metrics: LabMetrics
+  yearly: ({ year: number } & LabMetrics)[]
+  curve: [string, number][]
+  trades: { date: string; regime: string; side: string; pnl: number; cost: number }[]
+  skipped: { reason: string; days: number }[]
+  notes: string[]
+  caveats: string[]
+}
+
+export interface LabRequest {
+  algo_id: string
+  model: LabModel
+  gated: boolean
+  start?: string
+}
+
 export const algoQueryKeys = {
   all: ['algos'] as const,
   catalogue: () => [...algoQueryKeys.all, 'catalogue'] as const,
@@ -159,4 +199,9 @@ export async function checkAlgoNow(id: number): Promise<{ action: string; reason
 
 export async function removeAlgo(id: number): Promise<void> {
   await webClient.delete(`${BASE}/deployments/${id}`)
+}
+
+export async function runLab(request: LabRequest): Promise<LabResult> {
+  const response = await webClient.post<{ data: LabResult }>(`${BASE}/lab/run`, request)
+  return response.data.data
 }

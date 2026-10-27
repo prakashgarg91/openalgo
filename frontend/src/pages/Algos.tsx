@@ -18,6 +18,7 @@ import {
   setAlgoActive,
   setAlgoLive,
 } from '@/api/algos'
+import { LabPanel } from '@/components/algos/LabPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -433,6 +434,8 @@ export default function Algos() {
           </CardContent>
         </Card>
       ))}
+
+      {catalogue.data && catalogue.data.length > 0 && <LabPanel algos={catalogue.data} />}
     </div>
   )
 }
