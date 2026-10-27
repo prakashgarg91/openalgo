@@ -252,11 +252,19 @@ function DeployedAlgo({ algo, deployment }: { algo: AlgoItem; deployment: Deploy
         </span>
       </div>
 
-      {algo.overnight && (
+      <p className="text-sm text-muted-foreground">
+        Checks the market at {algo.entry_time} on every trading day.
+      </p>
+
+      {algo.overnight ? (
         <p className="flex items-start gap-2 text-sm text-muted-foreground">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           This algo holds overnight and exits at 09:45 the next morning. Log in to your broker
           before then each day, or the exit cannot be sent.
+        </p>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          This algo trades within the day and closes its position before the market ends.
         </p>
       )}
 
@@ -344,7 +352,7 @@ function DeployedAlgo({ algo, deployment }: { algo: AlgoItem; deployment: Deploy
         <div className="mb-1 text-sm font-medium">Recent decisions</div>
         {deployment.recent_decisions.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Nothing yet. The first check runs at 15:05 on the next trading day.
+            Nothing yet. The first check runs at {algo.entry_time} on the next trading day.
           </p>
         ) : (
           <ul className="space-y-1 text-sm">

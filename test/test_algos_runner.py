@@ -277,3 +277,26 @@ def test_morning_gap_stands_aside_when_the_quote_has_no_opening_gap(env):
 def test_morning_gap_can_be_deployed_and_has_a_worst_case_to_confirm():
     dep = _deploy("morning_gap")
     assert runner.max_loss_ceiling("morning_gap", dep["capital"]) == 45000.0
+
+
+def test_one_deployment_with_an_unknown_algo_does_not_stop_the_others_being_scheduled():
+    """An algo renamed or removed in a later release must not break boot for the rest."""
+    sm_scheduler.start(paused=True)
+    try:
+        good = _deploy("zen", active=True)
+        bad = _deploy("morning_gap", active=True)
+        # Point the second deployment at an algo this release does not know.
+        algo_db.db_session.query(algo_db.AlgoDeployment).filter_by(id=bad["id"]).update(
+            {"algo_id": "retired_algo"}
+        )
+        algo_db.db_session.commit()
+        algo_db.db_session.remove()
+
+        installed = runner.sync_all_jobs()
+
+        sched = sm_scheduler.get_scheduler()
+        assert sched.get_job(runner.job_id(good["id"])) is not None
+        assert sched.get_job(runner.job_id(bad["id"])) is None
+        assert installed == 1
+    finally:
+        sm_scheduler.shutdown()

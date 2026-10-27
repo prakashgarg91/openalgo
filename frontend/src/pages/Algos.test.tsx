@@ -58,6 +58,7 @@ function algo(deployed: Deployment | null): AlgoItem {
     risk: 'medium',
     allowed_regimes: ['calm', 'trending'],
     overnight: true,
+    entry_time: '15:05',
     status: 'tested',
     evidence: 'Indicative test on Nifty data.',
     deployment: deployed,
@@ -154,6 +155,22 @@ describe('Algos page', () => {
     api.fetchCatalogue.mockResolvedValue([algo(deployment())])
     renderPage()
     expect(await screen.findByText(/exits at 09:45 the next morning/)).toBeTruthy()
+  })
+
+  it("shows the algo's own check time, not a fixed one", async () => {
+    api.fetchCatalogue.mockResolvedValue([
+      { ...algo(deployment()), entry_time: '09:25', overnight: false },
+    ])
+    renderPage()
+    expect(await screen.findByText(/Checks the market at 09:25/)).toBeTruthy()
+    expect(screen.getByText(/The first check runs at 09:25/)).toBeTruthy()
+  })
+
+  it('does not warn about an overnight exit on an intraday algo', async () => {
+    api.fetchCatalogue.mockResolvedValue([{ ...algo(deployment()), overnight: false }])
+    renderPage()
+    expect(await screen.findByText(/trades within the day/)).toBeTruthy()
+    expect(screen.queryByText(/exits at 09:45 the next morning/)).toBeNull()
   })
 
   it('never uses the word armed anywhere a trader reads', async () => {
