@@ -13,7 +13,7 @@ from typing import Any
 
 from services.algos import chooser
 from services.algos.context import RegimeResult
-from services.algos.templates import ALGOS, DEFAULT_MAX_LOSS_PCT, Plan, build
+from services.algos.templates import ALGOS, Plan, build
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -61,7 +61,7 @@ def smart_plan(
     capital: float,
     lot_size: int,
     days_to_expiry: int | None,
-    max_loss_pct: float = DEFAULT_MAX_LOSS_PCT,
+    max_loss_pct: float | None = None,
     inputs: Any = None,
 ) -> Plan:
     """Run whichever algo the chooser picks for today, or sit out. Never invents its own trade."""

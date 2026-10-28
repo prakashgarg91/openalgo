@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from services.algos import mandate
 from services.algos.context import RegimeResult
 from services.algos.lab import summarize
 from services.algos.templates import (
@@ -197,7 +198,7 @@ def live_plan(
     capital: float,
     lot_size: int,
     days_to_expiry: int | None,
-    max_loss_pct: float = DEFAULT_MAX_LOSS_PCT,
+    max_loss_pct: float | None = None,
 ) -> Plan:
     """The plan the daily runner acts on. Sized so the worst case fits the loss limit."""
     reason = _gate(spec, regime, days_to_expiry)
@@ -222,6 +223,7 @@ def live_plan(
             None,
             None,
         )
+    max_loss_pct = mandate.effective_pct(capital, DEFAULT_MAX_LOSS_PCT, max_loss_pct)
     loss_per_lot = spec.width_pts * lot_size
     lots = min(int((capital * max_loss_pct / 100.0) // loss_per_lot), MAX_ENGINE_LOTS)
     if lots < 1:

@@ -16,6 +16,7 @@ from typing import Any
 from database import algo_db
 from database import strategy_module_db as sm_store
 from services.algos import inputs as feed
+from services.algos import mandate
 from services.algos.context import (
     INPUT_LABELS,
     RELIABLE_CONFIDENCE,
@@ -225,7 +226,7 @@ def max_loss_ceiling(algo_id: str, capital: float) -> float | None:
         return None
     if algo_id == "smart_pick":
         # It may run any overnight algo, and every one of them is sized to the same cap.
-        return float(capital * DEFAULT_MAX_LOSS_PCT / 100.0)
+        return float(capital * mandate.effective_pct(capital, DEFAULT_MAX_LOSS_PCT) / 100.0)
     plan = build(
         algo_id,
         _PLACEHOLDER_REGIME,
@@ -346,6 +347,21 @@ def _record(dep_id: int, action: str, reason: str, **fields: Any) -> dict[str, A
     return {"action": action, "reason": reason, **fields}
 
 
+def committed_today(user_id: str, today: date) -> float:
+    """Worst-case rupees already put at risk today by this trader's algos, from their own log."""
+    from datetime import timedelta
+
+    total = 0.0
+    for dep in algo_db.list_deployments(user_id):
+        for decision in algo_db.list_decisions(dep["id"], 20):
+            if decision["action"] != "trade" or not decision["decided_at"]:
+                continue
+            when = datetime.fromisoformat(decision["decided_at"]) + timedelta(hours=5, minutes=30)
+            if when.date() == today:  # stored as UTC; the trading day is the Indian date
+                total += float(decision["max_loss_inr"] or 0)
+    return total
+
+
 @releases_scoped_sessions
 def run_entry(deployment_id: int, *, today: date | None = None) -> dict[str, Any]:
     """The daily entry check for one deployment.
@@ -409,6 +425,19 @@ def run_entry(deployment_id: int, *, today: date | None = None) -> dict[str, Any
         )
         if plan.action != "trade":
             return _record(deployment_id, "skip", plan.reason, **regime_fields)
+
+        cap = mandate.daily_cap_from_env()
+        if cap is not None:
+            used = committed_today(user_id, today)
+            if used + float(plan.max_loss_inr or 0) > cap:
+                return _record(
+                    deployment_id,
+                    "skip",
+                    f"Today's loss limit of Rs {cap:,.0f} would be passed: Rs {used:,.0f} is "
+                    f"already at risk from your other algos and this one could lose "
+                    f"Rs {plan.max_loss_inr or 0:,.0f} more.",
+                    **regime_fields,
+                )
 
         from blueprints.strategy_module import validate_strategy_config
         from services.strategy_module import engine

@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from services.algos import mandate
 from services.algos.context import MarketInputs, RegimeResult
 
 STRIKE_STEP = 50  # NIFTY strike gap in points
@@ -321,7 +322,7 @@ def build(
     capital: float,
     lot_size: int,
     days_to_expiry: int | None,
-    max_loss_pct: float = DEFAULT_MAX_LOSS_PCT,
+    max_loss_pct: float | None = None,
     inputs: MarketInputs | None = None,
 ) -> Plan:
     """Turn a regime into a plan. Raises ``KeyError`` for an unknown algo.
@@ -329,6 +330,7 @@ def build(
     ``inputs`` is the raw market snapshot. Only the morning algo reads it, for
     the opening gap, which the regime label alone does not carry.
     """
+    max_loss_pct = mandate.effective_pct(capital, DEFAULT_MAX_LOSS_PCT, max_loss_pct)
     spec = ALGOS[algo_id]
     if algo_id == "smart_pick":
         from services.algos import chooser_store
