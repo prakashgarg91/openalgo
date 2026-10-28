@@ -398,3 +398,56 @@ def test_a_real_price_replay_uses_only_actual_prices_and_counts_what_it_cannot_p
     assert result.skipped.get("No option prices for this day", 0) > 0
     for trade in result.trades:  # any priced trade must come from the two real days
         assert trade["date"] == d0.strftime("%Y-%m-%d")
+
+
+# --- multi-day hold on real prices -------------------------------------------
+
+
+def _hold_world(history, hold_day_index):
+    """Real prices on entry day d0, the next day d1 and a later day dk, all for one expiry."""
+    nifty = history.frames["nifty"]
+    d0, d1, dk = nifty.index[40], nifty.index[41], nifty.index[40 + hold_day_index]
+    spot = float(nifty["Close"].iloc[40])
+    atm = round(spot / 50) * 50
+    expiry = nifty.index[40 + hold_day_index] + pd.Timedelta(days=2)
+    entry = [(atm - 50 * n, "PE", 0, 20.0 - n, 100) for n in (1, 4)]
+    one_night = [(atm - 50 * n, "PE", 15.0 - n, 0, 0) for n in (1, 4)]
+    later = [(atm - 50 * n, "PE", 6.0 - n, 0, 0) for n in (1, 4)]
+    days = {d0: _real_day(d0, expiry, entry), d1: _real_day(d1, expiry, one_night)}
+    days[dk] = _real_day(dk, expiry, later)
+    return d0, d1, dk, lab.RealPrices(days)
+
+
+def _one_leg_plan(regime, inputs, dte, extra):
+    from services.algos.templates import Plan, spread_config
+
+    cfg = spread_config("c", "bull_put", 1, "weekly", short_offset="OTM1", long_offset="OTM4")
+    return Plan("zen", "trade", "", cfg, 1, 0.0, "bull_put")
+
+
+def test_holding_longer_prices_the_exit_from_the_later_day(history):
+    d0, d1, dk, real = _hold_world(history, 3)
+    one = run_lab(history, "zen", gated=False, real=real, plan_fn=_one_leg_plan, hold=1)
+    three = run_lab(history, "zen", gated=False, real=real, plan_fn=_one_leg_plan, hold=3)
+    day = d0.strftime("%Y-%m-%d")
+    pnl_one = next(t["pnl"] for t in one.trades if t["date"] == day)
+    pnl_three = next(t["pnl"] for t in three.trades if t["date"] == day)
+    assert pnl_one != pnl_three
+    # Short OTM1 leg decayed 19 -> 14 overnight and 19 -> 5 over three days: the longer hold
+    # kept more of the premium before costs.
+    assert pnl_three > pnl_one
+
+
+def test_a_hold_longer_than_a_night_needs_real_prices(history):
+    with pytest.raises(ValueError):
+        run_lab(history, "zen", hold=2)
+    with pytest.raises(ValueError):
+        run_lab(history, "zen", hold=0)
+
+
+def test_a_hold_with_no_price_on_the_exit_day_is_skipped_and_counted(history):
+    d0, d1, dk, real = _hold_world(history, 3)
+    real._days.pop(dk)
+    result = run_lab(history, "zen", gated=False, real=real, plan_fn=_one_leg_plan, hold=3)
+    assert result.skipped.get("No option prices for this day", 0) > 0
+    assert not any(t["date"] == d0.strftime("%Y-%m-%d") for t in result.trades)

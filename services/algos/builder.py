@@ -34,10 +34,14 @@ from services.algos.templates import (
     STRIKE_STEP,
     Plan,
     condor_config,
+    debit_spread_config,
     spread_config,
 )
 
 FAMILIES = ("condor", "bull_put", "bear_call")
+#: Spreads that pay a debit: the nearer strike is bought and the farther one sold.
+DEBIT_FAMILIES = ("bull_call", "bear_put")
+BIASES = ("any", "bullish", "bearish")
 SHAPES = ((1, 3), (1, 4), (2, 4), (2, 5), (3, 5))  # (short OTM, long OTM)
 LABEL_SETS = (("calm",), ("calm", "trending"))
 EXPIRY_HANDLING = ("skip", "roll")
@@ -66,14 +70,23 @@ class Spec:
     long: int
     labels: tuple[str, ...]
     expiry: str  # skip | roll, for the day before and the day of weekly expiry
+    #: Trade only when the day's lean matches: any, bullish or bearish.
+    bias: str = "any"
 
     @property
     def name(self) -> str:
-        kind = {"condor": "Iron condor", "bull_put": "Bull put", "bear_call": "Bear call"}[
-            self.family
-        ]
+        kind = {
+            "condor": "Iron condor",
+            "bull_put": "Bull put",
+            "bear_call": "Bear call",
+            "bull_call": "Bull call debit",
+            "bear_put": "Bear put debit",
+        }[self.family]
+        lean = "" if self.bias == "any" else f", {self.bias} lean only"
         tail = "skipping expiry eve" if self.expiry == "skip" else "rolling past expiry eve"
-        return f"{kind} OTM{self.short}/OTM{self.long} on {'+'.join(self.labels)} days, {tail}"
+        return (
+            f"{kind} OTM{self.short}/OTM{self.long} on {'+'.join(self.labels)} days{lean}, {tail}"
+        )
 
     @property
     def width_pts(self) -> int:
@@ -86,6 +99,7 @@ class Spec:
             "long": self.long,
             "labels": list(self.labels),
             "expiry": self.expiry,
+            "bias": self.bias,
         }
 
     @classmethod
@@ -93,15 +107,16 @@ class Spec:
         if not isinstance(raw, dict):
             raise SpecError("The algo definition is missing.")
         family = raw.get("family")
-        if family not in FAMILIES:
-            raise SpecError("Pick an iron condor, a bull put spread or a bear call spread.")
+        if family not in (*FAMILIES, *DEBIT_FAMILIES):
+            raise SpecError("Pick an iron condor or a credit or debit spread.")
         try:
             short, long = int(raw.get("short")), int(raw.get("long"))
         except (TypeError, ValueError):
             raise SpecError("Strike distances must be whole numbers.") from None
-        if not (1 <= short < long <= 8):
+        lowest = 0 if family in DEBIT_FAMILIES else 1
+        if not (lowest <= short < long <= 8):
             raise SpecError(
-                "The bought strike must be further out than the sold strike, within 8 strikes."
+                "The far strike must be further out than the near strike, within 8 strikes."
             )
         labels = tuple(raw.get("labels") or ())
         if not labels or any(label not in VALID_LABELS for label in labels):
@@ -109,7 +124,10 @@ class Spec:
         expiry = raw.get("expiry", "skip")
         if expiry not in EXPIRY_HANDLING:
             raise SpecError("Expiry handling must be skip or roll.")
-        return cls(family, short, long, labels, expiry)
+        bias = raw.get("bias", "any")
+        if bias not in BIASES:
+            raise SpecError("Lean must be any, bullish or bearish.")
+        return cls(family, short, long, labels, expiry, bias)
 
 
 def space(
@@ -134,6 +152,8 @@ def _gate(spec: Spec, regime: RegimeResult, dte: int | None) -> str | None:
     """Why this spec stands aside today, or None. The one rule set shared by the Lab and live."""
     if regime.label not in spec.labels or regime.confidence < MIN_CONFIDENCE:
         return "regime"
+    if spec.bias != "any" and regime.bias != spec.bias:
+        return "regime"
     if dte is not None and dte <= 1 and spec.expiry == "skip":
         return "expiry eve"
     return None
@@ -146,6 +166,10 @@ def _config(spec: Spec, lots: int, dte: int | None, name: str) -> tuple[dict[str
         return condor_config(
             name, lots, expiry, short_offset=short, long_offset=long
         ), "iron_condor"
+    if spec.family in DEBIT_FAMILIES:
+        return debit_spread_config(
+            name, spec.family, lots, expiry, near_offset=short, far_offset=long
+        ), spec.family
     return spread_config(
         name, spec.family, lots, expiry, short_offset=short, long_offset=long
     ), spec.family

@@ -166,3 +166,66 @@ def test_no_losing_trade_at_all_counts_as_unbounded_profit_factor():
     assert b._pf({"profit_factor": None, "total": 500.0}) == float("inf")
     assert b._pf({"profit_factor": None, "total": 0.0}) == 0.0
     assert b._pf({"profit_factor": 1.4, "total": 5.0}) == 1.4
+
+
+# -- bias filter and debit spreads ----------------------------------------------------
+
+
+def lean(label="calm", bias="bullish", confidence=1.0):
+    return RegimeResult(label, bias, 0.2, confidence, ("ok",), ())
+
+
+def test_an_old_stored_spec_without_a_bias_still_loads_as_any():
+    old = {"family": "condor", "short": 2, "long": 5, "labels": ["calm"], "expiry": "skip"}
+    assert b.Spec.from_dict(old).bias == "any"
+    assert b.Spec.from_dict({**old, "bias": "bullish"}).to_dict()["bias"] == "bullish"
+
+
+@pytest.mark.parametrize("bad", ["sideways", None, 3])
+def test_unknown_bias_is_refused(bad):
+    with pytest.raises(b.SpecError):
+        b.Spec.from_dict(
+            {"family": "bull_put", "short": 1, "long": 4, "labels": ["calm"], "bias": bad}
+        )
+
+
+def test_a_bullish_only_spec_stands_aside_on_other_leans_in_both_lab_and_live():
+    spec = b.Spec("bull_put", 2, 5, ("calm", "trending"), "skip", "bullish")
+    for bias, trades in (("bullish", True), ("bearish", False), ("neutral", False)):
+        lab_plan = b.lab_plan_fn(spec)(lean(bias=bias), None, 4, {})
+        live = b.live_plan(
+            spec, "c", "Mine", lean(bias=bias), capital=500_000, lot_size=75, days_to_expiry=4
+        )
+        assert (lab_plan.action == "trade") == trades == (live.action == "trade"), bias
+
+
+def test_debit_spreads_buy_the_near_strike_and_sell_the_far_one():
+    for family, kind in (("bull_call", "CE"), ("bear_put", "PE")):
+        spec = b.Spec(family, 0, 2, ("calm",), "skip")
+        plan = b.lab_plan_fn(spec)(lean(), None, 4, {})
+        legs = {(x["position"], x["atm_offset"], x["option_type"]) for x in plan.config["legs"]}
+        assert legs == {("B", "OTM0", kind), ("S", "OTM2", kind)}
+        assert plan.side == family
+
+
+def test_only_debit_spreads_may_start_at_the_money():
+    assert b.Spec.from_dict({"family": "bull_call", "short": 0, "long": 2, "labels": ["calm"]})
+    with pytest.raises(b.SpecError):
+        b.Spec.from_dict({"family": "bull_put", "short": 0, "long": 2, "labels": ["calm"]})
+
+
+@pytest.mark.parametrize("family", b.DEBIT_FAMILIES)
+@pytest.mark.parametrize("dte", [0, 1, 4])
+def test_debit_live_plan_matches_the_lab_plan_and_sizes_by_width(family, dte):
+    spec = b.Spec(family, 1, 4, ("calm",), "skip")  # 150 points wide
+    lab_plan = b.lab_plan_fn(spec)(lean(), None, dte, {})
+    live = b.live_plan(spec, "c", "Mine", lean(), capital=500_000, lot_size=75, days_to_expiry=dte)
+    assert lab_plan.action == live.action
+    if live.action == "trade":
+        assert _legs(lab_plan) == _legs(live)
+        assert live.lots == 4 and live.max_loss_inr == 4 * 150 * 75
+
+
+def test_names_say_the_lean_and_the_structure():
+    spec = b.Spec("bull_call", 0, 3, ("calm",), "skip", "bullish")
+    assert spec.name.startswith("Bull call debit OTM0/OTM3") and "bullish lean only" in spec.name

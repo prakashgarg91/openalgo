@@ -451,6 +451,7 @@ def run_lab(
     plan_fn: Callable[..., Any] | None = None,
     real: RealPrices | None = None,
     trace: dict[str, Any] | None = None,
+    hold: int = 1,
 ) -> LabResult:
     """Replay one algo over the history. Raises ``KeyError`` for an unknown algo or model.
 
@@ -461,10 +462,16 @@ def run_lab(
     ``real`` prices overnight trades from actual option prices instead of the
     model. Days without option data are skipped and counted.
 
+    ``hold`` is how many trading days an overnight trade is kept, entered at the close and exited
+    at the open ``hold`` days later. More than one needs ``real`` prices (the models only know
+    one night) and is for research: the live engine exits the next morning.
+
     ``trace``, when given, is filled with what happened on the day(s) replayed:
     the inputs, the regime, the plan and the pricing. The debugger replays a single
     day with it; nothing else sets it.
     """
+    if hold < 1 or (hold > 1 and real is None):
+        raise ValueError("hold above one day needs real option prices")
     spec = ALGOS[algo_id]
     pricing = MODELS[model]
     frames = history.frames
@@ -491,7 +498,7 @@ def run_lab(
 
     trades: list[dict[str, Any]] = []
     skipped: dict[str, int] = {}
-    last = len(dates) - (1 if spec.overnight else 0)
+    last = len(dates) - (hold if spec.overnight else 0)
     days = 0
     for i in range(WARMUP_DAYS, last):
         t = dates[i]
@@ -541,7 +548,10 @@ def run_lab(
         expiry = expiry_after(t)
         if real is not None and spec.overnight:
             listed = real.expiries(t)
-            if not listed or not real.has_day(dates[i + 1]):
+            if hold > 1:
+                # The contract must still exist on the day it is sold.
+                listed = [e for e in listed if e >= dates[i + hold]]
+            if not listed or not real.has_day(dates[i + hold]):
                 skipped["No option prices for this day"] = (
                     skipped.get("No option prices for this day", 0) + 1
                 )
@@ -577,7 +587,7 @@ def run_lab(
         priced = False
         if real is not None and spec.overnight:
             outcome = _real_trade(
-                pricing, plan.config["legs"], real, t, dates[i + 1], expiry, float(cls.iloc[i])
+                pricing, plan.config["legs"], real, t, dates[i + hold], expiry, float(cls.iloc[i])
             )
             if outcome is None:
                 skipped["A contract had no opening price"] = (

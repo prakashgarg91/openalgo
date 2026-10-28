@@ -213,6 +213,50 @@ def spread_config(
     }
 
 
+def debit_spread_config(
+    name: str,
+    side: str,
+    lots: int,
+    expiry: str,
+    *,
+    near_offset: str,
+    far_offset: str,
+) -> dict[str, Any]:
+    """A spread that pays a debit: buy the nearer strike, sell the farther one.
+
+    ``bull_call`` uses calls and gains if the market rises; ``bear_put`` uses puts and gains if
+    it falls. The most it can lose is the debit paid, which is never more than the strike width,
+    so it is sized by the width exactly as the credit spreads are.
+    """
+    option_type = "CE" if side == "bull_call" else "PE"
+
+    def leg(leg_id: int, position: str, offset: str) -> dict[str, Any]:
+        return {
+            "id": leg_id,
+            "segment": "options",
+            "position": position,
+            "lots": lots,
+            "option_type": option_type,
+            "strike_mode": "atm",
+            "atm_offset": offset,
+            "expiry": expiry,
+        }
+
+    return {
+        "name": name,
+        "strategy_kind": "batch",
+        "universe_tab": "weekly_monthly",
+        "underlying": "NIFTY",
+        "underlying_exchange": "NSE_INDEX",
+        "strategy_type": "positional",
+        "entry_time": None,
+        "exit_time": "09:45",
+        "product": "NRML",
+        "pricetype": "MARKET",
+        "legs": [leg(1, "B", near_offset), leg(2, "S", far_offset)],
+    }
+
+
 CONDOR_SHORT_OFFSET = "OTM2"
 CONDOR_LONG_OFFSET = "OTM5"
 CONDOR_SL_PCT = 50
