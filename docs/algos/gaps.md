@@ -56,3 +56,13 @@ made; the claim "faster than Stratzy" is unsupported.
   never saw; all 40 lost money there. Verdict shown to the trader: no edge.
 - Simulated trades with no true edge: the search showed an edge in 6 of 150 runs (4 percent);
   with a true +Rs 150 per trade it found it in 127 of 150 (85 percent); +Rs 60 in 38 of 150.
+
+## New layout (tabs and tiles), measured
+
+Default at `/algos`; the earlier single-column page is one click away at `/algos?variant=classic`.
+Headless Chromium, local server, built UI: first paint 0.54 s cold and 0.32 s warm, tiles visible
+1.3 s cold and 1.1 s warm (unchanged from before within noise), tab switch about 50 ms, no console
+errors, no horizontal scroll at 390 px. Script payload grew from 662 KB to 690 KB.
+Tiles keep the honest score chip ("Lost money in our tests") and put the technical detail and test
+evidence behind "How it works and how it tested". This is a layout inspired by the common
+discover-then-try pattern; nothing was copied from Stratzy, and no comparison with it was made.

@@ -67,11 +67,11 @@ function algo(deployed: Deployment | null): AlgoItem {
   }
 }
 
-function renderPage() {
+function renderPage(variant = '/algos?variant=classic') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[variant]}>
         <Algos />
       </MemoryRouter>
     </QueryClientProvider>
@@ -108,6 +108,42 @@ beforeEach(() => {
   api.fetchCoverage.mockResolvedValue({
     regimes: { calm: ['zen'], trending: ['zen'], volatile: [], event: [] },
     stands_aside_on: ['volatile', 'event'],
+  })
+})
+
+describe('Algos page (new layout)', () => {
+  it('opens on Discover with one tile per algo and says plainly which lost money in tests', async () => {
+    api.fetchCatalogue.mockResolvedValue([{ ...algo(null), status: 'experimental' }])
+    renderPage('/algos')
+    expect(await screen.findByRole('tab', { name: 'Discover' })).toBeTruthy()
+    expect(await screen.findByText('Lost money in our tests')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Try it in Sandbox' })).toBeTruthy()
+    expect(await screen.findByText(/Today: Calm/)).toBeTruthy()
+  })
+
+  it('adding an algo asks for capital in a dialog and starts in Sandbox', async () => {
+    api.fetchCatalogue.mockResolvedValue([algo(null)])
+    renderPage('/algos')
+    fireEvent.click(await screen.findByRole('button', { name: 'Try it in Sandbox' }))
+    expect(await screen.findByText(/It starts in Sandbox and stopped/)).toBeTruthy()
+  })
+
+  it('shows deployed algos under My algos and the start guide when there are none', async () => {
+    api.fetchCatalogue.mockResolvedValue([algo(null)])
+    const first = renderPage('/algos')
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: /My algos/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /My algos/ }))
+    expect(await screen.findByText('Start in three steps')).toBeTruthy()
+    first.unmount()
+    api.fetchCatalogue.mockResolvedValue([algo(deployment())])
+    renderPage('/algos')
+    expect(await screen.findByRole('tab', { name: 'My algos (1)' })).toBeTruthy()
+  })
+
+  it('keeps the old layout one click away', async () => {
+    api.fetchCatalogue.mockResolvedValue([algo(null)])
+    renderPage('/algos?variant=classic')
+    expect(await screen.findByText('Market right now')).toBeTruthy()
   })
 })
 
