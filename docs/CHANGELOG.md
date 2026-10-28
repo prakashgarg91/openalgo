@@ -14,7 +14,10 @@ fix, live in [docs/releases](releases/).
   (exit 3 PM next day, India VIX 13 to 20) replayed on real NSE option prices.
   Neither difference earned in the untouched 2025-26 period; an exit at the
   close raises win rate to about 60% without raising profit. The Lab gained a
-  research-only exit_field option; the live engine is unchanged.
+  research-only exit_field option; the live engine is unchanged. The same
+  page checks Stratzy's own Zen Past Trades calendar (Jun to Oct 2026) against
+  our real-price replay: the daily results do not follow Nifty's direction and
+  are not reproduced by a plain overnight spread.
 - New Algos page (/algos): ready-made regime algos (Zen, Mirror Zen, Calm
   Condor, Morning Gap) that you add with a capital amount and turn on. Each
   starts in Sandbox. Going Live needs the Live checklist to pass and you to

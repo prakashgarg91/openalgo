@@ -62,6 +62,32 @@ All 16 cells lost money in the untouched last period.
 - Daily data cannot replay stops and targets, which may matter more than the exit time.
 - One lot, no slippage beyond the itemised costs.
 
+## Their Past Trades page, checked against our data
+
+Six screenshots of the Zen Past Trades tab (Jun to Oct 2026 calendars and the drawdown chart) were transcribed into `stratzy-zen-past-trades-2026.csv` (67 trading days). The monthly sums match the on-screen month totals, so the transcription is right. Script: `scripts/algo_backtest/stratzy_pasted_days.py`.
+
+What the page shows, in rupees:
+
+| Month | Trades | Result | Nifty that month |
+| --- | --- | --- | --- |
+| Jun 2026 | 14 | +2.14L (+66.84%) | +1.35% |
+| Jul 2026 | 14 | +78.26k (+24.46%) | +2.17% |
+| Aug 2026 | 15 | +27.09k (+8.47%) | -1.24% |
+| Sep 2026 | 12 | +68.82k (+21.51%) | -6.06% |
+| Oct 2026 (to 27th) | 12 | -32.40k (-10.12%) | +0.59% |
+
+Findings:
+
+1. **The percentages are on about Rs 3.2 lakh, not Rs 1 lakh.** Every day divides back to roughly Rs 3,20,000. The five months add up to about +3.6L on that base.
+2. **It is not a bull-market result.** September 2026 fell 6% and the algo made +21.5%; June rose 1.35% and it made +66.8%. Across the 67 days, the sign of the daily result matched the sign of Nifty's next-day move 50% of the time, with correlation near zero (+0.04 if the date is the entry day, -0.07 if it is the exit day). A bull put spread that profits from rising prices would show a clear positive link.
+3. **Our plain overnight spread does not reproduce the days.** The same dates replayed on real option prices (bull put and bear call, OTM1/OTM4, one lot, both exit times, both date readings) agree on sign 39% to 58% of the time, correlation between -0.16 and +0.31. Our one-lot totals on those days are within about +/-7,000 rupees. So whatever produces their numbers is not the simple structure we tested; it uses signals, strike choice, sizing or exits we cannot see.
+4. **Repeated exact amounts.** -8,400 appears twice (2 Jun and 7 Jul), +22,860 twice (11 Jun and 23 Jul), -11,120 twice (24 Aug and 13 Oct), all with the same percentage. Live fills do not repeat to the rupee. That pattern fits rule-based simulated fills (a fixed stop or target price at fixed size). The screenshots do not say whether the tab is live or backtest, so this is a reason to ask Stratzy, not proof.
+5. **The payoff shape is unusual for a credit spread.** Their average win is Rs 16.6k against an average loss of Rs 13.6k, with a 63% win rate. On real prices our overnight bull put and bear call have average wins well below average losses when the win rate is near 60% (about Rs 1.6k against Rs 3.1k at the close exit). Credit spreads normally win small and lose large, so a winner larger than the loser points to management or sizing we do not have.
+6. **It trades about two days in three.** Tuesday 21, Thursday 20, Monday 16, Friday 7, Wednesday 3. A condition decides the days, as ours does, but it is not the 13-20 VIX band alone.
+7. **Drawdown shown is about 10%**, and October 2026 is the first losing month on the page. Eight of the twelve October days lost.
+
+What this does not prove: it does not show their numbers are wrong. It shows they cannot come from the published description (overnight spread, 3 PM exit, VIX 13-20) tested on real prices, and that the direction of the market does not explain them. The honest next step for a trader is to run Zen in Sandbox from Stratzy's own signals for a month and compare with the page, before putting money behind it.
+
 ## Decision
 
 No change to the live engine. The two published differences do not pass the untouched period. The close-exit option stays research only in `run_lab(exit_field="close")`. The bull-put-only finding is a lead, not an edge: it breaks even before the last period turns it negative.

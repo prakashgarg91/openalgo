@@ -1,0 +1,17 @@
+Published days: 67; ours priced per variant: {('bull_put', 'open'): 80, ('bull_put', 'close'): 80, ('bear_call', 'open'): 80, ('bear_call', 'close'): 80}
+
+Sign agreement with the published days, and rupees per lot (ours) on those days
+  bull_put  exit-open  date=entry n=45 agree=55.6% corr=+0.31 our_total=   -4459
+  bull_put  exit-open  date=exit  n=62 agree=38.7% corr=-0.16 our_total=   -6096
+  bull_put  exit-close date=entry n=45 agree=48.9% corr=-0.10 our_total=   -7401
+  bull_put  exit-close date=exit  n=62 agree=53.2% corr=-0.04 our_total=  -33119
+  bear_call exit-open  date=entry n=45 agree=46.7% corr=+0.03 our_total=    2154
+  bear_call exit-open  date=exit  n=62 agree=53.2% corr=-0.10 our_total=  -10009
+  bear_call exit-close date=entry n=45 agree=57.8% corr=+0.03 our_total=    3995
+  bear_call exit-close date=exit  n=62 agree=54.8% corr=+0.11 our_total=    6550
+
+Nifty move on the published days (close to next close), sign vs published sign
+  date=entry n=66 corr=+0.04 agree=50.0%
+  date=exit  n=66 corr=-0.07 agree=47.0%
+
+Nifty close 2026-06-01: 23383, 2026-10-26: 22753
