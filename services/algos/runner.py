@@ -22,7 +22,13 @@ from services.algos.context import (
     RegimeResult,
     score_regime,
 )
-from services.algos.templates import ALGOS, PLACEHOLDER_INPUTS, Plan, build
+from services.algos.templates import (
+    ALGOS,
+    DEFAULT_MAX_LOSS_PCT,
+    PLACEHOLDER_INPUTS,
+    Plan,
+    build,
+)
 from utils.db_sessions import releases_scoped_sessions
 from utils.logging import get_logger
 
@@ -215,6 +221,9 @@ def max_loss_ceiling(algo_id: str, capital: float) -> float | None:
     lot = nifty_lot_size()
     if lot is None or algo_id not in ALGOS:
         return None
+    if algo_id == "smart_pick":
+        # It may run any overnight algo, and every one of them is sized to the same cap.
+        return float(capital * DEFAULT_MAX_LOSS_PCT / 100.0)
     plan = build(
         algo_id,
         _PLACEHOLDER_REGIME,
@@ -267,8 +276,9 @@ def deploy(user_id: str, algo_id: str, capital: float) -> tuple[dict | None, str
     if lot is None:
         return None, "The Nifty lot size is not available. Download the master contract first."
 
+    # Smart Pick has no trade of its own; its row is shaped like a condor and rewritten each day.
     plan = build(
-        algo_id,
+        "calm_condor" if algo_id == "smart_pick" else algo_id,
         _PLACEHOLDER_REGIME,
         capital=capital,
         lot_size=lot,

@@ -137,6 +137,26 @@ ALGOS: dict[str, AlgoSpec] = {
             "did not confirm it."
         ),
     ),
+    "smart_pick": AlgoSpec(
+        id="smart_pick",
+        name="Smart Pick",
+        summary=(
+            "Does not have a trade of its own. Each afternoon it reads what kind of day it is "
+            "and runs the one overnight algo whose past results on that kind of day were "
+            "positive after costs in both the older and the newer years. If none qualifies it "
+            "stands aside. Same protection, stop loss and next-morning exit as the algo it picks."
+        ),
+        risk="medium",
+        allowed_labels=("calm", "trending", "volatile", "event"),
+        min_confidence=MIN_CONFIDENCE,
+        overnight=True,
+        status="experimental",
+        evidence=(
+            "It only trades when an algo has earned the day. On the history tested when this was "
+            "built, no algo had, so expect it to stand aside until one does. Rebuild its evidence "
+            "table from the Algos page after new data arrives."
+        ),
+    ),
 }
 
 
@@ -266,6 +286,17 @@ def build(
     the opening gap, which the regime label alone does not carry.
     """
     spec = ALGOS[algo_id]
+    if algo_id == "smart_pick":
+        from services.algos import chooser_store
+
+        return chooser_store.smart_plan(
+            regime,
+            capital=capital,
+            lot_size=lot_size,
+            days_to_expiry=days_to_expiry,
+            max_loss_pct=max_loss_pct,
+            inputs=inputs,
+        )
     if algo_id in CUSTOM_SPECS:
         from services.algos import builder
 

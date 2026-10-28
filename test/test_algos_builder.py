@@ -160,3 +160,9 @@ def test_low_confidence_stands_aside_in_words_a_trader_can_use():
         days_to_expiry=4,
     )
     assert plan.action == "skip" and "data is too thin" in plan.reason
+
+
+def test_no_losing_trade_at_all_counts_as_unbounded_profit_factor():
+    assert b._pf({"profit_factor": None, "total": 500.0}) == float("inf")
+    assert b._pf({"profit_factor": None, "total": 0.0}) == 0.0
+    assert b._pf({"profit_factor": 1.4, "total": 5.0}) == 1.4

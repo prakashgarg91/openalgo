@@ -18,7 +18,17 @@ from flask import Blueprint, jsonify, request, session
 from database import algo_db
 from database import strategy_module_db as sm_store
 from limiter import limiter
-from services.algos import builder, builder_jobs, custom, lab, readiness, runner
+from services.algos import (
+    builder,
+    builder_jobs,
+    chooser,
+    chooser_store,
+    custom,
+    debugger,
+    lab,
+    readiness,
+    runner,
+)
 from services.algos.templates import ALGOS
 from services.algos.templates import coverage as coverage_matrix
 from utils.logging import get_logger
@@ -236,6 +246,12 @@ def lab_run():
     algo_id = data.get("algo_id")
     if algo_id not in ALGOS:
         return _error("Unknown algo", 400)
+    if algo_id == chooser_store.SMART_PICK:
+        return _error(
+            "Smart Pick has no history of its own, because its choices come from the other "
+            "algos' past results. Test those instead.",
+            400,
+        )
     model = data.get("model", "conservative")
     if model not in lab.MODELS:
         return _error("model must be standard or conservative", 400)
@@ -563,3 +579,120 @@ def builder_delete(custom_id):
     algo_db.delete_custom(custom_id, user)
     custom.unregister(custom_id)
     return _ok()
+
+
+# -- Chooser and debugger ----------------------------------------------------
+
+
+def _table_view(table: dict | None) -> dict | None:
+    if not table or not table.get("algos"):
+        return None
+    names = chooser_store.names()
+    return {
+        "built_at": table.get("built_at"),
+        "first": table["first"],
+        "split": table["split"],
+        "last": table["last"],
+        "rows": [
+            {"algo_id": a, "name": names.get(a, a), "label": label, **cell}
+            for a, per in table["algos"].items()
+            for label, cell in per.items()
+            if cell["evidence"]["trades"] or cell["check"]["trades"]
+        ],
+    }
+
+
+@algos_bp.route("/api/chooser/today", methods=["GET"])
+@check_session_validity
+@_api_limit
+def chooser_today():
+    """Which algo suits today's market, and why every other one was turned down."""
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    api_key = runner._api_key(user)
+    if not api_key:
+        return _error("No OpenAlgo API key found. Generate one on the API Key page.", 400)
+
+    def load():
+        result, _ = runner.current_regime(api_key)
+        return runner.regime_to_dict(result)
+
+    regime = _regime_cache.get_or_load(user, load)
+    table = chooser_store.load_table()
+    decision = chooser.choose(
+        regime["label"],
+        regime["confidence"],
+        table,
+        chooser_store.names(),
+        candidates=chooser_store.candidate_ids(),
+    )
+    return _ok({"data": {"regime": regime, "decision": decision, "table": _table_view(table)}})
+
+
+@algos_bp.route("/api/chooser/rebuild", methods=["POST"])
+@check_session_validity
+@_builder_limit
+def chooser_rebuild():
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    ids = chooser_store.candidate_ids()
+    customs = {a: custom.CUSTOM_SPECS[a].to_dict() for a in ids if a in custom.CUSTOM_SPECS}
+    request_ = {
+        "kind": "chooser",
+        "algos": [a for a in ids if a not in customs],
+        "customs": customs,
+        "model": "conservative",
+    }
+    try:
+        job_id = builder_jobs.start(user, request_)
+    except builder_jobs.Busy as exc:
+        return _error(str(exc), 409)
+    return _ok({"job_id": job_id}, 202)
+
+
+@algos_bp.route("/api/debug", methods=["POST"])
+@check_session_validity
+@_lab_limit
+def debug_day():
+    """Replay one past day for one algo and say, step by step, why it did what it did."""
+    if not _user():
+        return _error("Not authenticated", 401)
+    data, error = _body()
+    if error:
+        return error
+    algo_id = data.get("algo_id")
+    if algo_id not in ALGOS or algo_id == chooser_store.SMART_PICK:
+        return _error("Pick one of the algos with its own trade.", 400)
+    day, message = _lab_date(data.get("date"), "date")
+    if message or not day:
+        return _error(message or "Enter the day to look at, like 2024-03-14.", 400)
+    try:
+        history = _history_cache.get_or_load("history", lab.load_history)
+        return _ok({"data": debugger.run(history, algo_id, day)})
+    except debugger.DayUnavailable as exc:
+        return _error(str(exc), 400)
+    except lab.HistoryUnavailable as exc:
+        return _error(str(exc), 503)
+    except Exception:
+        logger.exception("Debugger failed for %s %s", algo_id, day)
+        return _error("The debugger could not finish. Nothing was changed. Try again.", 500)
+
+
+@algos_bp.route("/api/deployments/<int:deployment_id>/explain", methods=["GET"])
+@check_session_validity
+@_api_limit
+def explain_deployment(deployment_id):
+    """The algo's recent real decisions, each explained in words."""
+    user, dep = _mine(deployment_id)
+    if not user:
+        return _error("Not authenticated", 401)
+    if not dep:
+        return _error(NOT_FOUND, 404)
+    name = ALGOS[dep["algo_id"]].name if dep["algo_id"] in ALGOS else dep["algo_id"]
+    items = [
+        {"decided_at": d["decided_at"], **debugger.explain_recorded(d, name)}
+        for d in algo_db.list_decisions(deployment_id, 10)
+    ]
+    return _ok({"data": items})

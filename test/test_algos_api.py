@@ -93,7 +93,13 @@ def test_logged_out_is_refused(app):
 
 def test_catalogue_lists_every_algo_undeployed(client):
     body = client.get("/algos/api/catalogue").get_json()
-    assert [a["id"] for a in body["data"]] == ["zen", "mirror_zen", "morning_gap", "calm_condor"]
+    assert [a["id"] for a in body["data"]] == [
+        "zen",
+        "mirror_zen",
+        "morning_gap",
+        "calm_condor",
+        "smart_pick",
+    ]
     assert all(a["deployment"] is None for a in body["data"])
 
 

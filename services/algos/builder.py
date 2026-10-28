@@ -253,6 +253,12 @@ def _within(trades: list[dict[str, Any]], lo: str, hi: str, *, first: bool) -> l
     return [t for t in trades if (t["date"] >= lo if first else t["date"] > lo) and t["date"] <= hi]
 
 
+def _pf(stats: dict[str, Any]) -> float:
+    """Profit factor, with no losing trade at all (reported as None) counted as unbounded."""
+    pf = stats["profit_factor"]
+    return float("inf") if pf is None and (stats["total"] or 0) > 0 else (pf or 0.0)
+
+
 def _verdict(winner: dict[str, Any], validate_ok: bool) -> dict[str, Any]:
     test, val = winner["test"], winner["validate"]
     reasons: list[str] = []
@@ -262,7 +268,7 @@ def _verdict(winner: dict[str, Any], validate_ok: bool) -> dict[str, Any]:
         )
     if (test["total"] or 0) <= 0:
         reasons.append("It lost money on the period nothing was chosen on.")
-    if (test["profit_factor"] or 0) < MIN_PROFIT_FACTOR:
+    if _pf(test) < MIN_PROFIT_FACTOR:
         reasons.append(f"Its profit factor on that period is below {MIN_PROFIT_FACTOR}.")
     if not validate_ok or val["trades"] < MIN_EVAL_TRADES:
         reasons.append("It did not hold up on the validation period either.")
@@ -343,7 +349,7 @@ def search(
         key=lambda r: r["validate_score"] if r["validate_score"] is not None else float("-inf"),
     )
     validate_ok = (winner["validate"]["total"] or 0) > 0 and (
-        winner["validate"]["profit_factor"] or 0
+        _pf(winner["validate"])
     ) >= MIN_VALIDATE_PROFIT_FACTOR
 
     def public(r: dict[str, Any], *, with_test: bool) -> dict[str, Any]:

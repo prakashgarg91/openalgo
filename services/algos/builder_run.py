@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from services.algos import builder, lab
+from services.algos import builder, chooser, chooser_store, lab
 
 
 def _write(path: Path, payload: dict[str, Any]) -> None:
@@ -29,8 +29,37 @@ def _curve(trades: list[dict[str, Any]]) -> list[list[Any]]:
     return lab.downsample(points, 200)
 
 
+def run_chooser(job_dir: Path, request: dict[str, Any]) -> None:
+    """Replay every overnight algo and keep the evidence table the chooser reads."""
+    model = request.get("model", "conservative")
+    history = lab.load_history()
+    trades: dict[str, list[dict[str, Any]]] = {}
+    wanted = [*request["algos"], *request.get("customs", {})]
+    for done, algo_id in enumerate(wanted, start=1):
+        spec = request.get("customs", {}).get(algo_id)
+        if spec is None:
+            result = lab.run_lab(history, algo_id, model=model)
+        else:
+            result = lab.run_lab(
+                history,
+                "calm_condor",
+                model=model,
+                plan_fn=builder.lab_plan_fn(builder.Spec.from_dict(spec)),
+            )
+        trades[algo_id] = result.trades
+        _write(job_dir / "progress.json", {"done": done, "total": len(wanted)})
+    table = chooser.build_table(trades)
+    chooser_store.save_table(table)
+    _write(
+        job_dir / "result.json", {"kind": "chooser", "split": table["split"], "algos": len(trades)}
+    )
+
+
 def run(job_dir: Path) -> None:
     request = json.loads((job_dir / "request.json").read_text())
+    if request.get("kind") == "chooser":
+        run_chooser(job_dir, request)
+        return
     model = request.get("model", "conservative")
     specs = builder.space(request["families"], [tuple(x) for x in request["label_sets"]])
     history = lab.load_history()

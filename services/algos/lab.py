@@ -450,6 +450,7 @@ def run_lab(
     overrides: dict[str, Any] | None = None,
     plan_fn: Callable[..., Any] | None = None,
     real: RealPrices | None = None,
+    trace: dict[str, Any] | None = None,
 ) -> LabResult:
     """Replay one algo over the history. Raises ``KeyError`` for an unknown algo or model.
 
@@ -459,6 +460,10 @@ def run_lab(
 
     ``real`` prices overnight trades from actual option prices instead of the
     model. Days without option data are skipped and counted.
+
+    ``trace``, when given, is filled with what happened on the day(s) replayed:
+    the inputs, the regime, the plan and the pricing. The debugger replays a single
+    day with it; nothing else sets it.
     """
     spec = ALGOS[algo_id]
     pricing = MODELS[model]
@@ -518,6 +523,17 @@ def run_lab(
             open_gap_pct=open_gap,
         )
         regime = score_regime(inputs)
+        if trace is not None:
+            trace["date"] = t.strftime("%Y-%m-%d")
+            trace["inputs"] = dict(vars(inputs))
+            trace["regime"] = {
+                "label": regime.label,
+                "bias": regime.bias,
+                "score": regime.score,
+                "confidence": regime.confidence,
+                "reasons": list(regime.reasons),
+                "missing": list(regime.missing),
+            }
         if not gated:
             # Trade every day, as if the market always suited the algo, to show what
             # the regime gate is worth.
@@ -544,6 +560,15 @@ def run_lab(
                 inputs=inputs,
                 **(overrides or {}),
             )
+        if trace is not None:
+            trace["days_to_expiry"] = dte
+            trace["expiry"] = expiry.isoformat()
+            trace["plan"] = {"action": plan.action, "reason": plan.reason, "side": plan.side}
+            if plan.config:
+                trace["legs"] = [
+                    {k: leg.get(k) for k in ("position", "option_type", "atm_offset")}
+                    for leg in plan.config["legs"]
+                ]
         if plan.action != "trade":
             key = plan.reason.split(".")[0][:70]
             skipped[key] = skipped.get(key, 0) + 1
@@ -588,6 +613,18 @@ def run_lab(
             pnl, cost = _price_trade(
                 pricing, plan.config["legs"], S0=S0, S1=S1, T0=T0, T1=T1, sig0=sig0, sig1=sig1
             )
+            if trace is not None:
+                trace["pricing"] = {
+                    "model": pricing.name,
+                    "nifty_in": round(S0, 1),
+                    "nifty_out": round(S1, 1),
+                    "years_in": round(T0, 4),
+                    "years_out": round(T1, 4),
+                    "vol_in": round(sig0, 4),
+                    "vol_out": round(sig1, 4),
+                }
+        if trace is not None:
+            trace["result"] = {"pnl": round(pnl, 1), "cost": round(cost, 1)}
         trades.append(
             {
                 "date": t.strftime("%Y-%m-%d"),
