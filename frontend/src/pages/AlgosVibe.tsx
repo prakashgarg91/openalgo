@@ -166,7 +166,7 @@ function AlgoTile({ algo, onTry }: { algo: AlgoItem; onTry: () => void }) {
   const chip = scoreChip(algo)
   const active = algo.deployment !== null
   return (
-    <Card className="flex flex-col">
+    <Card className="flex min-w-0 flex-col">
       <CardHeader className="space-y-2 pb-2">
         <div className="flex items-start justify-between gap-2">
           <span className="rounded-lg bg-muted p-2">
@@ -243,7 +243,7 @@ export default function AlgosVibe() {
         <TabsContent value="discover" className="space-y-4 pt-3">
           <ChooserPanel />
           {catalogue.isLoading && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2].map((i) => (
                 <Skeleton key={i} className="h-64 rounded-xl" />
               ))}
@@ -252,7 +252,7 @@ export default function AlgosVibe() {
           {catalogue.isError && (
             <p className="text-sm text-destructive">{errorText(catalogue.error)}</p>
           )}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((algo) => (
               <AlgoTile
                 key={algo.id}
