@@ -1,0 +1,52 @@
+204 published trades, 2025-07-09 to 2026-08-28
+1. Width: {400.0: 204}  lots: {2: 5, 3: 32, 4: 75, 5: 91, 6: 1}
+
+2. Matched to a weekly expiry (8 days or less): 204 of 204
+   Published credit within 10 points of the real open-close range: 74%
+   within 25 points: 87%
+   Days to expiry at entry: {0: 35, 1: 32, 2: 8, 3: 6, 4: 41, 5: 21, 6: 54, 7: 2, 8: 5}
+   Sold strike vs that day's open, points (+ is out of the money): p10/25/50/75/90 = [-119.0, -70.0, -15.0, 53.0, 99.0]
+   PE: median -19
+   CE: median -11
+
+3. Timing
+   Entry hour: {10: 163, 11: 16, 12: 11, 13: 9, 14: 5}
+   Exit time: {'15:00': 56, '09:16': 20, '14:53': 17, '00:00': 7, '09:15': 3, '11:01': 2}
+   Sessions 282; flat at 10:15: 194; entered by 11:00: 154
+   Entered share of flat sessions by weekday (Mon=0): {0: 0.85, 1: 0.76, 2: 0.69, 3: 0.78, 4: 0.91}
+   prior-close India VIX  0-13: flat sessions 115, entered  90%
+   prior-close India VIX 13-15: flat sessions  26, entered  85%
+   prior-close India VIX 15-17: flat sessions  10, entered 100%
+   prior-close India VIX 17-20: flat sessions  24, entered  58%
+   prior-close India VIX 20-25: flat sessions  13, entered  31%
+   prior-close India VIX 25-99: flat sessions   6, entered  17%
+   opening gap -1.000 to -0.010: flat sessions   9, entered  22%
+   opening gap -0.010 to -0.005: flat sessions  15, entered  73%
+   opening gap -0.005 to +0.005: flat sessions 146, entered  86%
+   opening gap +0.005 to +0.010: flat sessions  15, entered  73%
+   opening gap +0.010 to +1.000: flat sessions   9, entered  56%
+   India VIX on trade days: median 12.2, 90th percentile 18.2, max 25.5
+
+4. Stop, target and side
+   Re-entry within 4 hours of the previous exit: 59 trades; 85% follow a stop; flips side 73%
+   Next-session entry after a T exit: 97 trades, flips side 55%
+   Next-session entry after a S exit: 46 trades, flips side 61%
+   Stop: spread value rises by 43.8 points over the credit (middle half 41.9 to 46.3, 89 stops)
+   Winners: exit debit median 23.1 points; 47 trades closed at 12 or less
+   Put share when the entry day closes above its open 60% (n=96), below 44% (n=108)
+   Put share after an opening gap up 57%, gap down 47%
+   Put share with prior close above its 20-day average 47%, below 57%
+
+5. Same published trades, entered at the published credit, exited by daily rules
+   Entry is the published fill, so the side and strike choice cannot see the future;
+   only the stop, the target and the 15:00 timing are replaced by a plain close.
+   Priced 204 of 204 trades
+   Published                               2469 points,   12.1 per trade, win 56%
+   Hold to the next session's close        1492 points,    7.3 per trade, win 66%
+     after conservative costs               995 points,    4.9 per trade, win 66%
+   Close the same day instead               623 points,    3.1 per trade, win 63%
+   Correlation with published (next close): +0.67
+   79 published stops: -48.9 points each; plain hold -56.5
+   115 published winners: 56.0 points each; plain hold 52.8
+   2025-07 to 2025-12: published    886, plain hold    967 points (90 trades)
+   2026-01 to 2026-08: published   1545, plain hold    483 points (113 trades)

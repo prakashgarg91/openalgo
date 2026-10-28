@@ -39,7 +39,7 @@ Totals in rupees for one lot (OTM1/OTM4; OTM2/OTM5 is within a few thousand):
 | Variant | All days | Win rate | 2022-23H1 | 2023H2-24 | 2025-26 (untouched) |
 | --- | --- | --- | --- | --- | --- |
 | Follow lean, exit open, any VIX (ours) | -93,490 | 42% | +5,990 | -37,687 | -61,794 |
-| Follow lean, exit open, VIX 13-20 | -48,549 | 42% | +5,491 | -28,152 | -25,888 |
+| Follow lean, exit open, VIX 13-20 (see correction below) | -48,549 | 42% | +5,491 | -28,152 | -25,888 |
 | Follow lean, exit close, any VIX | -134,260 | 57% | +31,924 | -60,166 | -106,019 |
 | Bull put only, exit open, any VIX | -19,354 | 47% | +476 | -7,703 | -12,127 |
 | Bull put only, exit close, any VIX | +940 | 63% | +15,572 | +1,500 | -16,132 |
@@ -81,13 +81,58 @@ Findings:
 1. **The percentages are on about Rs 3.2 lakh, not Rs 1 lakh.** Every day divides back to roughly Rs 3,20,000. The five months add up to about +3.6L on that base.
 2. **It is not a bull-market result.** September 2026 fell 6% and the algo made +21.5%; June rose 1.35% and it made +66.8%. Across the 67 days, the sign of the daily result matched the sign of Nifty's next-day move 50% of the time, with correlation near zero (+0.04 if the date is the entry day, -0.07 if it is the exit day). A bull put spread that profits from rising prices would show a clear positive link.
 3. **Our plain overnight spread does not reproduce the days.** The same dates replayed on real option prices (bull put and bear call, OTM1/OTM4, one lot, both exit times, both date readings) agree on sign 39% to 58% of the time, correlation between -0.16 and +0.31. Our one-lot totals on those days are within about +/-7,000 rupees. So whatever produces their numbers is not the simple structure we tested; it uses signals, strike choice, sizing or exits we cannot see.
-4. **Repeated exact amounts.** -8,400 appears twice (2 Jun and 7 Jul), +22,860 twice (11 Jun and 23 Jul), -11,120 twice (24 Aug and 13 Oct), all with the same percentage. Live fills do not repeat to the rupee. That pattern fits rule-based simulated fills (a fixed stop or target price at fixed size). The screenshots do not say whether the tab is live or backtest, so this is a reason to ask Stratzy, not proof.
+4. **Repeated exact amounts.** -8,400 appears twice (2 Jun and 7 Jul), +22,860 twice (11 Jun and 23 Jul), -11,120 twice (24 Aug and 13 Oct), all with the same percentage. The trade table behind this page (below) explains it: the stop is a fixed 43.1 points over the credit, filled at exactly the trigger price, with the same 3 lots both times. The feed marks every trade as executed and none as backtest, but a stop that fills at the trigger to the paisa is how a simulated or idealised fill behaves, so the page does not show what a live account would have received.
 5. **The payoff shape is unusual for a credit spread.** Their average win is Rs 16.6k against an average loss of Rs 13.6k, with a 63% win rate. On real prices our overnight bull put and bear call have average wins well below average losses when the win rate is near 60% (about Rs 1.6k against Rs 3.1k at the close exit). Credit spreads normally win small and lose large, so a winner larger than the loser points to management or sizing we do not have.
 6. **It trades about two days in three.** Tuesday 21, Thursday 20, Monday 16, Friday 7, Wednesday 3. A condition decides the days, as ours does, but it is not the 13-20 VIX band alone.
 7. **Drawdown shown is about 10%**, and October 2026 is the first losing month on the page. Eight of the twelve October days lost.
 
 What this does not prove: it does not show their numbers are wrong. It shows they cannot come from the published description (overnight spread, 3 PM exit, VIX 13-20) tested on real prices, and that the direction of the market does not explain them. The honest next step for a trader is to run Zen in Sandbox from Stratzy's own signals for a month and compare with the page, before putting money behind it.
 
+## Zen's rules, reverse-engineered from its own trade table
+
+The Rex repository (`trading-rex-ai`) holds a capture of the full published trade list: 204 trades from 2025-07-09 to 2026-08-28 with sold and long strike, credit, exit debit, lots and entry and exit times (research note `RESEARCH-stratzy-zen-past-trades-analysis.md`, taken from Stratzy's public Past Trades feed, all trades marked executed, none backtest). The table is not copied into this repository. The screenshots above are the same data: the calendar date is the exit date. Script: `scripts/algo_backtest/stratzy_zen_reverse.py`; output in `stratzy-zen-reverse-output.txt`.
+
+| Question | What the table shows |
+| --- | --- |
+| Width | Exactly 400 points on all 204 trades. Ours is 150. |
+| Sold strike | At the money: median 15 points from that day's open, middle half from 70 points in to 53 out. Ours is one strike out. |
+| Which expiry | The nearest weekly, on every day of the weekly cycle: 0 or 1 days to expiry on 67 trades, 4 to 6 days on 116. |
+| Size | 2 to 6 lots (mostly 4 or 5), chosen to fill a fixed Rs 3.2 lakh allocation: lots equal the allocation divided by margin per lot. |
+| Entry time | 10:15 to 10:35 on 163 of 204 trades. Never at the close. |
+| One at a time | It is in one position at a time and enters the next 10:15 after it is flat. |
+| Days it stays out | When India VIX is 20 or higher it entered 31% of flat sessions at VIX 20 to 25 and 17% above 25, against 85% to 100% below 17; and after a gap down of 1% or more (22%). Median VIX on its trade days is 12.2, 90th percentile 18.2. So "VIX 13 to 20" is really a ceiling near 20; most trades are at VIX 11 to 14. |
+| Stop | The spread's value rises 43.8 points over the credit (middle half 41.9 to 46.3, 89 stops), the same distance whatever the credit or lots. Roughly Rs 2,900 per lot. |
+| After a stop | It reverses: 59 re-entries came within 4 hours of an exit, 85% of them after a stop, and 73% switched side. |
+| Exit | 15:00 or 14:53 the next session on 73 trades, 09:15 or 09:16 next morning on 23 (gap exits), at expiry on 7, and 47 closed at a debit of 12 points or less (a target near 10 points). |
+| Side (put or call) | Not recoverable. Put share is 60% when the day closes above its open and 44% below; 57% after a gap up and 47% after a gap down; 47% with the prior close above its 20-day average and 57% below. All weak. |
+| Real prices | The published credit sits inside the exchange's real price range for that spread within 10 points on 74% of trades and within 25 on 87%. The entries are consistent with real prices. |
+| Which side earned | Bear call trades: 98 trades, +Rs 6.15 lakh. Bull put trades: 106 trades, +Rs 1.32 lakh. About 82% of the profit came from calls. It is not a bullish algo. |
+
+Correction to the earlier section: the "VIX 13 to 20" test above required VIX of at least 13, which removed most of Zen's real trades. It tested the wrong filter.
+
+## Does that structure earn on daily real prices?
+
+1. **On Zen's own entries, a plain hold works a little.** Entering at the published credit and simply closing at the next session's close, with no stop and no target, earns +1,492 points against the published +2,469 (60% of it), with a 66% win rate. After conservative costs that is +995 points, 4.9 points per trade, about Rs 320 per lot per trade. The stops and targets added +977 points in 2026 and nothing in the second half of 2025 (886 published against 967 for a plain hold). The 79 stops averaged -48.9 points against -56.5 for a plain hold.
+2. **The rule is not recoverable from daily data.** A pre-registered grid of 48 variants (shape, side rule, VIX filter, expiry rule) entered at the close and held to the next close: 33 of 48 lost money in 2025-26. One cell was positive in all three periods (400 wide, at the money, follow the day's direction, Zen filter): +172k, +8.5k, +27k, and -27k inside Zen's own window, with a worst drawdown near Rs 1.1 lakh for one lot. One survivor in 48 tries is what chance produces.
+3. **An artefact that would have fooled us.** Entering at the opening print made the "follow the gap" rule look like +7.7 lakh and its reverse like -8.1 lakh, stable across years. It is not real. Options' first trade of the day lags the gapped spot: put-call parity is off by about +46 points after a gap down and -28 after a gap up at the open, and flat at the close. Selling the side the gap favours therefore sells a stale, too-high print that nobody could trade. Any test using bhavcopy opening prices has this flaw.
+
+What cannot be done here: Zen's edge, if it exists, sits in the 10:15 entry and the 43-point stop with reversal, and testing it needs intraday option prices for expired contracts. Those come from Upstox's paid Plus plan (5-minute bars, expired-instrument endpoints) and are not stored in either repository. The Rex repository already has `UpstoxExpiredDataSource` for it.
+
+## What differs from ours, in one list
+
+| | Zen (from its table) | Ours |
+| --- | --- | --- |
+| Width | 400 | 150 |
+| Sold strike | At the money | One strike out |
+| Entry | About 10:15 | Close of the previous session |
+| Exit | 15:00 next session, or stop, or target near 10 points | Next morning at about 09:45 |
+| Stop | Fixed 43 points over the credit, then reverses | None; stops are percent of premium in the live engine only |
+| Volatility rule | Stays out at VIX 20 or more and after a 1% gap down | Regime label, no VIX ceiling |
+| Size | Fills a Rs 3.2 lakh allocation (4 to 5 lots) | One lot |
+| Risk seen | Worst published trade -Rs 66.7k on 5 lots (10 April to 13 April 2026 gap), 1 lot about -Rs 13.3k | Capped by the 150 width |
+
+On a Rs 1 lakh account with a Rs 20k daily cap, Zen's structure fits only at one lot, where the worst published loss was about Rs 13.3k.
+
 ## Decision
 
-No change to the live engine. The two published differences do not pass the untouched period. The close-exit option stays research only in `run_lab(exit_field="close")`. The bull-put-only finding is a lead, not an edge: it breaks even before the last period turns it negative.
+No change to the live engine. The two published differences do not pass the untouched period, and the structure reverse-engineered from the trade table cannot be tested fairly without intraday option prices. The close-exit option stays research only in `run_lab(exit_field="close")`. The bull-put-only finding is a lead, not an edge: it breaks even before the last period turns it negative.

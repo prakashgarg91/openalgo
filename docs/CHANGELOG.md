@@ -17,7 +17,11 @@ fix, live in [docs/releases](releases/).
   research-only exit_field option; the live engine is unchanged. The same
   page checks Stratzy's own Zen Past Trades calendar (Jun to Oct 2026) against
   our real-price replay: the daily results do not follow Nifty's direction and
-  are not reproduced by a plain overnight spread.
+  are not reproduced by a plain overnight spread. Reverse-engineering Zen's 204
+  published trades shows a 400-point spread sold at the money at about 10:15,
+  a fixed 43-point stop that reverses side, a VIX ceiling near 20, and 82% of
+  profit from bear calls. On daily prices only, nothing robust reproduces it;
+  a fair test needs intraday option prices (Upstox Plus).
 - New Algos page (/algos): ready-made regime algos (Zen, Mirror Zen, Calm
   Condor, Morning Gap) that you add with a capital amount and turn on. Each
   starts in Sandbox. Going Live needs the Live checklist to pass and you to

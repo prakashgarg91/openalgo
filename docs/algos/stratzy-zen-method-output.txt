@@ -1,0 +1,328 @@
+Real prices 2022-01-03 to 2026-10-26; 1188 sessions; lot size 75
+
+Z put  filter-none expiry-near
+  all    n=1186 win= 62% total= -233304 maxDD= -310808
+  2022-01..2023-06 n=369 win= 63% total=    4035 maxDD= -124815
+  2023-07..2024-12 n=369 win= 65% total=  -51623 maxDD= -125609
+  2025-01..2026-12 n=448 win= 58% total= -185716 maxDD= -238766
+  zen window n=282 win= 57% total= -165651 maxDD= -220269
+Z put  filter-none expiry-eve 
+  all    n=1179 win= 56% total= -439126 maxDD= -465378
+  2022-01..2023-06 n=366 win= 55% total=  -78145 maxDD= -144879
+  2023-07..2024-12 n=367 win= 63% total=  -63503 maxDD= -118004
+  2025-01..2026-12 n=446 win= 52% total= -297477 maxDD= -310073
+  zen window n=282 win= 52% total= -194527 maxDD= -214610
+Z put  filter-zen  expiry-near
+  all    n=968 win= 62% total= -126266 maxDD= -275227
+  2022-01..2023-06 n=253 win= 64% total=   49343 maxDD=  -65346
+  2023-07..2024-12 n=325 win= 66% total=  -21439 maxDD= -115369
+  2025-01..2026-12 n=390 win= 57% total= -154170 maxDD= -187915
+  zen window n=247 win= 57% total=  -99640 maxDD= -157876
+Z put  filter-zen  expiry-eve 
+  all    n=962 win= 57% total= -325763 maxDD= -367179
+  2022-01..2023-06 n=250 win= 59% total=  -23023 maxDD=  -84385
+  2023-07..2024-12 n=323 win= 64% total=  -25528 maxDD=  -87993
+  2025-01..2026-12 n=389 win= 50% total= -277211 maxDD= -289806
+  zen window n=247 win= 51% total= -142774 maxDD= -154897
+Z call filter-none expiry-near
+  all    n=1186 win= 58% total=   59008 maxDD= -150623
+  2022-01..2023-06 n=369 win= 58% total=  -26214 maxDD=  -65090
+  2023-07..2024-12 n=369 win= 56% total=   -8715 maxDD= -114866
+  2025-01..2026-12 n=448 win= 60% total=   93937 maxDD= -107050
+  zen window n=282 win= 62% total=  127187 maxDD=  -40492
+Z call filter-none expiry-eve 
+  all    n=1179 win= 54% total= -228773 maxDD= -357449
+  2022-01..2023-06 n=366 win= 54% total= -100362 maxDD= -133753
+  2023-07..2024-12 n=367 win= 51% total= -147351 maxDD= -237702
+  2025-01..2026-12 n=446 win= 57% total=   18940 maxDD= -122930
+  zen window n=282 win= 56% total=   15839 maxDD=  -66773
+Z call filter-zen  expiry-near
+  all    n=968 win= 59% total=   67964 maxDD= -141316
+  2022-01..2023-06 n=253 win= 57% total=  -34312 maxDD=  -52736
+  2023-07..2024-12 n=325 win= 55% total=  -22994 maxDD=  -98658
+  2025-01..2026-12 n=390 win= 63% total=  125270 maxDD=  -81319
+  zen window n=247 win= 64% total=  120664 maxDD=  -38510
+Z call filter-zen  expiry-eve 
+  all    n=962 win= 54% total= -137472 maxDD= -309522
+  2022-01..2023-06 n=250 win= 51% total=  -67579 maxDD=  -98186
+  2023-07..2024-12 n=323 win= 50% total= -158449 maxDD= -211335
+  2025-01..2026-12 n=389 win= 59% total=   88557 maxDD=  -91206
+  zen window n=247 win= 59% total=   33755 maxDD=  -68359
+Z lean filter-none expiry-near
+  all    n=1186 win= 59% total=  -86180 maxDD= -286104
+  2022-01..2023-06 n=369 win= 59% total=  -80185 maxDD= -115974
+  2023-07..2024-12 n=369 win= 54% total= -144839 maxDD= -188894
+  2025-01..2026-12 n=448 win= 64% total=  138844 maxDD= -125408
+  zen window n=282 win= 64% total=  147123 maxDD= -125408
+Z lean filter-none expiry-eve 
+  all    n=1179 win= 54% total= -286590 maxDD= -354131
+  2022-01..2023-06 n=366 win= 52% total= -119658 maxDD= -138192
+  2023-07..2024-12 n=367 win= 51% total= -182867 maxDD= -216157
+  2025-01..2026-12 n=446 win= 59% total=   15936 maxDD= -141405
+  zen window n=282 win= 59% total=   41925 maxDD= -141405
+Z lean filter-zen  expiry-near
+  all    n=968 win= 59% total=  -30609 maxDD= -240800
+  2022-01..2023-06 n=253 win= 58% total=   -2425 maxDD=  -56461
+  2023-07..2024-12 n=325 win= 52% total= -182766 maxDD= -214406
+  2025-01..2026-12 n=390 win= 65% total=  154582 maxDD=  -67786
+  zen window n=247 win= 65% total=  183191 maxDD=  -59514
+Z lean filter-zen  expiry-eve 
+  all    n=962 win= 54% total= -238758 maxDD= -318592
+  2022-01..2023-06 n=250 win= 51% total=  -68292 maxDD=  -88173
+  2023-07..2024-12 n=323 win= 50% total= -206534 maxDD= -240140
+  2025-01..2026-12 n=389 win= 59% total=   36068 maxDD=  -92196
+  zen window n=247 win= 60% total=  107967 maxDD=  -52520
+Z gap  filter-none expiry-near
+  all    n=1186 win= 64% total=  307199 maxDD= -127160
+  2022-01..2023-06 n=369 win= 70% total=  263373 maxDD=  -50182
+  2023-07..2024-12 n=369 win= 63% total=   50831 maxDD= -123029
+  2025-01..2026-12 n=448 win= 60% total=   -7005 maxDD= -127160
+  zen window n=282 win= 59% total=  -31715 maxDD= -127160
+Z gap  filter-none expiry-eve 
+  all    n=1179 win= 59% total=    2745 maxDD= -201832
+  2022-01..2023-06 n=366 win= 63% total=  121842 maxDD=  -58664
+  2023-07..2024-12 n=367 win= 59% total=  -22773 maxDD= -172049
+  2025-01..2026-12 n=446 win= 56% total=  -96324 maxDD= -189265
+  zen window n=282 win= 54% total= -107564 maxDD= -137830
+Z gap  filter-zen  expiry-near
+  all    n=968 win= 64% total=  207537 maxDD= -112968
+  2022-01..2023-06 n=253 win= 72% total=  171805 maxDD=  -49475
+  2023-07..2024-12 n=325 win= 62% total=    8518 maxDD= -112968
+  2025-01..2026-12 n=390 win= 61% total=   27214 maxDD= -102447
+  zen window n=247 win= 60% total=  -26963 maxDD= -102447
+Z gap  filter-zen  expiry-eve 
+  all    n=962 win= 59% total=  -19551 maxDD= -180600
+  2022-01..2023-06 n=250 win= 64% total=   92851 maxDD=  -64997
+  2023-07..2024-12 n=323 win= 58% total=  -53385 maxDD= -167171
+  2025-01..2026-12 n=389 win= 58% total=  -59017 maxDD= -161334
+  zen window n=247 win= 55% total=  -98773 maxDD= -123804
+O put  filter-none expiry-near
+  all    n=1186 win= 53% total= -261677 maxDD= -269038
+  2022-01..2023-06 n=369 win= 54% total=  -36487 maxDD=  -78833
+  2023-07..2024-12 n=369 win= 54% total=  -74415 maxDD=  -89686
+  2025-01..2026-12 n=448 win= 51% total= -150774 maxDD= -158667
+  zen window n=282 win= 50% total= -114362 maxDD= -126607
+O put  filter-none expiry-eve 
+  all    n=1179 win= 52% total= -412199 maxDD= -423752
+  2022-01..2023-06 n=366 win= 51% total= -101787 maxDD= -127285
+  2023-07..2024-12 n=367 win= 56% total=  -84977 maxDD=  -97621
+  2025-01..2026-12 n=446 win= 50% total= -225435 maxDD= -230570
+  zen window n=282 win= 50% total= -142563 maxDD= -144250
+O put  filter-zen  expiry-near
+  all    n=968 win= 53% total= -178796 maxDD= -193188
+  2022-01..2023-06 n=253 win= 55% total=   -7626 maxDD=  -41772
+  2023-07..2024-12 n=325 win= 55% total=  -45725 maxDD=  -65756
+  2025-01..2026-12 n=390 win= 51% total= -125444 maxDD= -131211
+  zen window n=247 win= 51% total=  -79023 maxDD=  -94245
+O put  filter-zen  expiry-eve 
+  all    n=962 win= 53% total= -296446 maxDD= -307394
+  2022-01..2023-06 n=250 win= 55% total=  -43701 maxDD=  -66785
+  2023-07..2024-12 n=323 win= 58% total=  -54660 maxDD=  -67996
+  2025-01..2026-12 n=389 win= 48% total= -198085 maxDD= -203220
+  zen window n=247 win= 49% total= -104687 maxDD= -105748
+O call filter-none expiry-near
+  all    n=1186 win= 48% total= -121542 maxDD= -150600
+  2022-01..2023-06 n=369 win= 48% total=  -52134 maxDD=  -56366
+  2023-07..2024-12 n=369 win= 47% total=  -49043 maxDD=  -88769
+  2025-01..2026-12 n=448 win= 50% total=  -20365 maxDD=  -65807
+  zen window n=282 win= 50% total=    8218 maxDD=  -26745
+O call filter-none expiry-eve 
+  all    n=1179 win= 50% total= -323072 maxDD= -341847
+  2022-01..2023-06 n=366 win= 48% total= -106216 maxDD= -106216
+  2023-07..2024-12 n=367 win= 47% total= -127890 maxDD= -148827
+  2025-01..2026-12 n=446 win= 52% total=  -88967 maxDD= -127056
+  zen window n=282 win= 52% total=  -60580 maxDD=  -80503
+O call filter-zen  expiry-near
+  all    n=968 win= 48% total=  -75957 maxDD= -120404
+  2022-01..2023-06 n=253 win= 46% total=  -39967 maxDD=  -39967
+  2023-07..2024-12 n=325 win= 47% total=  -49629 maxDD=  -80359
+  2025-01..2026-12 n=390 win= 51% total=   13639 maxDD=  -55459
+  zen window n=247 win= 51% total=   21780 maxDD=  -23943
+O call filter-zen  expiry-eve 
+  all    n=962 win= 50% total= -234356 maxDD= -266330
+  2022-01..2023-06 n=250 win= 47% total=  -68727 maxDD=  -75516
+  2023-07..2024-12 n=323 win= 47% total= -123147 maxDD= -136320
+  2025-01..2026-12 n=389 win= 55% total=  -42482 maxDD=  -91016
+  zen window n=247 win= 55% total=  -41963 maxDD=  -61886
+O lean filter-none expiry-near
+  all    n=1186 win= 50% total= -173925 maxDD= -209748
+  2022-01..2023-06 n=369 win= 49% total=  -72803 maxDD=  -77845
+  2023-07..2024-12 n=369 win= 46% total= -115509 maxDD= -131266
+  2025-01..2026-12 n=448 win= 55% total=   14387 maxDD=  -65742
+  zen window n=282 win= 55% total=   36343 maxDD=  -65742
+O lean filter-none expiry-eve 
+  all    n=1179 win= 50% total= -355982 maxDD= -369555
+  2022-01..2023-06 n=366 win= 47% total= -127069 maxDD= -127069
+  2023-07..2024-12 n=367 win= 47% total= -147534 maxDD= -154693
+  2025-01..2026-12 n=446 win= 55% total=  -81379 maxDD= -100460
+  zen window n=282 win= 55% total=  -35718 maxDD=  -77010
+O lean filter-zen  expiry-near
+  all    n=968 win= 50% total= -124579 maxDD= -175620
+  2022-01..2023-06 n=253 win= 49% total=  -25245 maxDD=  -38527
+  2023-07..2024-12 n=325 win= 44% total= -131300 maxDD= -142064
+  2025-01..2026-12 n=390 win= 55% total=   31967 maxDD=  -34188
+  zen window n=247 win= 56% total=   55847 maxDD=  -34188
+O lean filter-zen  expiry-eve 
+  all    n=962 win= 50% total= -276194 maxDD= -288245
+  2022-01..2023-06 n=250 win= 47% total=  -70592 maxDD=  -70592
+  2023-07..2024-12 n=323 win= 45% total= -149379 maxDD= -159044
+  2025-01..2026-12 n=389 win= 55% total=  -56224 maxDD=  -70785
+  zen window n=247 win= 57% total=    5411 maxDD=  -27858
+O gap  filter-none expiry-near
+  all    n=1186 win= 53% total=  -16816 maxDD= -111969
+  2022-01..2023-06 n=369 win= 57% total=   72365 maxDD=  -29197
+  2023-07..2024-12 n=369 win= 51% total=  -14425 maxDD=  -72182
+  2025-01..2026-12 n=448 win= 52% total=  -74757 maxDD= -109227
+  zen window n=282 win= 51% total=  -58542 maxDD=  -70632
+O gap  filter-none expiry-eve 
+  all    n=1179 win= 54% total= -212283 maxDD= -240655
+  2022-01..2023-06 n=366 win= 57% total=   -8784 maxDD=  -50627
+  2023-07..2024-12 n=367 win= 53% total=  -63319 maxDD= -103492
+  2025-01..2026-12 n=446 win= 53% total= -140180 maxDD= -164036
+  zen window n=282 win= 51% total= -107728 maxDD= -112923
+O gap  filter-zen  expiry-near
+  all    n=968 win= 53% total=  -20278 maxDD=  -86016
+  2022-01..2023-06 n=253 win= 57% total=   49396 maxDD=  -30960
+  2023-07..2024-12 n=325 win= 50% total=  -27207 maxDD=  -65678
+  2025-01..2026-12 n=390 win= 53% total=  -42467 maxDD=  -85629
+  zen window n=247 win= 52% total=  -47002 maxDD=  -57431
+O gap  filter-zen  expiry-eve 
+  all    n=962 win= 55% total= -164378 maxDD= -199802
+  2022-01..2023-06 n=250 win= 59% total=    8772 maxDD=  -40373
+  2023-07..2024-12 n=323 win= 52% total=  -67839 maxDD=  -96193
+  2025-01..2026-12 n=389 win= 54% total= -105311 maxDD= -136762
+  zen window n=247 win= 53% total=  -91263 maxDD=  -96458
+W put  filter-none expiry-near
+  all    n=1186 win= 56% total= -356774 maxDD= -366485
+  2022-01..2023-06 n=369 win= 58% total=  -56669 maxDD=  -87529
+  2023-07..2024-12 n=369 win= 60% total=  -74100 maxDD=  -94757
+  2025-01..2026-12 n=448 win= 52% total= -226006 maxDD= -232359
+  zen window n=282 win= 52% total= -169498 maxDD= -170301
+W put  filter-none expiry-eve 
+  all    n=1179 win= 50% total= -503224 maxDD= -515214
+  2022-01..2023-06 n=366 win= 49% total= -124710 maxDD= -151882
+  2023-07..2024-12 n=367 win= 54% total= -106369 maxDD= -120843
+  2025-01..2026-12 n=446 win= 46% total= -272144 maxDD= -277616
+  zen window n=282 win= 46% total= -171241 maxDD= -171241
+W put  filter-zen  expiry-near
+  all    n=968 win= 57% total= -255904 maxDD= -273209
+  2022-01..2023-06 n=253 win= 59% total=  -17505 maxDD=  -46074
+  2023-07..2024-12 n=325 win= 61% total=  -41168 maxDD=  -74201
+  2025-01..2026-12 n=390 win= 51% total= -197232 maxDD= -203585
+  zen window n=247 win= 51% total= -136576 maxDD= -137379
+W put  filter-zen  expiry-eve 
+  all    n=962 win= 51% total= -367415 maxDD= -379024
+  2022-01..2023-06 n=250 win= 53% total=  -55692 maxDD=  -80176
+  2023-07..2024-12 n=323 win= 55% total=  -72344 maxDD=  -88324
+  2025-01..2026-12 n=389 win= 45% total= -239379 maxDD= -244851
+  zen window n=247 win= 45% total= -129227 maxDD= -129227
+W call filter-none expiry-near
+  all    n=1186 win= 54% total= -155250 maxDD= -193880
+  2022-01..2023-06 n=369 win= 54% total=  -61016 maxDD=  -67823
+  2023-07..2024-12 n=369 win= 51% total=  -81029 maxDD= -127695
+  2025-01..2026-12 n=448 win= 56% total=  -13205 maxDD=  -60815
+  zen window n=282 win= 57% total=    9295 maxDD=  -28333
+W call filter-none expiry-eve 
+  all    n=1179 win= 46% total= -443151 maxDD= -460450
+  2022-01..2023-06 n=366 win= 45% total= -148837 maxDD= -148837
+  2023-07..2024-12 n=367 win= 43% total= -162324 maxDD= -180898
+  2025-01..2026-12 n=446 win= 49% total= -131991 maxDD= -165802
+  zen window n=282 win= 49% total=  -94270 maxDD= -108764
+W call filter-zen  expiry-near
+  all    n=968 win= 54% total= -106883 maxDD= -171030
+  2022-01..2023-06 n=253 win= 53% total=  -52863 maxDD=  -53298
+  2023-07..2024-12 n=325 win= 50% total=  -79612 maxDD= -118167
+  2025-01..2026-12 n=390 win= 57% total=   25591 maxDD=  -53565
+  zen window n=247 win= 58% total=   28228 maxDD=  -25883
+W call filter-zen  expiry-eve 
+  all    n=962 win= 46% total= -329904 maxDD= -359200
+  2022-01..2023-06 n=250 win= 44% total=  -99321 maxDD= -104669
+  2023-07..2024-12 n=323 win= 42% total= -153341 maxDD= -165644
+  2025-01..2026-12 n=389 win= 51% total=  -77242 maxDD= -124914
+  zen window n=247 win= 50% total=  -71537 maxDD=  -86032
+W lean filter-none expiry-near
+  all    n=1186 win= 54% total= -246550 maxDD= -287587
+  2022-01..2023-06 n=369 win= 53% total=  -85676 maxDD=  -94822
+  2023-07..2024-12 n=369 win= 49% total= -181005 maxDD= -198950
+  2025-01..2026-12 n=448 win= 58% total=   20131 maxDD=  -69491
+  zen window n=282 win= 58% total=   44326 maxDD=  -69491
+W lean filter-none expiry-eve 
+  all    n=1179 win= 46% total= -463679 maxDD= -478722
+  2022-01..2023-06 n=366 win= 44% total= -162300 maxDD= -162300
+  2023-07..2024-12 n=367 win= 43% total= -185560 maxDD= -194293
+  2025-01..2026-12 n=446 win= 51% total= -115819 maxDD= -134242
+  zen window n=282 win= 50% total=  -58077 maxDD=  -91174
+W lean filter-zen  expiry-near
+  all    n=968 win= 53% total= -187010 maxDD= -249800
+  2022-01..2023-06 n=253 win= 54% total=  -29392 maxDD=  -48379
+  2023-07..2024-12 n=325 win= 46% total= -194382 maxDD= -206702
+  2025-01..2026-12 n=390 win= 58% total=   36763 maxDD=  -39913
+  zen window n=247 win= 59% total=   60602 maxDD=  -37321
+W lean filter-zen  expiry-eve 
+  all    n=962 win= 46% total= -366761 maxDD= -380291
+  2022-01..2023-06 n=250 win= 45% total=  -94266 maxDD=  -94266
+  2023-07..2024-12 n=323 win= 41% total= -185096 maxDD= -193146
+  2025-01..2026-12 n=389 win= 50% total=  -87399 maxDD= -103491
+  zen window n=247 win= 52% total=  -13260 maxDD=  -39946
+W gap  filter-none expiry-near
+  all    n=1186 win= 59% total=  -38719 maxDD= -147951
+  2022-01..2023-06 n=369 win= 65% total=   88274 maxDD=  -30646
+  2023-07..2024-12 n=369 win= 57% total=  -24140 maxDD=  -89921
+  2025-01..2026-12 n=448 win= 55% total= -102853 maxDD= -141013
+  zen window n=282 win= 54% total=  -91092 maxDD=  -95773
+W gap  filter-none expiry-eve 
+  all    n=1179 win= 51% total= -294111 maxDD= -313477
+  2022-01..2023-06 n=366 win= 54% total=  -26400 maxDD=  -61472
+  2023-07..2024-12 n=367 win= 50% total=  -85029 maxDD= -123879
+  2025-01..2026-12 n=446 win= 49% total= -182682 maxDD= -202684
+  zen window n=282 win= 48% total= -138302 maxDD= -143587
+W gap  filter-zen  expiry-near
+  all    n=968 win= 59% total=  -41769 maxDD= -126107
+  2022-01..2023-06 n=253 win= 66% total=   62366 maxDD=  -39735
+  2023-07..2024-12 n=325 win= 56% total=  -37784 maxDD=  -85506
+  2025-01..2026-12 n=390 win= 56% total=  -66351 maxDD= -116113
+  zen window n=247 win= 54% total=  -78201 maxDD=  -82882
+W gap  filter-zen  expiry-eve 
+  all    n=962 win= 52% total= -228820 maxDD= -261014
+  2022-01..2023-06 n=250 win= 56% total=    1490 maxDD=  -46048
+  2023-07..2024-12 n=323 win= 50% total=  -88311 maxDD= -117595
+  2025-01..2026-12 n=389 win= 50% total= -141999 maxDD= -172926
+  zen window n=247 win= 48% total= -119769 maxDD= -125053
+
+48 cells tried; 33 lost money in the untouched last period.
+Cells profitable in all three periods: 1
+   Z gap  filter-zen  expiry-near
+
+======================================================================
+
+Robustness (one lot; the last three columns are the three periods)
+
+Does the entry print matter? Z shape, expiry near, no filter
+  put  enter at the open                     all n=1186 win= 61% total= -505140 maxDD= -558417 |  -136348 |  -140415 |  -228377
+  put  enter at the prior day's close        all n=1186 win= 62% total= -233304 maxDD= -310808 |     4035 |   -51623 |  -185716
+  call enter at the open                     all n=1186 win= 62% total=  459765 maxDD= -186045 |    -1772 |   121743 |   339793
+  call enter at the prior day's close        all n=1186 win= 58% total=   59008 maxDD= -150623 |   -26214 |    -8715 |    93937
+  gap  enter at the open                     all n=1186 win= 65% total=  766082 maxDD= -118175 |   152502 |   318810 |   294770
+  gap  enter at the prior day's close        all n=1186 win= 64% total=  307199 maxDD= -127160 |   263373 |    50831 |    -7005
+  fade enter at the open                     all n=1186 win= 58% total= -811457 maxDD= -831818 |  -290622 |  -337482 |  -183353
+  fade enter at the prior day's close        all n=1186 win= 56% total= -481495 maxDD= -520586 |  -285552 |  -111169 |   -84774
+
+Is the gap rule just noise on tiny gaps? Z gap, filter zen, expiry near
+  skip gaps smaller than 0.0%                all n=1031 win= 65% total=  663971 maxDD= -112950 |   113917 |   227398 |   322656
+  skip gaps smaller than 0.1%                all n=788 win= 66% total=  634494 maxDD=  -98036 |   139877 |   237605 |   257013
+  skip gaps smaller than 0.3%                all n=401 win= 66% total=  236029 maxDD= -104543 |    52427 |    69538 |   114064
+  skip gaps smaller than 0.5%                all n=176 win= 64% total=   83386 maxDD=  -65812 |    42096 |     8210 |    33080
+
+Fill quality, Z gap, filter zen, expiry near
+  slippage x1                                all n=1031 win= 65% total=  663971 maxDD= -112950 |   113917 |   227398 |   322656
+  slippage x2                                all n=1031 win= 64% total=  446895 maxDD= -126347 |    66249 |   154337 |   226310
+  slippage x3                                all n=1031 win= 63% total=  229820 maxDD= -160417 |    18581 |    81275 |   129964
+  slippage x5                                all n=1031 win= 61% total= -204330 maxDD= -356958 |   -76755 |   -64848 |   -62728
+  exit at the next session's open            all n=1031 win= 64% total=  538352 maxDD= -116549 |   134034 |   146950 |   257368
+  base                                       all n=1031 win= 65% total=  663971 maxDD= -112950 |   113917 |   227398 |   322656
+
+Where the base cell earns
+  by days to expiry: {0: (217, 54650), 1: (199, 85283), 2: (154, -3138), 3: (150, 211299), 4: (54, 68063), 5: (58, 33532), 6: (198, 212899), 7: (1, 1382)}
+  by side: {'CE': (391, 557929), 'PE': (640, 106041)}
+  by year: {2022: (148, 74764), 2023: (244, 142626), 2024: (226, 123925), 2025: (240, 140781), 2026: (173, 181874)}
+  worst trade -31223, best 13559, worst 5 trades together -128592
