@@ -1,4 +1,4 @@
-# Algos: the catalogue, the Lab and the Sandbox gate
+# Algos: the catalogue, the Lab, the engines and the Sandbox gate
 
 This is the trader's guide to the **Algos** page (`/algos`). It covers how to run it
 on your own desktop, what each part does, and, before anything else, what the
@@ -6,8 +6,9 @@ testing has and has not shown.
 
 ## Read this first: no algo here has been shown to make money
 
-The four algos in the catalogue (Zen, Mirror Zen, Calm Condor, Morning Gap Fade)
-are **all marked Experimental, and each card says why**. They were tested on the
+The option algos in the catalogue (Zen, Mirror Zen, Calm Condor, Morning Gap Fade, and
+Smart Pick, which only runs one of them) are **all marked Experimental, and each card
+says why**. They were tested on the
 actual prices of Nifty options and futures from NSE, not on a model:
 
 | Test, on real NSE prices | Result after costs |
@@ -27,6 +28,12 @@ position earn a full day of time decay while carrying only the overnight share o
 the risk. The real prices disagreed, and the real prices are what the cards now
 quote.
 
+Since then two further studies were run on real prices
+([mandate-results.md](mandate-results.md), [universe-results.md](universe-results.md)):
+no option spread beat leaving the money in cash on a Rs 1,00,000 account, and the one
+family that did earn after costs, rotating monthly between a Nifty ETF, a gold ETF and
+cash, is mostly equity and gold exposure (half of each, held, did almost as well).
+
 What this means for you:
 
 - Use the page to learn how these structures behave, and to build a track record
@@ -38,23 +45,33 @@ What this means for you:
 
 ## What the page does
 
-- **Market right now.** Scores the market (calm, trending, volatile or event day)
-  from Nifty's move, India VIX, the US indices, crude oil and the dollar index.
-  If your broker is not connected there is too little data, and it says
-  "Not enough data" instead of guessing. Algos stand aside until there is more.
-- **Algo cards.** For each algo: what it does, when it trades, what the test found,
-  and a capital box. "See what it would do today" shows the plan or the reason it
-  would stand aside, with the worst-case loss in rupees. "Add in Sandbox mode" saves
-  it, Stopped and in Sandbox.
-- **Once added.** Switch it Active and it checks the market at its own time (15:05
-  for overnight algos, 09:25 for the morning one). "Check the market now" runs the
-  same check immediately. Every decision, including the days it stood aside and
-  why, is listed under Recent decisions. The Sandbox record shows trades, wins and
-  net result.
-- **Go Live.** Disabled until the Sandbox record passes the gate. When allowed, you
-  must type the worst-case loss in rupees back to confirm. It is refused while a
-  position is open.
-- **Lab.** Replays any algo over real market history with no broker needed. See below.
+The page has a one-line read of the market at the top (calm, trending, volatile or event day, or
+"cannot read the market yet" when your broker is not connected), a "Live: N things to do" chip,
+and five tabs.
+
+- **Discover.** "Which algo suits today?" picks an overnight algo only if it made money after
+  costs in the older years and again in the newer years on this kind of day; otherwise it stands
+  aside and says why for each algo. Below it, one tile per algo with a plain one-line summary, the
+  honest score ("Lost money in our tests") and a Sandbox button; the technical detail and test
+  evidence are behind "How it works and how it tested".
+- **My algos.** Each added algo: switch it Active and it checks the market at its own time (15:05
+  for overnight algos, 09:25 for the morning one). "Check the market now" runs the same check. Every
+  decision, including days it stood aside and why, is listed; "Why did it do that?" explains each in
+  steps. The Sandbox record shows trades, wins and net result. **Go Live** stays disabled until the
+  record passes the gate, then needs the worst-case loss typed back; it is refused while a position is
+  open. Below: "Days to sit out" (budget, central-bank days: every algo stands aside on that day and the
+  trading day before) and the Live checklist, including the address this server reaches the internet
+  from, to compare with your broker's static-IP list.
+- **Build your own.** "Search every kind of algo" (ETF rotation, trend, dip buying, calendar rules,
+  against cash and buy and hold) and "Build and refine your own" (option spreads, see below).
+- **Test on history.** The Lab: replays any algo over real market history with no broker. "Test on my
+  account" runs it through your capital and your most-to-lose-in-a-day limit.
+- **Why did it do that?** Pick an algo and a past day; it lists what the market looked like, what kind
+  of day it was, which rule allowed or stopped the trade, and what the model says happened.
+
+Set `ALGO_MAX_DAILY_LOSS_INR` in `.env` (for example 20000) to size every algo to that limit and to make a
+second algo stand aside if it would take the day's total risk past it. The old single-column layout is at
+`/algos?variant=classic`. How each engine works and was checked: [engines.md](engines.md).
 
 ## Build and refine your own
 
@@ -69,7 +86,8 @@ kinds of market day. A search runs in the background (about a minute) and:
 
 Saving puts the result in your list as an experimental algo that starts in Sandbox like the
 others. "Check for a better version" searches again on newer data and only proposes a change;
-it never applies one. It is not run on a schedule. A search is only as good as its prices:
+it never applies one. A weekly pass (Sundays 10:07 IST) also re-checks your built algos and refreshes
+the chooser's evidence when it is over a week old, storing proposals only. A search is only as good as its prices:
 these are modelled option prices, not real fills, and the earlier real-price tests showed
 the models flatter option sellers.
 

@@ -81,6 +81,14 @@ function result(edge: boolean): UniverseResult {
         ['2026-10-28', 164366],
       ],
     },
+    today: {
+      as_of: '2026-10-28',
+      lookback_days: 126,
+      returns: { equity: 4.2, gold: 11.8 },
+      would_hold: { equity: 0, gold: 1 },
+      headline: 'On the latest close it would hold the gold ETF.',
+      note: 'It acts only on the first trading day of a month, using the previous close.',
+    },
     caveats: [
       'Holding half Nifty and half gold is a fair comparison: most of any gain is owning equities and gold.',
     ],
@@ -104,6 +112,9 @@ describe('UniversePanel', () => {
     expect(screen.getByText(/Rs 1,64,366/)).toBeTruthy()
     expect(screen.getByText(/No day passed your daily limit/)).toBeTruthy()
     expect(screen.getByText(/half Nifty and half gold/)).toBeTruthy()
+    expect(screen.getByText(/What the rotation sees today \(2026-10-28\)/)).toBeTruthy()
+    expect(screen.getByText(/it would hold the gold ETF/)).toBeTruthy()
+    expect(screen.getByText(/gold ETF 11.8%/)).toBeTruthy()
   })
 
   it('says plainly when nothing beat cash or buy and hold', () => {

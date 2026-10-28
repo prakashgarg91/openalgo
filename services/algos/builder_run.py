@@ -180,6 +180,7 @@ def run_universe(
                 key=lambda r: -r["test_excess_over_cash"],
             ),
             "verdict": found["verdict"],
+            "today": universe.today_view(bars),
             "account": sim,
             "caveats": [
                 "Daily closing prices of two exchange-traded funds (Nifty and gold), trades a full day after each signal.",

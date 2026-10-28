@@ -445,6 +445,15 @@ export interface UniverseResult {
     headline: string
     reasons: string[]
   }
+  today?: {
+    as_of: string | null
+    lookback_days?: number
+    returns: Record<string, number>
+    would_hold: Record<string, number>
+    nifty_above_200_day_average?: boolean | null
+    headline: string
+    note?: string
+  }
   account: AccountResult
   caveats: string[]
 }

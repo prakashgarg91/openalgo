@@ -87,6 +87,17 @@ export function UniverseResultView({ result }: { result: UniverseResult }) {
           </tbody>
         </table>
       </div>
+      {result.today?.as_of && (
+        <div className="space-y-1 rounded-md border p-3 text-sm">
+          <div className="font-medium">{`What the rotation sees today (${result.today.as_of})`}</div>
+          <p>{result.today.headline}</p>
+          <p className="text-muted-foreground">
+            Rise over the last {result.today.lookback_days} trading days: Nifty ETF{' '}
+            {result.today.returns.equity}%, gold ETF {result.today.returns.gold}%.{' '}
+            {result.today.note}
+          </p>
+        </div>
+      )}
       {acct.final_equity != null && (
         <div className="space-y-2 rounded-md border p-3 text-sm">
           <div className="font-medium">

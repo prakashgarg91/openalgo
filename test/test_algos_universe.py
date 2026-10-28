@@ -257,6 +257,7 @@ def test_the_job_writes_a_complete_result_for_the_page(tmp_path):
     assert out["account"]["within_daily_cap"] in (True, False) and out["account"]["curve"]
     assert any("half Nifty and half gold" in c for c in out["caveats"])
     assert out["verdict"]["headline"]
+    assert out["today"]["as_of"] and out["today"]["headline"]
 
 
 def test_an_account_of_a_different_size_scales_the_result(tmp_path):
@@ -276,3 +277,52 @@ def test_an_account_of_a_different_size_scales_the_result(tmp_path):
     assert results[300_000]["worst_day"] == pytest.approx(
         3 * results[100_000]["worst_day"], abs=0.5
     )
+
+
+# -- what the rotation sees today ------------------------------------------------------------------------
+
+
+def _rising_falling(equity_slope, gold_slope, days=400):
+    idx = pd.bdate_range("2024-01-01", periods=days)
+    eq = pd.Series(100 + np.arange(days) * equity_slope, index=idx)
+    gd = pd.Series(100 + np.arange(days) * gold_slope, index=idx)
+    return {
+        "equity": pd.DataFrame({"Open": eq, "Close": eq}),
+        "gold": pd.DataFrame({"Open": gd, "Close": gd}),
+    }
+
+
+def test_today_says_which_etf_it_would_hold_and_why():
+    view = u.today_view(_rising_falling(0.05, 0.2))
+    assert view["would_hold"] == {"equity": 0.0, "gold": 1.0}
+    assert view["returns"]["gold"] > view["returns"]["equity"] > 0
+    assert "gold ETF" in view["headline"] and view["nifty_above_200_day_average"] is True
+
+
+def test_today_says_cash_when_neither_rose_and_splits_in_all_mode():
+    assert "hold cash" in u.today_view(_rising_falling(-0.05, -0.05))["headline"]
+    both = u.today_view(_rising_falling(0.1, 0.1), mode="all")
+    assert both["would_hold"] == {"equity": 0.5, "gold": 0.5}
+
+
+def test_today_is_honest_about_too_little_history():
+    assert u.today_view(_rising_falling(0.1, 0.1, days=50))["as_of"] is None
+
+
+def test_today_matches_the_signal_the_script_would_use():
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "etf_rotation",
+        Path(__file__).resolve().parents[1] / "strategies/examples/etf_momentum_rotation.py",
+    )
+    rot = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rot)
+    bars = make_bars(days=500, seed=11)
+    view = u.today_view(bars, 126, "best")
+    weights = rot.signal_weights(
+        list(bars["equity"]["Close"]), list(bars["gold"]["Close"]), 126, "best"
+    )
+    assert view["would_hold"]["equity"] == weights[rot.EQUITY]
+    assert view["would_hold"]["gold"] == weights[rot.GOLD]

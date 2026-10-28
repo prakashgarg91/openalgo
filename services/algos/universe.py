@@ -430,3 +430,51 @@ def search(
         "winner_days": ran[winner["strategy"]],
         "buy_and_hold_days": bh,
     }
+
+
+def today_view(
+    bars: dict[str, pd.DataFrame], lookback: int = 126, mode: str = "best"
+) -> dict[str, Any]:
+    """What the momentum rotation sees on the newest finished day, in plain numbers.
+
+    The real decision is made on the first trading day of each month from the previous close; this shows the
+    standing the rotation is in now, so a reader can see why it would hold what it would hold.
+    """
+    close = pd.DataFrame({k: bars[k]["Close"] for k in ("equity", "gold")}).dropna()
+    if len(close) <= lookback:
+        return {
+            "as_of": None,
+            "returns": {},
+            "would_hold": {},
+            "headline": "Not enough history to say.",
+        }
+    returns = {
+        k: float(close[k].iloc[-1] / close[k].iloc[-1 - lookback] - 1) for k in close.columns
+    }
+    positive = {k: v for k, v in returns.items() if v > 0}
+    weights = {"equity": 0.0, "gold": 0.0}
+    if positive:
+        if mode == "best":
+            weights[max(positive, key=positive.get)] = 1.0
+        else:
+            for k in positive:
+                weights[k] = 1.0 / len(positive)
+    names = {"equity": "the Nifty ETF", "gold": "the gold ETF"}
+    held = [names[k] for k, w in weights.items() if w > 0]
+    headline = (
+        f"On the latest close it would hold {' and '.join(held)}."
+        if held
+        else "On the latest close neither ETF is above where it was, so it would hold cash."
+    )
+    sma200 = float(close["equity"].rolling(200).mean().iloc[-1]) if len(close) >= 200 else None
+    return {
+        "as_of": str(close.index[-1].date()),
+        "lookback_days": lookback,
+        "returns": {k: round(v * 100, 2) for k, v in returns.items()},
+        "would_hold": weights,
+        "nifty_above_200_day_average": None
+        if sma200 is None
+        else bool(close["equity"].iloc[-1] > sma200),
+        "headline": headline,
+        "note": "It acts only on the first trading day of a month, using the previous close.",
+    }
