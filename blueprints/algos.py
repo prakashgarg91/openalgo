@@ -10,6 +10,7 @@ Nothing here places an order: orders belong to ``services/strategy_module/``.
 from __future__ import annotations
 
 import os
+import threading
 from datetime import date
 from typing import Any
 
@@ -141,14 +142,21 @@ def _rate_limited(error):
 
 
 _custom_loaded = False
+_custom_lock = threading.Lock()
 
 
 def _ensure_custom_loaded() -> None:
-    """Built algos join the catalogue once per process, on first use."""
+    """Built algos join the catalogue once per process, on first use.
+
+    The check and the write sit under one lock, so two first requests cannot both load them.
+    """
     global _custom_loaded
-    if not _custom_loaded:
-        custom.register_saved()
-        _custom_loaded = True
+    if _custom_loaded:
+        return
+    with _custom_lock:
+        if not _custom_loaded:
+            custom.register_saved()
+            _custom_loaded = True
 
 
 @algos_bp.before_request

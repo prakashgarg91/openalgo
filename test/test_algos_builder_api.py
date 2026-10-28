@@ -263,3 +263,27 @@ def test_a_waiting_proposal_is_readable_by_its_owner_only(app, client, jobs, mon
     other = app.test_client()
     _login(other, OTHER)
     assert other.get(f"/algos/api/builder/custom/{row_id}/proposal").status_code == 404
+
+
+def test_built_algos_are_loaded_once_even_when_first_requests_overlap(monkeypatch):
+    import threading
+    import time
+
+    calls = []
+
+    def slow_load():
+        calls.append(1)
+        time.sleep(0.05)  # a yield point, so an unlocked check-then-act would let a second in
+
+    monkeypatch.setattr(custom, "register_saved", slow_load)
+    algos._custom_loaded = False
+    barrier = threading.Barrier(8)
+
+    def first_request():
+        barrier.wait()
+        algos._ensure_custom_loaded()
+
+    threads = [threading.Thread(target=first_request) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert len(calls) == 1
