@@ -21,8 +21,23 @@ fix, live in [docs/releases](releases/).
   key, broker login for today, instrument list. The static IP your broker must
   have registered cannot be checked from OpenAlgo, so it is listed as
   something for you to confirm.
+- Build and refine your own (Algos page): choose trade types and kinds of
+  market day, and a search tries up to 90 configurations on ten years of
+  history. It chooses on the early years, checks on the middle years, and reads
+  the single best one on the last years it never saw, with costs included. It
+  says "No edge shown" unless the best one holds up on both later periods. On
+  simulated trades with no real edge it shows an edge about 4 percent of the
+  time. On the real run in this build, all 40 configurations lost money on the
+  untouched period. A saved algo is experimental, starts in Sandbox, and the
+  re-check button only proposes a change; it never applies one. It is not
+  scheduled, and results use modelled option prices, not real fills.
+- Sign in with your phone: save a mobile number on the Profile page, then
+  sign in with a text-message code instead of the password. Off until you set
+  `PHONE_OTP_PROVIDER` in `.env` (see docs/algos/phone-login.md). An
+  authenticator code, if you use one, is still asked for. The SMS providers
+  are not tested against live accounts here.
 - Existing installs need `cd upgrade && uv run migrate_all.py` once, which adds
-  the two Algos tables.
+  the Algos tables and the phone sign-in table.
 
 ### Changed
 

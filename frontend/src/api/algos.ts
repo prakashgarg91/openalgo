@@ -228,3 +228,68 @@ export async function fetchReadiness(): Promise<Readiness> {
   const response = await webClient.get<{ data: Readiness }>(`${BASE}/readiness`)
   return response.data.data
 }
+
+export type BuilderFamily = 'condor' | 'bull_put' | 'bear_call'
+
+export interface BuilderStats {
+  trades: number
+  win_rate: number
+  avg: number
+  total: number
+  max_drawdown: number
+  profit_factor: number | null
+}
+
+export interface BuilderCandidate {
+  spec: Record<string, unknown>
+  name: string
+  train: BuilderStats
+  validate: BuilderStats
+  test?: BuilderStats
+  curve?: [string, number][]
+}
+
+export interface BuilderResult {
+  trials: number
+  lost_on_test: number
+  segments: Record<'train' | 'validate' | 'test', [string, string]>
+  baseline_test: BuilderStats | null
+  winner: BuilderCandidate | null
+  shortlist: BuilderCandidate[]
+  verdict: { edge_shown: boolean; headline: string; reasons: string[] }
+  caveats: string[]
+  proposal?: { name: string; why: string; spec: Record<string, unknown> } | null
+}
+
+export type BuilderJob =
+  | { state: 'running'; progress: { done: number; total?: number } }
+  | { state: 'done'; result: BuilderResult }
+  | { state: 'failed'; message: string }
+
+export interface BuilderRequest {
+  families: BuilderFamily[]
+  label_sets: string[][]
+  custom_id?: number
+}
+
+export async function startBuilderSearch(request: BuilderRequest): Promise<string> {
+  const response = await webClient.post<{ job_id: string }>(`${BASE}/builder/search`, request)
+  return response.data.job_id
+}
+
+export async function fetchBuilderJob(jobId: string): Promise<BuilderJob> {
+  const response = await webClient.get<{ data: BuilderJob }>(`${BASE}/builder/jobs/${jobId}`)
+  return response.data.data
+}
+
+export async function saveBuiltAlgo(jobId: string, name: string): Promise<{ algo_id: string }> {
+  const response = await webClient.post<{ data: { algo_id: string } }>(`${BASE}/builder/save`, {
+    job_id: jobId,
+    name,
+  })
+  return response.data.data
+}
+
+export async function deleteBuiltAlgo(customId: number): Promise<void> {
+  await webClient.delete(`${BASE}/builder/custom/${customId}`)
+}

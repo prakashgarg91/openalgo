@@ -18,6 +18,7 @@ import {
   setAlgoActive,
   setAlgoLive,
 } from '@/api/algos'
+import { BuilderPanel, BuiltAlgoTools } from '@/components/algos/BuilderPanel'
 import { LabPanel } from '@/components/algos/LabPanel'
 import { ReadinessPanel, StartHere } from '@/components/algos/ReadinessPanel'
 import { Badge } from '@/components/ui/badge'
@@ -459,9 +460,17 @@ export default function Algos() {
             ) : (
               <AddAlgo algo={algo} />
             )}
+            {algo.id.startsWith('custom_') && (
+              <BuiltAlgoTools
+                customId={Number(algo.id.slice('custom_'.length))}
+                deployed={algo.deployment !== null}
+              />
+            )}
           </CardContent>
         </Card>
       ))}
+
+      <BuilderPanel />
 
       {catalogue.data && catalogue.data.length > 0 && <LabPanel algos={catalogue.data} />}
     </div>

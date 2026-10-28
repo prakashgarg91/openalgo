@@ -8,7 +8,7 @@ below comes from reading the repository and from running the app in a real brows
 
 | Asked for | State |
 | --- | --- |
-| Strategy builder, easy to start, Stratzy-like | Catalogue, add with capital, Sandbox first, start guide, live checklist. No custom (user-drawn) strategy builder on this page; `/strategy` and `/flow` remain the free-form builders. |
+| Strategy builder, easy to start, Stratzy-like | Catalogue, add with capital, Sandbox first, start guide, live checklist, and a builder that searches spread and condor setups and refines them walk-forward (see below). Free-form legs remain in `/strategy` and `/flow`. |
 | Zen, Mirror Zen | Built as approximations of the named algos from public descriptions. Not Stratzy's own rules. |
 | Situation-wise (dynamic) | Regime scorer (calm, trending, volatile, event) gates each algo. |
 | Foreign markets and other impacts | S&P 500, Nasdaq, crude, dollar index and VIX feed the regime. Missing: GIFT Nifty (no free reliable feed), an event/news calendar (results, RBI, budget days are not known to the scorer). |
@@ -43,6 +43,16 @@ made; the claim "faster than Stratzy" is unsupported.
 ## Still open
 
 - Real Upstox login and a real order (needs the trader's credentials and a registered IP).
-- A custom strategy builder on /algos.
+- The builder's re-check is manual. A scheduled weekly re-check that stores a proposal was not built; applying a change automatically is deliberately not offered.
+- The builder searches condors and credit spreads only, and prices with the conservative model, not real option prices.
+- Phone sign-in: Twilio and MSG91 senders untested against live accounts; Indian SMS needs your DLT registration.
 - GIFT Nifty and an event calendar in the regime.
 - Architecture diagrams in the openalgo-docs repository.
+
+## Builder, measured
+
+- Real run, condors and bull puts on calm and trending days: 40 configurations; the best on
+  training (profit factor 1.9) fell to 1.26 on the middle years and 0.45 on the last years it
+  never saw; all 40 lost money there. Verdict shown to the trader: no edge.
+- Simulated trades with no true edge: the search showed an edge in 6 of 150 runs (4 percent);
+  with a true +Rs 150 per trade it found it in 127 of 150 (85 percent); +Rs 60 in 38 of 150.

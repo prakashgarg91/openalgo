@@ -56,6 +56,25 @@ What this means for you:
   position is open.
 - **Lab.** Replays any algo over real market history with no broker needed. See below.
 
+## Build and refine your own
+
+Under the catalogue, "Build and refine your own" lets you choose the trade types and the
+kinds of market day. A search runs in the background (about a minute) and:
+
+1. replays every combination on ten years of history with costs included;
+2. chooses the best few on the first half, narrows them on the next quarter, and reads only
+   the winner on the final quarter, which nothing was chosen on;
+3. tells you "No edge shown" unless the winner held up on both later periods, and always
+   shows how many configurations it tried and how many lost money on the last period.
+
+Saving puts the result in your list as an experimental algo that starts in Sandbox like the
+others. "Check for a better version" searches again on newer data and only proposes a change;
+it never applies one. It is not run on a schedule. A search is only as good as its prices:
+these are modelled option prices, not real fills, and the earlier real-price tests showed
+the models flatter option sellers.
+
+Sign in with your phone is described in [phone-login.md](phone-login.md).
+
 ## The Lab, and how to read it
 
 Pick an algo, a period and the option-price model, then "Run the replay".
