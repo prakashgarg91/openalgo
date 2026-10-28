@@ -424,9 +424,10 @@ export default function Login() {
 
             <Alert className="mb-6">
               <Info className="h-4 w-4" />
-              <AlertTitle>First Time User?</AlertTitle>
+              <AlertTitle>First time here?</AlertTitle>
               <AlertDescription>
-                Contact your administrator to set up your account.
+                OpenAlgo has one account per installation, the one made when it was first set up.
+                Forgot the password? Use the link under the password box.
               </AlertDescription>
             </Alert>
 

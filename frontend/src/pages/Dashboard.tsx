@@ -1,6 +1,7 @@
 import { BarChart3, BookOpen, FileText, GraduationCap, Search, Zap } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { AlgosTodayCard } from '@/components/algos/AlgosTodayCard'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { useOrderEventRefresh } from '@/hooks/useOrderEventRefresh'
@@ -96,10 +97,14 @@ export default function Dashboard() {
         setMarginData(data.data)
         setError(null)
       } else {
-        setError(data.message || 'Failed to fetch margin data')
+        setError(
+          'Your broker did not return your funds. If it is a new day, connect your broker again; otherwise refresh in a minute.'
+        )
       }
     } catch (_err) {
-      setError('Failed to fetch margin data')
+      setError(
+        'Could not reach OpenAlgo to load your funds. Check that it is still running, then refresh.'
+      )
     } finally {
       setIsLoading(false)
     }
@@ -452,6 +457,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      <AlgosTodayCard />
 
       {/* Quick Access Tools */}
       <div>

@@ -10,7 +10,7 @@ import {
 describe('Navigation Config', () => {
   describe('navItems', () => {
     it('contains the expected main navigation items', () => {
-      expect(navItems).toHaveLength(9)
+      expect(navItems).toHaveLength(10)
 
       const labels = navItems.map((item) => item.label)
       expect(labels).toContain('Dashboard')
@@ -20,6 +20,11 @@ describe('Navigation Config', () => {
       expect(labels).toContain('Platforms')
       expect(labels).toContain('Trading')
       expect(labels).toContain('Strategies')
+
+      // Algos is the page a new trader starts on, so it sits right after Dashboard and
+      // never collapses into the More menu.
+      expect(labels.indexOf('Algos')).toBe(labels.indexOf('Dashboard') + 1)
+      expect(navItems.find((item) => item.label === 'Algos')?.collapseBelow).toBeUndefined()
 
       // Strategies sits directly after Platforms. Asserting the position, not
       // just its presence, is the point: it is where the user expects to find

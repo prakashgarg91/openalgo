@@ -31,6 +31,14 @@ fix, live in [docs/releases](releases/).
   untouched period. A saved algo is experimental, starts in Sandbox, and the
   re-check button only proposes a change; it never applies one. It is not
   scheduled, and results use modelled option prices, not real fills.
+- Algos page redesigned as tabs (Discover, My algos, Build your own, Test on
+  history) with one tile per algo and a plain one-line summary. The tiles keep
+  the "Lost money in our tests" label. The earlier layout is at
+  `/algos?variant=classic`. Algos now sits in the main navigation after
+  Dashboard instead of the profile menu, and the Dashboard has a "Your algos
+  today" card. The broker-connect page explains the daily login, the login page
+  no longer tells you to contact an administrator, and the dashboard's funds
+  error says what to do.
 - Sign in with your phone: save a mobile number on the Profile page, then
   sign in with a text-message code instead of the password. Off until you set
   `PHONE_OTP_PROVIDER` in `.env` (see docs/algos/phone-login.md). An

@@ -44,6 +44,7 @@ export interface NavItem {
 // Main navigation items shown in desktop navbar
 export const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/algos', label: 'Algos', icon: Bot },
   { href: '/orderbook', label: 'Orderbook', icon: ClipboardList },
   { href: '/tradebook', label: 'Tradebook', icon: FileText, collapseBelow: 'lg' },
   { href: '/positions', label: 'Positions', icon: TrendingUp },
@@ -92,7 +93,6 @@ export const profileMenuItems: NavItem[] = [
   { href: '/historify', label: 'Historify', icon: Database },
   { href: '/search/token', label: 'Search', icon: Search },
   { href: '/sandbox', label: 'Sandbox', icon: FlaskConical },
-  { href: '/algos', label: 'Algos', icon: Bot },
   { href: '/leverage', label: 'Leverage', icon: Gauge },
   { href: '/admin', label: 'Admin', icon: Settings },
 ]

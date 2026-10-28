@@ -1,7 +1,7 @@
 import { BookOpen, ExternalLink, Info, Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { BrokerAuthSignOut } from '@/components/auth/BrokerAuthSignOut'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -305,6 +305,11 @@ export default function BrokerSelect() {
                     </AlertDescription>
                   </Alert>
                 )}
+
+                <p className="text-xs text-muted-foreground">
+                  Broker logins end every morning around 3 AM, so you connect once each trading day.
+                  Algos you switched on keep their settings.
+                </p>
 
                 <Button type="submit" className="w-full" disabled={!selectedBroker || isSubmitting}>
                   {isSubmitting ? (
