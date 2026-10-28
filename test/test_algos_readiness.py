@@ -40,3 +40,14 @@ def test_wording_has_no_internal_terms():
     text = " ".join(s["detail"] + s["label"] for s in evaluate(_facts(has_api_key=False))["steps"])
     for bad in ("HTTP", "token", "403", "armed"):
         assert bad not in text
+
+
+def test_static_ip_step_names_the_servers_address_when_known():
+    detail = evaluate(_facts(public_ip="203.0.113.7"))["steps"][-1]["detail"]
+    assert "203.0.113.7" in detail and "exactly this address" in detail
+
+
+def test_static_ip_step_degrades_to_plain_words_when_the_address_is_unknown():
+    out = evaluate(_facts())
+    detail = out["steps"][-1]["detail"]
+    assert "could not look its own address up" in detail and out["steps"][-1]["state"] == "confirm"

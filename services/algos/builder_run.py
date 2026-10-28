@@ -55,10 +55,76 @@ def run_chooser(job_dir: Path, request: dict[str, Any]) -> None:
     )
 
 
+PROPOSALS = "proposals.json"
+
+
+def _review_one(history: lab.History, model: str, current: dict[str, Any]) -> dict[str, Any]:
+    """Search the full space on current data and compare the winner with the algo in use."""
+    specs = builder.space()
+    found = builder.search(
+        specs,
+        lambda spec: (
+            lab.run_lab(
+                history, "calm_condor", model=model, plan_fn=builder.lab_plan_fn(spec)
+            ).trades
+        ),
+    )
+    spec = builder.Spec.from_dict(current)
+    lo, hi = found["segments"]["test"]
+    mine = [
+        t
+        for t in lab.run_lab(
+            history, "calm_condor", model=model, plan_fn=builder.lab_plan_fn(spec)
+        ).trades
+        if lo < t["date"] <= hi
+    ]
+    summary = lab.summarize([t["pnl"] for t in mine])
+    return {
+        "proposal": builder.review(spec, found, summary),
+        "verdict": found["verdict"],
+        "current_test": summary,
+        "trials": found["trials"],
+    }
+
+
+def run_maintenance(job_dir: Path, request: dict[str, Any]) -> None:
+    """The weekly pass: refresh stale chooser evidence, re-check every built algo.
+
+    It only writes proposals to a file. Nothing here changes an algo, a deployment or an order.
+    """
+    model = request.get("model", "conservative")
+    if request.get("rebuild_chooser"):
+        run_chooser(job_dir, request["chooser"])
+    history = lab.load_history()
+    path = job_dir.parent / PROPOSALS
+    try:
+        stored = json.loads(path.read_text())
+    except (OSError, ValueError):
+        stored = {}
+    customs = request.get("customs", {})
+    for done, (algo_id, spec) in enumerate(customs.items(), start=1):
+        try:
+            outcome = _review_one(history, model, spec)
+        except builder.SpecError:
+            continue
+        stored[algo_id] = {
+            "checked_on": request["today"],
+            "proposal": outcome["proposal"],
+            "verdict": outcome["verdict"]["headline"],
+            "trials": outcome["trials"],
+        }
+        _write(path, stored)  # after each algo, so a timeout keeps what was finished
+        _write(job_dir / "progress.json", {"done": done, "total": len(customs)})
+    _write(job_dir / "result.json", {"kind": "maintenance", "checked": len(customs)})
+
+
 def run(job_dir: Path) -> None:
     request = json.loads((job_dir / "request.json").read_text())
     if request.get("kind") == "chooser":
         run_chooser(job_dir, request)
+        return
+    if request.get("kind") == "maintenance":
+        run_maintenance(job_dir, request)
         return
     model = request.get("model", "conservative")
     specs = builder.space(request["families"], [tuple(x) for x in request["label_sets"]])

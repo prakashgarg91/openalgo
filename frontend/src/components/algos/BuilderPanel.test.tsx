@@ -2,13 +2,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BuilderResult, BuilderStats } from '@/api/algos'
-import { BuilderPanel, BuilderResultView } from './BuilderPanel'
+import { BuilderPanel, BuilderResultView, BuiltAlgoTools } from './BuilderPanel'
 
 const api = vi.hoisted(() => ({
   startBuilderSearch: vi.fn(),
   fetchBuilderJob: vi.fn(),
   saveBuiltAlgo: vi.fn(),
   deleteBuiltAlgo: vi.fn(),
+  fetchProposal: vi.fn(),
 }))
 
 vi.mock('@/api/algos', async (importOriginal) => ({
@@ -105,5 +106,37 @@ describe('Builder', () => {
     wrap(<BuilderPanel />)
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
     expect(await screen.findByText(/already running/)).toBeTruthy()
+  })
+})
+
+describe('BuiltAlgoTools weekly check', () => {
+  it('shows a waiting proposal and says nothing was changed', async () => {
+    api.fetchProposal.mockResolvedValue({
+      checked_on: '2026-10-25',
+      verdict: 'v',
+      trials: 60,
+      proposal: { name: 'Bull put OTM2/OTM5', why: 'It made more on the latest period.' },
+    })
+    wrap(<BuiltAlgoTools customId={3} deployed={false} />)
+    expect(await screen.findByText(/found a setup that looks better/)).toBeTruthy()
+    expect(screen.getByText(/Nothing was changed/)).toBeTruthy()
+  })
+
+  it('says when the weekly check recommends no change', async () => {
+    api.fetchProposal.mockResolvedValue({
+      checked_on: '2026-10-25',
+      verdict: 'v',
+      trials: 60,
+      proposal: null,
+    })
+    wrap(<BuiltAlgoTools customId={3} deployed={false} />)
+    expect(await screen.findByText(/no change recommended/)).toBeTruthy()
+  })
+
+  it('stays quiet before the first weekly check', async () => {
+    api.fetchProposal.mockResolvedValue(null)
+    wrap(<BuiltAlgoTools customId={3} deployed={false} />)
+    await screen.findByRole('button', { name: 'Check for a better version' })
+    expect(screen.queryByText(/weekly check/i)).toBeNull()
   })
 })

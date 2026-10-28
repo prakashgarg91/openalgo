@@ -16,6 +16,7 @@ class Facts:
     has_api_key: bool
     broker_logged_in: bool
     master_contract_ready: bool
+    public_ip: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,8 +64,15 @@ def evaluate(facts: Facts) -> dict:
             "static_ip",
             "Static IP registered with your broker",
             "confirm",
-            "Orders are rejected unless your broker has this server's IP on its allowed list. "
-            "Check it in your broker's developer settings. OpenAlgo cannot see it for you.",
+            (
+                f"This server reaches the internet from {facts.public_ip}. Your broker must have "
+                "exactly this address on its allowed list, or orders are rejected. Check it in "
+                "your broker's developer settings."
+                if facts.public_ip
+                else "Orders are rejected unless your broker has this server's address on its "
+                "allowed list. OpenAlgo could not look its own address up just now; check it in "
+                "your broker's developer settings."
+            ),
         ),
     ]
     blocking = [s for s in steps if s.state == "todo"]

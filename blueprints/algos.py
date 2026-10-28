@@ -26,6 +26,8 @@ from services.algos import (
     custom,
     debugger,
     lab,
+    maintenance,
+    netinfo,
     readiness,
     runner,
 )
@@ -205,6 +207,7 @@ def readiness_check():
         has_api_key=bool(get_api_key(user)),
         broker_logged_in=bool(broker and get_auth_token(user)),
         master_contract_ready=bool(broker and check_if_ready(broker)),
+        public_ip=netinfo.public_ip(),
     )
     return _ok({"data": readiness.evaluate(facts)})
 
@@ -696,3 +699,16 @@ def explain_deployment(deployment_id):
         for d in algo_db.list_decisions(deployment_id, 10)
     ]
     return _ok({"data": items})
+
+
+@algos_bp.route("/api/builder/custom/<int:custom_id>/proposal", methods=["GET"])
+@check_session_validity
+@_api_limit
+def builder_proposal(custom_id):
+    """What the weekly check found for one built algo. A proposal is advice, never applied."""
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    if not algo_db.get_custom(custom_id, user):
+        return _error(NOT_FOUND, 404)
+    return _ok({"data": maintenance.proposals().get(custom.algo_id(custom_id))})

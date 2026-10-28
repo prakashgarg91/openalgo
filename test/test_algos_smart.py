@@ -232,3 +232,19 @@ def test_explain_lists_real_decisions_and_is_private(app, client):
     other = app.test_client()
     _login(other, OTHER)
     assert other.get(f"/algos/api/deployments/{dep['id']}/explain").status_code == 404
+
+
+def test_readiness_shows_the_servers_address_and_what_is_missing(client, monkeypatch):
+    from database import auth_db, master_contract_status_db
+    from services.algos import netinfo
+
+    monkeypatch.setattr(netinfo, "public_ip", lambda: "203.0.113.7")
+    monkeypatch.setattr(auth_db, "get_api_key", lambda user: True)
+    monkeypatch.setattr(auth_db, "get_auth_token", lambda user: None)
+    monkeypatch.setattr(master_contract_status_db, "check_if_ready", lambda broker: True)
+    with client.session_transaction() as s:
+        s["broker"] = "upstox"
+    data = client.get("/algos/api/readiness").get_json()["data"]
+    steps = {s["id"]: s for s in data["steps"]}
+    assert "203.0.113.7" in steps["static_ip"]["detail"]
+    assert steps["broker"]["state"] == "todo" and data["ready_for_live"] is False

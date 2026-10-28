@@ -243,3 +243,19 @@ def test_someone_elses_built_algo_cannot_be_deleted(app, client, jobs):
         other.delete(f"/algos/api/builder/custom/{int(algo_id.split('_')[1])}").status_code == 404
     )
     assert algo_id in ALGOS
+
+
+def test_a_waiting_proposal_is_readable_by_its_owner_only(app, client, jobs, monkeypatch):
+    from services.algos import maintenance
+
+    jobs["status"][("0123456789abcdef", USER)] = {"state": "done", "result": _result()}
+    algo_id = client.post(
+        "/algos/api/builder/save", json={"job_id": "0123456789abcdef", "name": "Mine"}
+    ).get_json()["data"]["algo_id"]
+    row_id = int(algo_id.split("_")[1])
+    note = {"checked_on": "2026-10-28", "proposal": {"name": "Better one", "why": "x"}, "verdict": "v"}
+    monkeypatch.setattr(maintenance, "proposals", lambda: {algo_id: note})
+    assert client.get(f"/algos/api/builder/custom/{row_id}/proposal").get_json()["data"] == note
+    other = app.test_client()
+    _login(other, OTHER)
+    assert other.get(f"/algos/api/builder/custom/{row_id}/proposal").status_code == 404

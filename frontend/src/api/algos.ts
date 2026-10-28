@@ -354,3 +354,17 @@ export async function fetchExplanations(deploymentId: number): Promise<DebugResu
   )
   return response.data.data
 }
+
+export interface WaitingProposal {
+  checked_on: string
+  verdict: string
+  trials: number
+  proposal: { name: string; why: string } | null
+}
+
+export async function fetchProposal(customId: number): Promise<WaitingProposal | null> {
+  const response = await webClient.get<{ data: WaitingProposal | null }>(
+    `${BASE}/builder/custom/${customId}/proposal`
+  )
+  return response.data.data
+}

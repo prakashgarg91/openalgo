@@ -8,6 +8,7 @@ import {
   type BuilderStats,
   deleteBuiltAlgo,
   fetchBuilderJob,
+  fetchProposal,
   saveBuiltAlgo,
   startBuilderSearch,
 } from '@/api/algos'
@@ -329,8 +330,26 @@ export function BuiltAlgoTools({ customId, deployed }: { customId: number; deplo
   }
 
   const data = job.data
+  const waiting = useQuery({
+    queryKey: ['algos', 'proposal', customId],
+    queryFn: () => fetchProposal(customId),
+    staleTime: 60_000,
+  })
   return (
     <div className="mt-3 space-y-2 border-t pt-3 text-sm">
+      {waiting.data?.proposal && (
+        <p className="rounded-md border border-amber-500/40 p-2">
+          The weekly check on {waiting.data.checked_on} found a setup that looks better:{' '}
+          <span className="font-medium">{waiting.data.proposal.name}</span>.{' '}
+          {waiting.data.proposal.why} Nothing was changed. To use it, build it above and save it as
+          a new algo.
+        </p>
+      )}
+      {waiting.data && !waiting.data.proposal && (
+        <p className="text-muted-foreground">
+          Weekly check on {waiting.data.checked_on}: no change recommended.
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={recheck} disabled={data?.state === 'running'}>
           Check for a better version

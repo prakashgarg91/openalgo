@@ -516,9 +516,13 @@ def sync_all_jobs() -> int:
     Runs on the boot thread, where no request teardown fires, so it releases
     its own sessions.
     """
-    from services.algos import custom
+    from services.algos import custom, maintenance
 
     custom.register_saved()
+    try:
+        maintenance.install_job()
+    except Exception:
+        logger.exception("Could not schedule the weekly algo maintenance")
     count = 0
     for dep in algo_db.list_deployments(active_only=True):
         try:
