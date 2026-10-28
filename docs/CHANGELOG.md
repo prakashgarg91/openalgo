@@ -10,6 +10,11 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Intraday test of Zen's rules on real 5-minute option prices (docs/algos/intraday-test.md):
+  a resumable Upstox downloader for expired Nifty weekly options (needs the Plus plan),
+  a replay engine with the 10:15 entry, a 43.8-point stop that reverses, a target and the
+  next-session exit, and a runner that first checks the replay against the 204 published
+  trades and only then tries rule variants. Research only; no orders are placed.
 - Stratzy comparison (docs/algos/stratzy-comparison.md): Zen's published recipe
   (exit 3 PM next day, India VIX 13 to 20) replayed on real NSE option prices.
   Neither difference earned in the untouched 2025-26 period; an exit at the
