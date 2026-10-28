@@ -12,7 +12,9 @@ mobile number, then a code), adapted to OpenAlgo's single-user model.
   code. It replaces the password only. If you turned on an authenticator code for login,
   that is still asked for. The broker login (Upstox) that follows is unchanged.
 - Codes last 5 minutes, work once, and are burned by 5 wrong guesses. A new code cannot
-  be asked for inside a minute, and one number gets 5 codes an hour.
+  be asked for inside a minute, and one number gets 5 codes an hour. Ten wrong guesses in an hour
+  on one number stop new codes for that number until the hour is up (the password still works).
+- The text is sent in the background so that a registered number does not answer slower than an unknown one.
 - The page gives the same answer whether or not a number is registered, so nobody can use
   it to find out which number belongs to this installation.
 
