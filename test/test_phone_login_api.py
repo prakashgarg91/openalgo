@@ -123,6 +123,7 @@ def test_second_factor_is_still_asked_for(client, stubs, monkeypatch):
     client.post("/auth/phone/request", json={"phone": PHONE})
     response = client.post("/auth/phone/verify", json={"phone": PHONE, "code": stubs[0][1]})
     assert response.get_json()["status"] == "totp_required"
+    assert response.get_json()["username"] == USER
     state = client.get("/whoami").get_json()
     assert "user" not in state and state["pending_totp_user"] == USER
 

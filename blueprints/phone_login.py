@@ -121,6 +121,7 @@ def verify_login_code():
         return jsonify(
             {
                 "status": "totp_required",
+                "username": username,
                 "message": "Enter the 6-digit code from your authenticator app.",
             }
         ), 200

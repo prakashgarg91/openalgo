@@ -8,9 +8,11 @@ import {
   LogIn,
   MessageCircle,
   ShieldCheck,
+  Smartphone,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { PhoneSignIn, type PhoneSignInResult } from '@/components/auth/PhoneSignIn'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,11 +27,19 @@ export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
-  const [step, setStep] = useState<'password' | 'totp'>('password')
+  const [step, setStep] = useState<'password' | 'totp' | 'phone'>('password')
+  const [phoneEnabled, setPhoneEnabled] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingSetup, setIsCheckingSetup] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/auth/phone/status', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { enabled: false }))
+      .then((d) => setPhoneEnabled(Boolean(d.enabled)))
+      .catch(() => setPhoneEnabled(false))
+  }, [])
 
   // Check if setup is required or already logged in on page load
   useEffect(() => {
@@ -199,6 +209,25 @@ export default function Login() {
     }
   }
 
+  const handlePhoneResult = async (result: PhoneSignInResult) => {
+    if (result.status === 'totp_required') {
+      setUsername(result.username || '')
+      setStep('totp')
+      setError(null)
+      return
+    }
+    let who = result.username || ''
+    try {
+      const status = await fetch('/auth/session-status', { credentials: 'include' })
+      if (status.ok) who = (await status.json()).user || who
+    } catch {
+      // The name only labels the session in the UI; the sign-in itself already succeeded.
+    }
+    setLogin(who, result.broker || '')
+    showToast.success('Login successful', 'system')
+    navigate(result.redirect || '/broker')
+  }
+
   const handleBackToPassword = () => {
     setStep('password')
     setTotpCode('')
@@ -228,7 +257,9 @@ export default function Login() {
               <CardDescription>Sign in to your OpenAlgo account</CardDescription>
             </CardHeader>
             <CardContent>
-              {step === 'password' ? (
+              {step === 'phone' ? (
+                <PhoneSignIn onResult={handlePhoneResult} onBack={() => setStep('password')} />
+              ) : step === 'password' ? (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
@@ -302,6 +333,20 @@ export default function Login() {
                       </>
                     )}
                   </Button>
+                  {phoneEnabled && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setError(null)
+                        setStep('phone')
+                      }}
+                    >
+                      <Smartphone className="mr-2 h-4 w-4" />
+                      Sign in with your phone
+                    </Button>
+                  )}
                 </form>
               ) : (
                 <form onSubmit={handleTotpSubmit} className="space-y-4">

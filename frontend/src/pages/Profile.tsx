@@ -29,6 +29,7 @@ import {
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { webClient } from '@/api/client'
+import { PhoneRegistration } from '@/components/auth/PhoneRegistration'
 import TwoFactorEnforcement from '@/components/auth/TwoFactorEnforcement'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
@@ -928,6 +929,8 @@ export default function ProfilePage() {
               </form>
             </CardContent>
           </Card>
+
+          <PhoneRegistration />
         </TabsContent>
 
         {/* Broker Tab */}
