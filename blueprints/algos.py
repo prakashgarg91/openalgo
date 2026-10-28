@@ -25,6 +25,7 @@ from services.algos import (
     chooser_store,
     custom,
     debugger,
+    events,
     lab,
     maintenance,
     netinfo,
@@ -712,3 +713,43 @@ def builder_proposal(custom_id):
     if not algo_db.get_custom(custom_id, user):
         return _error(NOT_FOUND, 404)
     return _ok({"data": maintenance.proposals().get(custom.algo_id(custom_id))})
+
+
+# -- Event days --------------------------------------------------------------
+
+
+@algos_bp.route("/api/events", methods=["GET"])
+@check_session_validity
+@_api_limit
+def list_events():
+    if not _user():
+        return _error("Not authenticated", 401)
+    return _ok({"data": events.load()})
+
+
+@algos_bp.route("/api/events", methods=["POST"])
+@check_session_validity
+@_api_limit
+def add_event():
+    if not _user():
+        return _error("Not authenticated", 401)
+    data, error = _body()
+    if error:
+        return error
+    try:
+        entries = events.add(data.get("date"), data.get("label"), date.today())
+    except events.EventError as exc:
+        return _error(str(exc), 400)
+    _regime_cache.clear()
+    return _ok({"data": entries}, 201)
+
+
+@algos_bp.route("/api/events/<day>", methods=["DELETE"])
+@check_session_validity
+@_api_limit
+def delete_event(day):
+    if not _user():
+        return _error("Not authenticated", 401)
+    entries = events.remove(day)
+    _regime_cache.clear()
+    return _ok({"data": entries})

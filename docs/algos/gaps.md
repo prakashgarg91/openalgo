@@ -11,7 +11,7 @@ below comes from reading the repository and from running the app in a real brows
 | Strategy builder, easy to start, Stratzy-like | Catalogue, add with capital, Sandbox first, start guide, live checklist, and a builder that searches spread and condor setups and refines them walk-forward (see below). Free-form legs remain in `/strategy` and `/flow`. |
 | Zen, Mirror Zen | Built as approximations of the named algos from public descriptions. Not Stratzy's own rules. |
 | Situation-wise (dynamic) | Regime scorer (calm, trending, volatile, event) gates each algo. |
-| Foreign markets and other impacts | S&P 500, Nasdaq, crude, dollar index and VIX feed the regime. Missing: GIFT Nifty (no free reliable feed), an event/news calendar (results, RBI, budget days are not known to the scorer). |
+| Foreign markets and other impacts | S&P 500, Nasdaq, crude, dollar index and VIX feed the regime. Event days you list make every algo sit out. Missing: GIFT Nifty (no free reliable feed). |
 | Real trading through Upstox | Wired through the existing Upstox broker plugin and the Live gate. Never exercised against a real Upstox login or a real order here. |
 | Static IP | Reported in the checklist as the trader's confirmation; cannot be verified from the server. |
 | Profitable | Not shown. See below. |
@@ -43,14 +43,15 @@ made; the claim "faster than Stratzy" is unsupported.
 ## Still open
 
 - The four engines and how each was verified: [engines.md](engines.md). The main trading engine has not run against a live broker feed here.
-- The chooser's evidence table is rebuilt by hand, not on a schedule.
+- The chooser evidence is rebuilt weekly (Sunday 10:07 IST) only when it is over 7 days old; "Refresh the evidence" still works by hand.
 
 - Real Upstox login and a real order (needs the trader's credentials and a registered IP).
-- The builder's re-check is manual. A scheduled weekly re-check that stores a proposal was not built; applying a change automatically is deliberately not offered.
+- The builder is re-checked weekly and a proposal is stored and shown. Applying a proposal automatically is deliberately not offered.
 - The builder searches condors and credit spreads only, and prices with the conservative model, not real option prices.
 - Phone sign-in: Twilio and MSG91 senders untested against live accounts; Indian SMS needs your DLT registration.
-- GIFT Nifty and an event calendar in the regime.
-- Architecture diagrams in the openalgo-docs repository.
+- GIFT Nifty is not in the regime: there is no reliable free feed. It needs a data source you supply.
+- The event calendar is a list you keep (My algos, Days to sit out). It applies to live decisions only; the Lab's history does not know past events.
+- The illustrated diagrams in the `openalgo-docs` repository (not reachable from this session). Mermaid versions are in [architecture.md](architecture.md).
 
 ## Builder, measured
 

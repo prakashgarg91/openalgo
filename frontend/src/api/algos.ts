@@ -368,3 +368,23 @@ export async function fetchProposal(customId: number): Promise<WaitingProposal |
   )
   return response.data.data
 }
+
+export interface EventDay {
+  date: string
+  label: string
+}
+
+export async function fetchEventDays(): Promise<EventDay[]> {
+  const response = await webClient.get<{ data: EventDay[] }>(`${BASE}/events`)
+  return response.data.data
+}
+
+export async function addEventDay(date: string, label: string): Promise<EventDay[]> {
+  const response = await webClient.post<{ data: EventDay[] }>(`${BASE}/events`, { date, label })
+  return response.data.data
+}
+
+export async function removeEventDay(date: string): Promise<EventDay[]> {
+  const response = await webClient.delete<{ data: EventDay[] }>(`${BASE}/events/${date}`)
+  return response.data.data
+}

@@ -248,3 +248,15 @@ def test_readiness_shows_the_servers_address_and_what_is_missing(client, monkeyp
     steps = {s["id"]: s for s in data["steps"]}
     assert "203.0.113.7" in steps["static_ip"]["detail"]
     assert steps["broker"]["state"] == "todo" and data["ready_for_live"] is False
+
+
+def test_event_days_can_be_listed_added_and_removed_over_http(client, monkeypatch, tmp_path):
+    from services.algos import events
+
+    monkeypatch.setattr(events, "PATH", tmp_path / "e.json")
+    day = (datetime.now() + __import__("datetime").timedelta(days=10)).strftime("%Y-%m-%d")
+    added = client.post("/algos/api/events", json={"date": day, "label": "Union Budget"})
+    assert added.status_code == 201 and added.get_json()["data"][0]["label"] == "Union Budget"
+    bad = client.post("/algos/api/events", json={"date": "soon", "label": "x"})
+    assert bad.status_code == 400 and "like 2026-02-01" in bad.get_json()["message"]
+    assert client.delete(f"/algos/api/events/{day}").get_json()["data"] == []

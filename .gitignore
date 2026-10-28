@@ -150,3 +150,4 @@ docs/audit/qa_audit/**/qa_live_*.csv
 docs/audit/qa_audit/**/~$*
 db/algo_builder/
 db/algo_chooser/
+db/algo_events.json

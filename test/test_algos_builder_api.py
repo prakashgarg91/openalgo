@@ -253,7 +253,11 @@ def test_a_waiting_proposal_is_readable_by_its_owner_only(app, client, jobs, mon
         "/algos/api/builder/save", json={"job_id": "0123456789abcdef", "name": "Mine"}
     ).get_json()["data"]["algo_id"]
     row_id = int(algo_id.split("_")[1])
-    note = {"checked_on": "2026-10-28", "proposal": {"name": "Better one", "why": "x"}, "verdict": "v"}
+    note = {
+        "checked_on": "2026-10-28",
+        "proposal": {"name": "Better one", "why": "x"},
+        "verdict": "v",
+    }
     monkeypatch.setattr(maintenance, "proposals", lambda: {algo_id: note})
     assert client.get(f"/algos/api/builder/custom/{row_id}/proposal").get_json()["data"] == note
     other = app.test_client()

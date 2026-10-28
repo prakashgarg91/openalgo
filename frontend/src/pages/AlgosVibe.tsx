@@ -24,6 +24,7 @@ import {
 import { BuilderPanel, BuiltAlgoTools } from '@/components/algos/BuilderPanel'
 import { ChooserPanel } from '@/components/algos/ChooserPanel'
 import { DebuggerPanel, ExplainRecent } from '@/components/algos/DebuggerPanel'
+import { EventDaysPanel } from '@/components/algos/EventDaysPanel'
 import { LabPanel } from '@/components/algos/LabPanel'
 import { ReadinessPanel, StartHere } from '@/components/algos/ReadinessPanel'
 import { Badge } from '@/components/ui/badge'
@@ -302,6 +303,7 @@ export default function AlgosVibe() {
                 </CardContent>
               </Card>
             ))}
+          <EventDaysPanel />
           <ReadinessPanel />
         </TabsContent>
 

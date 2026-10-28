@@ -118,8 +118,10 @@ def days_to_expiry(api_key: str, today: date | None = None) -> int | None:
 
 
 def current_regime(api_key: str) -> tuple[RegimeResult, feed.MarketInputs]:
+    from services.algos import events
+
     snapshot = feed.collect(api_key)
-    return score_regime(snapshot), snapshot
+    return events.apply(score_regime(snapshot), date.today(), events.load()), snapshot
 
 
 def _api_key(user_id: str) -> str | None:

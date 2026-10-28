@@ -31,6 +31,15 @@ fix, live in [docs/releases](releases/).
   untouched period. A saved algo is experimental, starts in Sandbox, and the
   re-check button only proposes a change; it never applies one. It is not
   scheduled, and results use modelled option prices, not real fills.
+- Days to sit out (My algos): list the budget, a central-bank decision or big
+  results, and every algo stands aside on that day and the trading day before
+  it. There is no built-in event calendar.
+- Weekly algo housekeeping (Sundays 10:07 IST): refreshes the chooser's evidence
+  when it is over a week old and re-checks the algos you built against newer
+  data, storing a proposal if a different setup looks better. It never changes
+  an algo. The Live checklist now also shows the address this server calls out
+  from, to compare with your broker's allowed list. New guides:
+  docs/algos/go-live.md and docs/algos/architecture.md.
 - Algo chooser, Smart Pick and a debugger. "Which algo suits today?" picks an
   overnight algo for the kind of day only if it made money after costs in the
   older years and again in the newer years, and otherwise stands aside and says
