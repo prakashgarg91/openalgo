@@ -42,6 +42,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 SHIMS = {
+    # The updater downloads a 146 MB Chrome package when no browser is on PATH. These tests are about
+    # layouts, so the box has a browser and never goes to the network.
+    "google-chrome": "#!/bin/sh\nexit 0\n",
     "sudo": r"""#!/bin/bash
 echo "sudo $*" >> "$SHIM_STATE/calls.log"
 while [ $# -gt 0 ]; do
