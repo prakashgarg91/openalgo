@@ -31,6 +31,14 @@ fix, live in [docs/releases](releases/).
   untouched period. A saved algo is experimental, starts in Sandbox, and the
   re-check button only proposes a change; it never applies one. It is not
   scheduled, and results use modelled option prices, not real fills.
+- Algo chooser, Smart Pick and a debugger. "Which algo suits today?" picks an
+  overnight algo for the kind of day only if it made money after costs in the
+  older years and again in the newer years, and otherwise stands aside and says
+  why for each algo. Smart Pick is an algo that runs that choice through the
+  same Sandbox-first daily check. "Why did it do that?" replays any past day
+  step by step, and explains each recorded decision. On the history tested no
+  algo qualifies for any kind of day, so Smart Pick stands aside for now. The
+  evidence is rebuilt by hand and uses modelled option prices.
 - Algos page redesigned as tabs (Discover, My algos, Build your own, Test on
   history) with one tile per algo and a plain one-line summary. The tiles keep
   the "Lost money in our tests" label. The earlier layout is at

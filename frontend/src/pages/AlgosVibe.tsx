@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   type Bot,
+  Compass,
   Hammer,
   Moon,
   RefreshCw,
@@ -21,6 +22,8 @@ import {
   type RegimeLabel,
 } from '@/api/algos'
 import { BuilderPanel, BuiltAlgoTools } from '@/components/algos/BuilderPanel'
+import { ChooserPanel } from '@/components/algos/ChooserPanel'
+import { DebuggerPanel, ExplainRecent } from '@/components/algos/DebuggerPanel'
 import { LabPanel } from '@/components/algos/LabPanel'
 import { ReadinessPanel, StartHere } from '@/components/algos/ReadinessPanel'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +53,7 @@ const ALGO_ICON: Record<string, typeof Bot> = {
   mirror_zen: Moon,
   morning_gap: Sunrise,
   calm_condor: ShieldCheck,
+  smart_pick: Compass,
 }
 
 const TAGLINE: Record<string, string> = {
@@ -57,6 +61,7 @@ const TAGLINE: Record<string, string> = {
   mirror_zen: "Zen's opposite twin: bets the market will not follow through.",
   morning_gap: 'Fades a big opening gap and closes the same day.',
   calm_condor: 'Earns if the market stays in a range. Calm days only.',
+  smart_pick: 'Runs whichever algo has earned today. Stands aside if none has.',
 }
 
 function MoodStrip() {
@@ -136,6 +141,11 @@ function MoodStrip() {
 }
 
 function scoreChip(algo: AlgoItem): { text: string; className: string } {
+  if (algo.id === 'smart_pick')
+    return {
+      text: 'Sits out unless proven',
+      className: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+    }
   if (algo.id.startsWith('custom_'))
     return {
       text: 'Built by you',
@@ -225,9 +235,11 @@ export default function AlgosVibe() {
           </TabsTrigger>
           <TabsTrigger value="build">Build your own</TabsTrigger>
           <TabsTrigger value="lab">Test on history</TabsTrigger>
+          <TabsTrigger value="debug">Why did it do that?</TabsTrigger>
         </TabsList>
 
         <TabsContent value="discover" className="space-y-4 pt-3">
+          <ChooserPanel />
           {catalogue.isLoading && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2].map((i) => (
@@ -266,6 +278,7 @@ export default function AlgosVibe() {
               </CardHeader>
               <CardContent>
                 {algo.deployment && <DeployedAlgo algo={algo} deployment={algo.deployment} />}
+                {algo.deployment && <ExplainRecent deploymentId={algo.deployment.id} />}
                 {algo.id.startsWith('custom_') && (
                   <BuiltAlgoTools customId={Number(algo.id.slice('custom_'.length))} deployed />
                 )}
@@ -297,7 +310,11 @@ export default function AlgosVibe() {
         </TabsContent>
 
         <TabsContent value="lab" className="pt-3">
-          {items.length > 0 && <LabPanel algos={items} />}
+          {items.length > 0 && <LabPanel algos={items.filter((a) => a.id !== 'smart_pick')} />}
+        </TabsContent>
+
+        <TabsContent value="debug" className="pt-3">
+          {items.length > 0 && <DebuggerPanel algos={items} />}
         </TabsContent>
       </Tabs>
 

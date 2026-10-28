@@ -124,7 +124,7 @@ def choose(
     if not eligible:
         return {
             "pick": None,
-            "headline": f"Standing aside: no algo has earned a place on {"an" if label[0] in "aeiou" else "a"} {label} day.",
+            "headline": f"Standing aside: no algo has earned a place on {'an' if label[0] in 'aeiou' else 'a'} {label} day.",
             "candidates": rows,
         }
     best = eligible[0]

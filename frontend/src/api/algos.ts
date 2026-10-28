@@ -293,3 +293,64 @@ export async function saveBuiltAlgo(jobId: string, name: string): Promise<{ algo
 export async function deleteBuiltAlgo(customId: number): Promise<void> {
   await webClient.delete(`${BASE}/builder/custom/${customId}`)
 }
+
+export interface ChooserCell {
+  trades: number
+  total: number
+  avg: number
+  profit_factor: number | null
+}
+
+export interface ChooserRow {
+  algo_id: string
+  name: string
+  eligible: boolean
+  reasons: string[]
+  evidence: ChooserCell
+  check: ChooserCell
+}
+
+export interface ChooserToday {
+  regime: Regime
+  decision: { pick: string | null; headline: string; candidates: ChooserRow[] }
+  table: { built_at: string | null; first: string; split: string; last: string } | null
+}
+
+export async function fetchChooserToday(): Promise<ChooserToday> {
+  const response = await webClient.get<{ data: ChooserToday }>(`${BASE}/chooser/today`)
+  return response.data.data
+}
+
+export async function rebuildChooser(): Promise<string> {
+  const response = await webClient.post<{ job_id: string }>(`${BASE}/chooser/rebuild`)
+  return response.data.job_id
+}
+
+export interface DebugStep {
+  title: string
+  status: 'pass' | 'stop' | 'info'
+  detail: string
+}
+
+export interface DebugResult {
+  algo_name: string
+  verdict: string
+  date?: string
+  decided_at?: string
+  steps: DebugStep[]
+}
+
+export async function debugDay(algoId: string, date: string): Promise<DebugResult> {
+  const response = await webClient.post<{ data: DebugResult }>(`${BASE}/debug`, {
+    algo_id: algoId,
+    date,
+  })
+  return response.data.data
+}
+
+export async function fetchExplanations(deploymentId: number): Promise<DebugResult[]> {
+  const response = await webClient.get<{ data: DebugResult[] }>(
+    `${BASE}/deployments/${deploymentId}/explain`
+  )
+  return response.data.data
+}

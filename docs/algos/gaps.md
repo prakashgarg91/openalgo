@@ -42,6 +42,9 @@ made; the claim "faster than Stratzy" is unsupported.
 
 ## Still open
 
+- The four engines and how each was verified: [engines.md](engines.md). The main trading engine has not run against a live broker feed here.
+- The chooser's evidence table is rebuilt by hand, not on a schedule.
+
 - Real Upstox login and a real order (needs the trader's credentials and a registered IP).
 - The builder's re-check is manual. A scheduled weekly re-check that stores a proposal was not built; applying a change automatically is deliberately not offered.
 - The builder searches condors and credit spreads only, and prices with the conservative model, not real option prices.
