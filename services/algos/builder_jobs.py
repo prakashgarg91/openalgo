@@ -79,7 +79,16 @@ def start(user: str, request: dict[str, Any]) -> str:
                 stdin=subprocess.DEVNULL,
             )
         _running[job_id] = proc
-    threading.Thread(target=_wait, args=(job_id, proc), daemon=True).start()
+    try:
+        threading.Thread(target=_wait, args=(job_id, proc), daemon=True).start()
+    except Exception:
+        # No waiter means nobody reaps the child or clears the slot, and every later
+        # search would report "busy" until a restart. Undo and report.
+        proc.kill()
+        proc.wait()
+        with _lock:
+            _running.pop(job_id, None)
+        raise
     return job_id
 
 

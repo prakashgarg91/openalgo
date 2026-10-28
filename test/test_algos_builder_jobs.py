@@ -47,3 +47,17 @@ def test_one_search_at_a_time(root, monkeypatch):
     monkeypatch.setitem(jobs._running, "x", object())
     with pytest.raises(jobs.Busy):
         jobs.start("me", {})
+
+
+def test_a_failed_waiter_thread_does_not_leave_the_engine_busy_forever(root, monkeypatch):
+    import threading
+
+    class Boom:
+        def __init__(self, *a, **k):
+            raise RuntimeError("cannot start new thread")
+
+    monkeypatch.setattr(threading, "Thread", Boom)
+    jobs._running.clear()
+    with pytest.raises(RuntimeError):
+        jobs.start("me", {"kind": "nothing"})
+    assert jobs._running == {}

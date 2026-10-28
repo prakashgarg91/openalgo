@@ -6,6 +6,8 @@ Rules, each one closing a way a six-digit code gets guessed or farmed:
 - five wrong guesses burn it, so six digits cannot be walked through;
 - a new code cannot be asked for inside a minute, and a phone gets five codes an hour,
   so the SMS bill and the target's phone cannot be flooded;
+- ten wrong guesses in an hour on one number stop new codes and guesses for that number until
+  the hour is up, so repeated fresh codes cannot be used to walk the six digits;
 - codes are stored as keyed hashes and compared in constant time;
 - the caller learns nothing about which numbers are registered: ``issue`` always
   returns the same shape, and it is the caller that decides whether to send.
@@ -27,6 +29,7 @@ TTL_SECONDS = 300
 MAX_ATTEMPTS = 5
 RESEND_AFTER_SECONDS = 60
 MAX_SENDS_PER_HOUR = 5
+MAX_WRONG_PER_HOUR = 10
 HOUR = 3600
 
 _INDIAN_MOBILE = re.compile(r"^[6-9]\d{9}$")
@@ -72,10 +75,12 @@ class OtpBook:
         store: MutableMapping,
         sends: MutableMapping,
         clock: Callable[[], float],
+        fails: MutableMapping | None = None,
     ) -> None:
         self._secret = secret.encode()
         self._store = store
         self._sends = sends
+        self._fails = fails if fails is not None else {}
         self._clock = clock
         self._lock = real_threading.RLock()
 
@@ -87,8 +92,18 @@ class OtpBook:
         with self._lock:
             return self._issue(purpose, phone)
 
+    def _recent_fails(self, phone: str, now: float) -> list[float]:
+        return [t for t in self._fails.get(phone, []) if now - t < HOUR]
+
+    def _note_fail(self, phone: str) -> None:
+        now = self._clock()
+        self._fails[phone] = [*self._recent_fails(phone, now), now]
+
     def _issue(self, purpose: str, phone: str) -> Issued:
         now = self._clock()
+        fails = self._recent_fails(phone, now)
+        if len(fails) >= MAX_WRONG_PER_HOUR:
+            return Issued(None, int(HOUR - (now - fails[0])) + 1)
         key = (purpose, phone)
         live = self._store.get(key)
         if live and now - live["sent_at"] < RESEND_AFTER_SECONDS:
@@ -113,6 +128,9 @@ class OtpBook:
 
     def _verify(self, purpose: str, phone: str, code: str) -> Verdict:
         key = (purpose, phone)
+        if len(self._recent_fails(phone, self._clock())) >= MAX_WRONG_PER_HOUR:
+            self._store.pop(key, None)
+            return Verdict(False, "locked")
         live = self._store.get(key)
         if not live:
             return Verdict(False, "none")
@@ -127,6 +145,7 @@ class OtpBook:
         if hmac.compare_digest(live["hash"], self._digest(purpose, phone, str(code))):
             self._store.pop(key, None)
             return Verdict(True, "ok")
+        self._note_fail(phone)
         if live["attempts"] >= MAX_ATTEMPTS:
             self._store.pop(key, None)
             return Verdict(False, "locked")

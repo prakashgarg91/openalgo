@@ -13,6 +13,13 @@ OTHER = "+919123456789"
 USER = "phone_api_user"
 
 
+class _Inline:
+    """Runs a submitted job at once, so tests can read what was sent."""
+
+    def submit(self, fn, *args):
+        fn(*args)
+
+
 class FakeUser:
     def __init__(self, totp=False):
         self._totp = totp
@@ -30,6 +37,8 @@ def stubs(monkeypatch):
     monkeypatch.setattr(sender, "send", lambda phone, code: sent.append((phone, code)))
     phone_login._codes.clear()
     phone_login._sends.clear()
+    phone_login._fails.clear()
+    monkeypatch.setattr(phone_login, "_executor", _Inline())
     store.clear_phone(USER)
     store.db_session.remove()
     from blueprints import auth
@@ -172,3 +181,45 @@ def test_registering_a_number_from_a_signed_in_session(client, stubs):
     finally:
         session_utils.is_session_valid = original
     assert store.get_phone(USER) == PHONE
+
+
+def test_a_registered_number_does_not_answer_slower_than_an_unknown_one(client, monkeypatch):
+    """The request must not wait for the SMS provider, or response time reveals the number."""
+    import threading
+
+    gate, started = threading.Event(), threading.Event()
+    monkeypatch.setattr(
+        phone_login,
+        "_executor",
+        __import__("concurrent.futures").futures.ThreadPoolExecutor(max_workers=1),
+    )
+    monkeypatch.setattr(sender, "send", lambda phone, code: (started.set(), gate.wait(3)))
+    _register()
+    began = __import__("time").monotonic()
+    response = client.post("/auth/phone/request", json={"phone": PHONE})
+    elapsed = __import__("time").monotonic() - began
+    try:
+        assert response.status_code == 200
+        assert elapsed < 1.0  # it did not wait for the provider, which is stuck for 3 seconds
+        assert not gate.is_set()
+        assert started.wait(2)  # and the text really is being sent in the background
+    finally:
+        gate.set()
+        phone_login._executor.shutdown(wait=True)
+
+
+def test_repeated_wrong_guesses_across_fresh_codes_lock_the_number_for_the_hour(
+    client, stubs, monkeypatch
+):
+    _register()
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(phone_login._book, "_clock", lambda: clock["now"])
+    for _ in range(2):
+        client.post("/auth/phone/request", json={"phone": PHONE})
+        for _ in range(5):
+            client.post("/auth/phone/verify", json={"phone": PHONE, "code": "000000"})
+        clock["now"] += 61
+    again = client.post("/auth/phone/request", json={"phone": PHONE})
+    assert again.status_code == 429 and again.get_json()["retry_after"] > 0
+    unknown = client.post("/auth/phone/request", json={"phone": OTHER})
+    assert unknown.status_code == 200  # another number is unaffected

@@ -107,3 +107,17 @@ def test_parallel_guesses_cannot_beat_the_attempt_cap():
     [t.start() for t in threads]
     [t.join() for t in threads]
     assert sum(v in ("wrong", "locked") for v in verdicts) == otp.MAX_ATTEMPTS
+
+
+def test_wrong_guesses_cap_per_hour_blocks_new_codes_and_old_ones(book):
+    b, clock = book
+    phone = "+919876543210"
+    for _ in range(2):
+        b.issue("login", phone)
+        for _ in range(5):
+            b.verify("login", phone, "000000")
+        clock.now += otp.RESEND_AFTER_SECONDS + 1
+    blocked = b.issue("login", phone)
+    assert blocked.code is None and blocked.retry_after > 0
+    clock.now += otp.HOUR  # the hour passes and the number works again
+    assert b.issue("login", phone).code

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from flask import Blueprint, jsonify, request, session
 
@@ -32,7 +33,13 @@ LOGIN_RATE_LIMIT_HOUR = os.getenv("LOGIN_RATE_LIMIT_HOUR", "25 per hour")
 #: Live codes and send history. Bounded, and short-lived by construction.
 _codes = LockedTTLCache(maxsize=2000, ttl=otp.TTL_SECONDS + 5)
 _sends = LockedTTLCache(maxsize=2000, ttl=otp.HOUR + 5)
-_book = otp.OtpBook(os.getenv("APP_KEY", ""), _codes, _sends, time.time)
+_fails = LockedTTLCache(maxsize=2000, ttl=otp.HOUR + 5)
+_book = otp.OtpBook(os.getenv("APP_KEY", ""), _codes, _sends, time.time, _fails)
+
+#: Texts are sent from here, not inside the request. If the request waited for the SMS
+#: provider, a registered number would answer slower than an unregistered one, and the
+#: difference in time would reveal which number belongs to this installation.
+_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="phone-otp")
 
 SENT = "If that number is registered, a code is on its way. It works for 5 minutes."
 BAD_CODE = "That code is wrong or has expired. Ask for a new one."
@@ -51,6 +58,15 @@ def _error(message: str, code: int, **extra):
     return jsonify({"status": "error", "message": message, **extra}), code
 
 
+def _send_quietly(phone: str, code: str) -> None:
+    try:
+        sender.send(phone, code)
+    except sender.SenderError as exc:
+        logger.warning("Phone code not delivered: %s", exc)
+    except Exception:
+        logger.exception("Phone code delivery failed")
+
+
 def _issue_and_maybe_send(purpose: str, phone: str, *, deliver: bool):
     """Throttle and mint a code the same way whether or not it will be sent."""
     issued = _book.issue(purpose, phone)
@@ -60,13 +76,15 @@ def _issue_and_maybe_send(purpose: str, phone: str, *, deliver: bool):
             429,
             retry_after=issued.retry_after,
         )
-    if deliver:
+    if deliver and purpose == "register":
+        # The trader is signed in and needs to know if the text did not go out.
         try:
             sender.send(phone, issued.code)
         except sender.SenderError as exc:
             logger.warning("Phone code not delivered: %s", exc)
-            if purpose == "register":
-                return _error(str(exc), 502)
+            return _error(str(exc), 502)
+    elif deliver:
+        _executor.submit(_send_quietly, phone, issued.code)
     return jsonify({"status": "success", "message": SENT}), 200
 
 
