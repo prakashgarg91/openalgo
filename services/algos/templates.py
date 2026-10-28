@@ -242,6 +242,10 @@ def condor_config(
     }
 
 
+#: Algos the trader built, by catalogue id. Filled by ``builder.register``; read by ``build``.
+CUSTOM_SPECS: dict[str, Any] = {}
+
+
 def _skip(algo_id: str, reason: str) -> Plan:
     return Plan(algo_id, "skip", reason, None, 0, None, None)
 
@@ -262,6 +266,19 @@ def build(
     the opening gap, which the regime label alone does not carry.
     """
     spec = ALGOS[algo_id]
+    if algo_id in CUSTOM_SPECS:
+        from services.algos import builder
+
+        return builder.live_plan(
+            CUSTOM_SPECS[algo_id],
+            algo_id,
+            spec.name,
+            regime,
+            capital=capital,
+            lot_size=lot_size,
+            days_to_expiry=days_to_expiry,
+            max_loss_pct=max_loss_pct,
+        )
 
     if regime.label not in spec.allowed_labels:
         return _skip(

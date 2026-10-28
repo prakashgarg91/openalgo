@@ -18,7 +18,7 @@ from flask import Blueprint, jsonify, request, session
 from database import algo_db
 from database import strategy_module_db as sm_store
 from limiter import limiter
-from services.algos import lab, readiness, runner
+from services.algos import builder, builder_jobs, custom, lab, readiness, runner
 from services.algos.templates import ALGOS
 from services.algos.templates import coverage as coverage_matrix
 from utils.logging import get_logger
@@ -125,6 +125,22 @@ def _rate_limited(error):
     )
     response.status_code = 429
     return response
+
+
+_custom_loaded = False
+
+
+def _ensure_custom_loaded() -> None:
+    """Built algos join the catalogue once per process, on first use."""
+    global _custom_loaded
+    if not _custom_loaded:
+        custom.register_saved()
+        _custom_loaded = True
+
+
+@algos_bp.before_request
+def _load_built_algos():
+    _ensure_custom_loaded()
 
 
 @algos_bp.route("/api/catalogue", methods=["GET"])
@@ -415,4 +431,135 @@ def remove(deployment_id):
     ok, message = runner.remove(deployment_id, user)
     if not ok:
         return _error(message or "Could not remove the algo", 409)
+    return _ok()
+
+
+# -- Builder: search, save, review ------------------------------------------
+
+_builder_limit = limiter.shared_limit("6 per minute", scope="algos_builder")
+
+
+def _builder_request(data: dict) -> tuple[dict | None, str | None]:
+    families = data.get("families", list(builder.FAMILIES))
+    labels = data.get("label_sets", [list(x) for x in builder.LABEL_SETS])
+    model = data.get("model", "conservative")
+    if (
+        not isinstance(families, list)
+        or not families
+        or any(f not in builder.FAMILIES for f in families)
+    ):
+        return None, "Pick at least one of iron condor, bull put spread or bear call spread."
+    if (
+        not isinstance(labels, list)
+        or not labels
+        or any(
+            not isinstance(x, list)
+            or not x
+            or any(label not in builder.VALID_LABELS for label in x)
+            for x in labels
+        )
+    ):
+        return None, "Pick at least one kind of market day to trade."
+    if model not in lab.MODELS:
+        return None, "model must be standard or conservative"
+    try:
+        builder.space(families, [tuple(x) for x in labels])
+    except builder.SpecError as exc:
+        return None, str(exc)
+    return {"families": families, "label_sets": labels, "model": model}, None
+
+
+@algos_bp.route("/api/builder/search", methods=["POST"])
+@check_session_validity
+@_builder_limit
+def builder_search():
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    data, error = _body()
+    if error:
+        return error
+    request_, message = _builder_request(data)
+    if message:
+        return _error(message, 400)
+    custom_id = data.get("custom_id")
+    if custom_id is not None:
+        row = algo_db.get_custom(custom_id, user) if isinstance(custom_id, int) else None
+        if not row:
+            return _error("Algo not found", 404)
+        request_["current"] = row["spec"]
+    try:
+        job_id = builder_jobs.start(user, request_)
+    except builder_jobs.Busy as exc:
+        return _error(str(exc), 409)
+    return _ok({"job_id": job_id}, 202)
+
+
+@algos_bp.route("/api/builder/jobs/<job_id>", methods=["GET"])
+@check_session_validity
+@_api_limit
+def builder_job(job_id):
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    state = builder_jobs.status(job_id, user)
+    if state is None:
+        return _error("Search not found", 404)
+    return _ok({"data": state})
+
+
+def _evidence(result: dict, built_on: date) -> str:
+    winner = result["winner"]
+    test = winner["test"]
+    pf = test["profit_factor"]
+    return (
+        f"Built by you on {built_on.isoformat()} from a search of {result['trials']} configurations. "
+        f"On the period it was not chosen on it made Rs {test['total']:,.0f} per lot over "
+        f"{test['trades']} trades (profit factor {pf if pf is not None else 'n/a'}). "
+        f"{result['verdict']['headline']}"
+    )
+
+
+@algos_bp.route("/api/builder/save", methods=["POST"])
+@check_session_validity
+@_api_limit
+def builder_save():
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    data, error = _body()
+    if error:
+        return error
+    name = data.get("name")
+    if not isinstance(name, str) or not (1 <= len(name.strip()) <= 60):
+        return _error("Give the algo a name of up to 60 characters.", 400)
+    state = builder_jobs.status(str(data.get("job_id", "")), user)
+    if not state or state["state"] != "done" or not state["result"].get("winner"):
+        return _error("That search has no result to save.", 400)
+    result = state["result"]
+    try:
+        spec = builder.Spec.from_dict(result["winner"]["spec"])
+        row = algo_db.create_custom(
+            user, name.strip(), spec.to_dict(), _evidence(result, date.today())
+        )
+    except (builder.SpecError, ValueError) as exc:
+        return _error(str(exc), 400)
+    custom.register(row)
+    return _ok({"data": {"algo_id": row["algo_id"]}}, 201)
+
+
+@algos_bp.route("/api/builder/custom/<int:custom_id>", methods=["DELETE"])
+@check_session_validity
+@_api_limit
+def builder_delete(custom_id):
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    key = custom.algo_id(custom_id)
+    if not algo_db.get_custom(custom_id, user):
+        return _error(NOT_FOUND, 404)
+    if any(d["algo_id"] == key for d in algo_db.list_deployments(user)):
+        return _error("Remove this algo from your deployed algos before deleting it.", 409)
+    algo_db.delete_custom(custom_id, user)
+    custom.unregister(custom_id)
     return _ok()

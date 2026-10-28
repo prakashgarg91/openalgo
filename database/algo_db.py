@@ -73,6 +73,19 @@ class AlgoDeployment(Base):
     __table_args__ = (UniqueConstraint("user_id", "algo_id", name="uq_algo_deployment_user_algo"),)
 
 
+class AlgoCustom(Base):
+    """An algo the trader built with the builder. Its id as a catalogue entry is ``custom_<id>``."""
+
+    __tablename__ = "algo_custom"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(80), nullable=False, index=True)
+    name = Column(String(80), nullable=False)
+    spec = Column(JSON, nullable=False)
+    evidence = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+
+
 class AlgoDecision(Base):
     __tablename__ = "algo_decision"
 
@@ -281,3 +294,53 @@ def list_decisions(deployment_id: int, limit: int = 60) -> list[dict]:
     except Exception:
         logger.exception("Could not read decisions for deployment %s", deployment_id)
         return []
+
+
+def _custom_dict(row: AlgoCustom) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "algo_id": f"custom_{row.id}",
+        "user_id": row.user_id,
+        "name": row.name,
+        "spec": row.spec,
+        "evidence": row.evidence,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+MAX_CUSTOM_PER_USER = 20
+
+
+def create_custom(user_id: str, name: str, spec: dict[str, Any], evidence: str) -> dict[str, Any]:
+    try:
+        if AlgoCustom.query.filter_by(user_id=user_id).count() >= MAX_CUSTOM_PER_USER:
+            raise ValueError(f"You can keep {MAX_CUSTOM_PER_USER} built algos. Delete one first.")
+        row = AlgoCustom(user_id=user_id, name=name, spec=spec, evidence=evidence)
+        db_session.add(row)
+        db_session.commit()
+        return _custom_dict(row)
+    except Exception:
+        db_session.rollback()
+        raise
+
+
+def list_custom(user_id: str | None = None) -> list[dict[str, Any]]:
+    query = AlgoCustom.query
+    if user_id is not None:
+        query = query.filter_by(user_id=user_id)
+    return [_custom_dict(r) for r in query.order_by(AlgoCustom.id).all()]
+
+
+def get_custom(custom_id: int, user_id: str) -> dict[str, Any] | None:
+    row = AlgoCustom.query.filter_by(id=custom_id, user_id=user_id).first()
+    return _custom_dict(row) if row else None
+
+
+def delete_custom(custom_id: int, user_id: str) -> bool:
+    try:
+        deleted = AlgoCustom.query.filter_by(id=custom_id, user_id=user_id).delete()
+        db_session.commit()
+        return bool(deleted)
+    except Exception:
+        db_session.rollback()
+        raise

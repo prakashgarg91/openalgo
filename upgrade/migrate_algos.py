@@ -2,10 +2,11 @@
 """
 Migration: Regime algo catalogue
 
-Adds the two tables behind /algos:
+Adds the tables behind /algos:
 
 - algo_deployment  one algo a trader switched on, tied to the sm_strategy row that trades it
 - algo_decision    what each algo decided each day and why (also the track record)
+- algo_custom      algos the trader built with the builder
 
 Both are new, so there is nothing to backfill. init_db() in database/algo_db.py
 creates them on the next start; this script is what reaches an installation
@@ -33,7 +34,7 @@ import _pragmas  # noqa: F401,E402
 from sqlalchemy import create_engine, inspect  # noqa: E402
 from sqlalchemy.pool import NullPool  # noqa: E402
 
-TABLES = ("algo_deployment", "algo_decision")
+TABLES = ("algo_deployment", "algo_decision", "algo_custom")
 
 
 def resolve_sqlite_path(db_url):

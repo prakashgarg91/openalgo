@@ -72,7 +72,8 @@ class Spec:
         kind = {"condor": "Iron condor", "bull_put": "Bull put", "bear_call": "Bear call"}[
             self.family
         ]
-        return f"{kind} OTM{self.short}/OTM{self.long} on {'+'.join(self.labels)} days"
+        tail = "skipping expiry eve" if self.expiry == "skip" else "rolling past expiry eve"
+        return f"{kind} OTM{self.short}/OTM{self.long} on {'+'.join(self.labels)} days, {tail}"
 
     @property
     def width_pts(self) -> int:

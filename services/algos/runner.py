@@ -506,6 +506,9 @@ def sync_all_jobs() -> int:
     Runs on the boot thread, where no request teardown fires, so it releases
     its own sessions.
     """
+    from services.algos import custom
+
+    custom.register_saved()
     count = 0
     for dep in algo_db.list_deployments(active_only=True):
         try:
