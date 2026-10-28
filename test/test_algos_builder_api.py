@@ -287,3 +287,24 @@ def test_built_algos_are_loaded_once_even_when_first_requests_overlap(monkeypatc
     [t.start() for t in threads]
     [t.join() for t in threads]
     assert len(calls) == 1
+
+
+def test_the_universe_search_starts_a_job_with_the_account_and_refuses_a_bad_one(
+    client, monkeypatch
+):
+    started = []
+    monkeypatch.setattr(
+        builder_jobs, "start", lambda user, req: started.append(req) or "0123456789abcdef"
+    )
+    ok = client.post("/algos/api/universe/search", json={})
+    assert ok.status_code == 202 and started[0]["kind"] == "universe"
+    assert started[0]["account"] == {"capital": 100_000.0, "max_daily_loss": 20_000.0}
+    custom_account = client.post(
+        "/algos/api/universe/search",
+        json={"account": {"capital": 250_000, "max_daily_loss": 30_000}},
+    )
+    assert custom_account.status_code == 202 and started[1]["account"]["capital"] == 250_000.0
+    bad = client.post(
+        "/algos/api/universe/search", json={"account": {"capital": 100_000, "max_daily_loss": 0}}
+    )
+    assert bad.status_code == 400 and len(started) == 2

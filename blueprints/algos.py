@@ -814,3 +814,29 @@ def delete_event(day):
     entries = events.remove(day)
     _regime_cache.clear()
     return _ok({"data": entries})
+
+
+@algos_bp.route("/api/universe/search", methods=["POST"])
+@check_session_validity
+@_builder_limit
+def universe_search():
+    """Search every non-option algo family (trend, momentum rotation, mean reversion, seasonal)."""
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    data, error = _body()
+    if error:
+        return error
+    account, message = _account(
+        data.get("account") or {"capital": 100_000, "max_daily_loss": 20_000}
+    )
+    if message:
+        return _error(message, 400)
+    capital, cap = account
+    try:
+        job_id = builder_jobs.start(
+            user, {"kind": "universe", "account": {"capital": capital, "max_daily_loss": cap}}
+        )
+    except builder_jobs.Busy as exc:
+        return _error(str(exc), 409)
+    return _ok({"job_id": job_id}, 202)

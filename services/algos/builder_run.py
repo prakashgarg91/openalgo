@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from services.algos import builder, chooser, chooser_store, lab
+from services.algos import builder, chooser, chooser_store, lab, mandate, universe
 
 
 def _write(path: Path, payload: dict[str, Any]) -> None:
@@ -118,8 +118,84 @@ def run_maintenance(job_dir: Path, request: dict[str, Any]) -> None:
     _write(job_dir / "result.json", {"kind": "maintenance", "checked": len(customs)})
 
 
+ETF_SYMBOLS = {"equity": "NIFTYBEES.NS", "gold": "GOLDBEES.NS"}
+
+
+def _bars_from_yahoo() -> dict[str, Any]:
+    lab.HISTORY_RANGE = "15y"
+    frames = {k: universe.clean(lab._fetch_series(sym)) for k, sym in ETF_SYMBOLS.items()}
+    common = frames["equity"].index.intersection(frames["gold"].index)
+    return {k: v.loc[common] for k, v in frames.items()}
+
+
+def _stat_row(stats: dict[str, Any]) -> dict[str, Any]:
+    return {k: stats[k] for k in ("cagr", "total", "max_drawdown", "worst_day", "days")}
+
+
+def run_universe(
+    job_dir: Path, request: dict[str, Any], bars: dict[str, Any] | None = None
+) -> None:
+    """Search every non-option family on ETF history and judge it against cash and buy and hold."""
+    bars = bars if bars is not None else _bars_from_yahoo()
+    _write(job_dir / "progress.json", {"done": 0, "total": 1})
+    found = universe.search(bars)
+    account = request.get("account") or {"capital": 100_000.0, "max_daily_loss": 20_000.0}
+    mine = mandate.Mandate(float(account["capital"]), float(account["max_daily_loss"]))
+    lo, hi = found["segments"]["test"]
+    window = [d for d in found["winner_days"] if lo <= d["date"] <= hi]
+    # The strategy is sized to the base of Rs 1,00,000; scale to the account asked about.
+    sim = mandate.simulate(window, mine, 1, lot_scale=mine.capital / universe.BASE)
+    sim["curve"] = lab.downsample(sim["curve"], 200)
+    winner = found["winner"]
+    _write(
+        job_dir / "result.json",
+        {
+            "kind": "universe",
+            "data_from": str(bars["equity"].index[0].date()),
+            "data_to": str(bars["equity"].index[-1].date()),
+            "trials": found["trials"],
+            "segments": found["segments"],
+            "lost_to_cash_on_test": found["lost_to_cash_on_test"],
+            "baselines": {
+                k: {p: _stat_row(v) for p, v in seg.items()}
+                for k, seg in found["baselines"].items()
+            },
+            "winner": {
+                "name": winner["strategy"].name,
+                "params": winner["strategy"].to_dict(),
+                "stats": {p: _stat_row(v) for p, v in winner["stats"].items()},
+            },
+            "rules": sorted(
+                (
+                    {
+                        "name": r["strategy"].name,
+                        "family": r["strategy"].family,
+                        "train_cagr": r["stats"]["train"]["cagr"],
+                        "validate_cagr": r["stats"]["validate"]["cagr"],
+                        "test_cagr": r["stats"]["test"]["cagr"],
+                        "test_excess_over_cash": round(r["excess"]["test"], 1),
+                    }
+                    for r in found["rows"]
+                ),
+                key=lambda r: -r["test_excess_over_cash"],
+            ),
+            "verdict": found["verdict"],
+            "account": sim,
+            "caveats": [
+                "Daily closing prices of two exchange-traded funds (Nifty and gold), trades a full day after each signal.",
+                "Costs are assumptions (brokerage, taxes, depository, slippage); idle cash is assumed to earn 6 percent.",
+                "Holding half Nifty and half gold is a fair comparison: most of any gain is owning equities and gold.",
+                "Past results over one test period are not a forecast.",
+            ],
+        },
+    )
+
+
 def run(job_dir: Path) -> None:
     request = json.loads((job_dir / "request.json").read_text())
+    if request.get("kind") == "universe":
+        run_universe(job_dir, request)
+        return
     if request.get("kind") == "chooser":
         run_chooser(job_dir, request)
         return
