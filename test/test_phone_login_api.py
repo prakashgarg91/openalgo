@@ -2,6 +2,8 @@
 
 import pytest
 from flask import Blueprint, Flask, jsonify
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
 
 from blueprints import phone_login
 from database import phone_login_db as store
@@ -29,7 +31,14 @@ class FakeUser:
 
 
 @pytest.fixture(autouse=True)
-def stubs(monkeypatch):
+def stubs(monkeypatch, tmp_path):
+    # Its own database file: the shared test database is rebuilt by other test files, which
+    # left this table missing when the whole suite ran in one process.
+    original = store.engine
+    engine = create_engine(f"sqlite:///{tmp_path / 'phone.db'}", poolclass=NullPool)
+    monkeypatch.setattr(store, "engine", engine)
+    store.db_session.remove()
+    store.db_session.configure(bind=engine)
     store.init_db()
     monkeypatch.setattr(limiter, "enabled", False)
     monkeypatch.setenv("PHONE_OTP_PROVIDER", "console")
@@ -48,8 +57,9 @@ def stubs(monkeypatch):
     monkeypatch.setattr(user_db, "find_user_by_exact_username", lambda u: FakeUser())
     monkeypatch.setattr(auth_db, "log_login_attempt", lambda *a, **k: None)
     yield sent
-    store.clear_phone(USER)
     store.db_session.remove()
+    store.db_session.configure(bind=original)
+    engine.dispose()
 
 
 @pytest.fixture

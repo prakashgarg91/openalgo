@@ -16,6 +16,10 @@ Built on 2016 to October 2026, split at September 2024, conservative model:
 - Result: no algo qualifies for any kind of day, so Smart Pick stands aside every day for now. That is the chooser working, not failing. It will start choosing only if an algo earns it.
 - Volatile and event days have no trades from any algo (they were designed to stand aside there).
 
+## Intraday replay (research only)
+
+A fifth, separate piece: `services/algos/intraday.py` replays an overnight spread on real 5-minute option bars, with a 10:15 entry, a fixed stop that reverses, a target and a next-session exit. It is not part of the Algos page and places no orders. It exists to test Zen's published rules fairly; see [intraday-test.md](intraday-test.md). It has 23 tests (synthetic bars) and has not yet run on real Upstox data.
+
 ## Limits
 
 - Prices are modelled, not real fills; earlier real-price tests found the models flatter option sellers.
