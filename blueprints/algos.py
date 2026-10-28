@@ -29,11 +29,12 @@ from services.algos import (
     events,
     lab,
     maintenance,
+    mandate,
     netinfo,
     readiness,
     runner,
 )
-from services.algos.templates import ALGOS
+from services.algos.templates import ALGOS, algo_width_pts
 from services.algos.templates import coverage as coverage_matrix
 from utils.logging import get_logger
 from utils.session import check_session_validity
@@ -245,6 +246,52 @@ def _lab_date(value: Any, label: str) -> tuple[str | None, str | None]:
     return parsed.isoformat(), None
 
 
+def _account(raw: Any) -> tuple[tuple[float, float] | None, str | None]:
+    """(capital, daily loss cap) from the request, or an explanation of what is wrong with it."""
+    if raw is None:
+        return None, None
+    if not isinstance(raw, dict):
+        return None, "account must hold a capital and a daily loss limit"
+    values = []
+    for field in ("capital", "max_daily_loss"):
+        value = raw.get(field)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None, "Enter your capital and your daily loss limit in rupees."
+        values.append(float(value))
+    capital, cap = values
+    if not (MIN_CAPITAL <= capital <= MAX_CAPITAL):
+        return None, f"Capital must be between Rs {MIN_CAPITAL:,} and Rs {MAX_CAPITAL:,}."
+    if not (0 < cap <= capital):
+        return None, "The daily loss limit must be above zero and no more than your capital."
+    return (capital, cap), None
+
+
+def _account_view(trades: list[dict], algo_id: str, account: tuple[float, float]) -> dict:
+    """What the replay would have done to this account, one position at a time."""
+    capital, cap = account
+    mine = mandate.Mandate(capital, cap)
+    width = algo_width_pts(algo_id)
+    lots = mine.lots(width, lab.LOT_SIZE)
+    if lots < 1:
+        return {
+            "lots": 0,
+            "message": (
+                f"One lot can lose Rs {width * lab.LOT_SIZE:,.0f}, which is more than your daily "
+                f"limit of Rs {cap:,.0f}, so this algo cannot trade on this account."
+            ),
+        }
+    lots = min(lots, int(capital * 0.5 // (width * lab.LOT_SIZE)) or 1)  # never most of the account
+    sim = mandate.simulate(trades, mine, lots)
+    sim["curve"] = lab.downsample(sim["curve"], 300)
+    return {
+        "lots": lots,
+        "worst_case_per_trade": width * lab.LOT_SIZE * lots,
+        "capital": capital,
+        "max_daily_loss": cap,
+        **sim,
+    }
+
+
 @algos_bp.route("/api/lab/run", methods=["POST"])
 @check_session_validity
 @_lab_limit
@@ -279,12 +326,18 @@ def lab_run():
     if start and end and start > end:
         return _error("start must be before end", 400)
 
-    key = (algo_id, model, gated, start, end)
+    account, message = _account(data.get("account"))
+    if message:
+        return _error(message, 400)
+    key = (algo_id, model, gated, start, end, account)
 
     def run():
         history = _history_cache.get_or_load("history", lab.load_history)
         result = lab.run_lab(history, algo_id, start=start, end=end, model=model, gated=gated)
-        return lab.to_payload(result, gated=gated)
+        payload = lab.to_payload(result, gated=gated)
+        if account is not None:
+            payload["account"] = _account_view(result.trades, algo_id, account)
+        return payload
 
     try:
         payload = _lab_cache.get_or_load(key, run)

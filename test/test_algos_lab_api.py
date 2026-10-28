@@ -196,3 +196,60 @@ def test_the_history_folder_never_holds_more_than_one_file_per_series(tmp_path):
         real_load_history(tmp_path, fetch=fetch, now=lambda: _time.time() + 99 * 3600)
     files = sorted(p.name for p in tmp_path.iterdir())
     assert files == sorted(f"{name}.csv" for name in lab.SERIES), files  # no .tmp leftovers
+
+
+# -- test on my account ---------------------------------------------------------------------
+
+
+def test_a_one_lakh_account_with_a_twenty_thousand_cap_trades_one_lot(client):
+    d = run(client, account={"capital": 100_000, "max_daily_loss": 20_000}).get_json()["data"]
+    acct = d["account"]
+    assert acct["lots"] == 1 and acct["worst_case_per_trade"] == 11_250
+    assert acct["within_daily_cap"] is True and acct["cap_breaches"] == []
+    assert acct["curve"] and acct["capital"] == 100_000
+    assert acct["worst_day"] >= -11_250 - 1  # a one-lot spread cannot lose more than its width
+
+
+def test_an_account_whose_cap_is_below_one_lot_is_told_so_plainly(client):
+    acct = run(client, account={"capital": 100_000, "max_daily_loss": 5_000}).get_json()["data"][
+        "account"
+    ]
+    assert acct["lots"] == 0 and "cannot trade on this account" in acct["message"]
+
+
+def test_more_cap_buys_more_lots(client):
+    acct = run(client, account={"capital": 500_000, "max_daily_loss": 50_000}).get_json()["data"][
+        "account"
+    ]
+    assert acct["lots"] == 4 and acct["worst_case_per_trade"] == 45_000
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "lots",
+        {"capital": "a lot", "max_daily_loss": 1000},
+        {"capital": True, "max_daily_loss": 1000},
+        {"capital": 100, "max_daily_loss": 50},
+        {"capital": 100_000, "max_daily_loss": 0},
+        {"capital": 100_000, "max_daily_loss": 200_000},
+        {"capital": 100_000},
+    ],
+)
+def test_bad_accounts_are_refused_in_plain_words(client, bad):
+    r = run(client, account=bad)
+    assert r.status_code == 400 and r.get_json()["message"]
+
+
+def test_without_an_account_nothing_changes(client):
+    assert "account" not in run(client).get_json()["data"]
+
+
+def test_different_accounts_are_cached_separately(client, calls):
+    a = run(client, account={"capital": 100_000, "max_daily_loss": 20_000}).get_json()["data"][
+        "account"
+    ]
+    b = run(client, account={"capital": 500_000, "max_daily_loss": 50_000}).get_json()["data"][
+        "account"
+    ]
+    assert a["lots"] != b["lots"] and calls["loads"] == 1

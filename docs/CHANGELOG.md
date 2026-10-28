@@ -34,6 +34,15 @@ fix, live in [docs/releases](releases/).
 - Days to sit out (My algos): list the budget, a central-bank decision or big
   results, and every algo stands aside on that day and the trading day before
   it. There is no built-in event calendar.
+- Test on my account (Lab): enter your capital and the most you will lose in a
+  day, and the Lab replays an algo through that account: lots, ending balance,
+  worst day, deepest fall, and whether any day passed your limit. Setting
+  `ALGO_MAX_DAILY_LOSS_INR` sizes every algo to that limit and makes a second
+  algo stand aside if it would take the day's total risk past it. On real
+  option prices a Rs 1,00,000 account with a Rs 20,000 daily limit lost most of
+  its money with every catalogue algo, without ever passing the daily limit; see
+  docs/algos/mandate-results.md. The builder gains a lean filter (bullish or
+  bearish) and debit spreads.
 - Weekly algo housekeeping (Sundays 10:07 IST): refreshes the chooser's evidence
   when it is over a week old and re-checks the algos you built against newer
   data, storing a proposal if a different setup looks better. It never changes

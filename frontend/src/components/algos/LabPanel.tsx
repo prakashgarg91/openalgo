@@ -5,6 +5,7 @@ import { type AlgoItem, type LabMetrics, type LabModel, type LabResult, runLab }
 import { EquityCurve } from '@/components/algos/EquityCurve'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
@@ -51,6 +52,58 @@ function Stat({
         {value}
       </div>
       {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
+    </div>
+  )
+}
+
+function AccountBlock({ account }: { account: NonNullable<LabResult['account']> }) {
+  if (account.lots < 1 || account.final_equity == null) {
+    return (
+      <div className="rounded-md border border-amber-500/50 p-3 text-sm">{account.message}</div>
+    )
+  }
+  const up = (account.return_pct ?? 0) >= 0
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="font-medium">
+        On your account: Rs {Math.round(account.capital ?? 0).toLocaleString('en-IN')}, at most Rs{' '}
+        {Math.round(account.max_daily_loss ?? 0).toLocaleString('en-IN')} lost in a day
+      </div>
+      <p className="text-sm text-muted-foreground">
+        It would have traded {account.lots} lot{account.lots === 1 ? '' : 's'} at a time, risking at
+        most {inr(account.worst_case_per_trade ?? 0)} per trade.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        <Stat
+          label="Ended with"
+          value={inr(account.final_equity)}
+          hint={`${up ? '+' : ''}${account.return_pct}% over ${account.days_traded} trades`}
+          tone={up ? 'good' : 'bad'}
+        />
+        <Stat label="Worst day" value={inr(account.worst_day ?? 0)} tone="bad" />
+        <Stat
+          label="Deepest fall"
+          value={inr(account.max_drawdown ?? 0)}
+          hint={`${account.max_drawdown_pct}% from the peak`}
+          tone="bad"
+        />
+        <Stat
+          label="Daily limit"
+          value={account.within_daily_cap ? 'Never passed' : 'Passed'}
+          hint={
+            account.within_daily_cap
+              ? 'no day lost more than your limit'
+              : `${account.cap_breaches?.length ?? 0} day(s) lost more`
+          }
+          tone={account.within_daily_cap ? 'good' : 'bad'}
+        />
+      </div>
+      {account.ruined && (
+        <p className="text-sm font-medium text-destructive">
+          The account would have been wiped out along the way.
+        </p>
+      )}
+      {account.curve && <EquityCurve curve={account.curve} />}
     </div>
   )
 }
@@ -103,6 +156,8 @@ function Results({ result }: { result: LabResult }) {
               />
             )}
           </div>
+
+          {result.account && <AccountBlock account={result.account} />}
 
           <EquityCurve curve={result.curve} />
 
@@ -184,10 +239,21 @@ export function LabPanel({ algos }: { algos: AlgoItem[] }) {
   const [model, setModel] = useState<LabModel>('conservative')
   const [period, setPeriod] = useState<Period>('all')
   const [everyDay, setEveryDay] = useState(false)
+  const [capital, setCapital] = useState('100000')
+  const [dailyLoss, setDailyLoss] = useState('20000')
+  const [useAccount, setUseAccount] = useState(true)
 
   const run = useMutation({
     mutationFn: () =>
-      runLab({ algo_id: algoId, model, gated: !everyDay, start: periodStart(period) }),
+      runLab({
+        algo_id: algoId,
+        model,
+        gated: !everyDay,
+        start: periodStart(period),
+        account: useAccount
+          ? { capital: Number(capital), max_daily_loss: Number(dailyLoss) }
+          : undefined,
+      }),
   })
 
   const selectClass = 'h-9 rounded-md border border-input bg-background px-2 text-sm'
@@ -256,6 +322,38 @@ export function LabPanel({ algos }: { algos: AlgoItem[] }) {
             />
             Trade every day, ignoring the market check
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={useAccount}
+              onChange={(e) => setUseAccount(e.target.checked)}
+            />
+            Test on my account
+          </label>
+          {useAccount && (
+            <>
+              <div className="space-y-1">
+                <Label htmlFor="lab-capital">Capital (Rs)</Label>
+                <Input
+                  id="lab-capital"
+                  inputMode="numeric"
+                  className="w-32"
+                  value={capital}
+                  onChange={(e) => setCapital(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="lab-daily-loss">Most to lose in a day (Rs)</Label>
+                <Input
+                  id="lab-daily-loss"
+                  inputMode="numeric"
+                  className="w-32"
+                  value={dailyLoss}
+                  onChange={(e) => setDailyLoss(e.target.value)}
+                />
+              </div>
+            </>
+          )}
           <Button onClick={() => run.mutate()} disabled={run.isPending}>
             {run.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Run the replay

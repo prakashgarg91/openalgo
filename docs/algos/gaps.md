@@ -42,6 +42,8 @@ made; the claim "faster than Stratzy" is unsupported.
 
 ## Still open
 
+- Rs 1,00,000 / Rs 20,000-a-day mandate: no algo earns after costs on real prices; results in [mandate-results.md](mandate-results.md). The chooser stands aside.
+
 - The four engines and how each was verified: [engines.md](engines.md). The main trading engine has not run against a live broker feed here.
 - The chooser evidence is rebuilt weekly (Sunday 10:07 IST) only when it is over 7 days old; "Refresh the evidence" still works by hand.
 

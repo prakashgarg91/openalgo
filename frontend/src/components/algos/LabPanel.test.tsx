@@ -103,6 +103,7 @@ describe('LabPanel', () => {
         model: 'conservative',
         gated: true,
         start: undefined,
+        account: { capital: 100000, max_daily_loss: 20000 },
       })
     )
   })
@@ -121,6 +122,7 @@ describe('LabPanel', () => {
         model: 'standard',
         gated: false,
         start: '2023-01-01',
+        account: { capital: 100000, max_daily_loss: 20000 },
       })
     )
   })
@@ -193,5 +195,59 @@ describe('LabPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run the replay/ }))
     await screen.findByText('Edge before costs')
     expect(container.textContent?.toLowerCase()).not.toMatch(/\barm(ed|ing)?\b/)
+  })
+
+  it('tests on the capital and daily limit the trader typed and shows what happened to the account', async () => {
+    api.runLab.mockResolvedValue({
+      ...RESULT,
+      account: {
+        lots: 1,
+        capital: 100000,
+        max_daily_loss: 20000,
+        worst_case_per_trade: 11250,
+        days_traded: 109,
+        final_equity: 51370,
+        return_pct: -48.63,
+        worst_day: -7001,
+        max_drawdown: -50514,
+        max_drawdown_pct: -50.5,
+        ruined: false,
+        within_daily_cap: true,
+        cap_breaches: [],
+        curve: [
+          ['2025-01-01', 100000],
+          ['2025-02-01', 51370],
+        ],
+      },
+    })
+    renderPanel()
+    fireEvent.change(screen.getByLabelText('Capital (Rs)'), { target: { value: '150000' } })
+    fireEvent.change(screen.getByLabelText('Most to lose in a day (Rs)'), {
+      target: { value: '25000' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Run the replay/ }))
+    expect(await screen.findByText(/On your account: Rs 1,00,000/)).toBeTruthy()
+    expect(screen.getByText('Never passed')).toBeTruthy()
+    expect(screen.getByText(/-48.63% over 109 trades/)).toBeTruthy()
+    expect(api.runLab.mock.calls[0][0].account).toEqual({ capital: 150000, max_daily_loss: 25000 })
+  })
+
+  it('says plainly when the daily limit is too small for one lot', async () => {
+    api.runLab.mockResolvedValue({
+      ...RESULT,
+      account: { lots: 0, message: 'One lot can lose Rs 11,250, more than your daily limit.' },
+    })
+    renderPanel()
+    fireEvent.click(screen.getByRole('button', { name: /Run the replay/ }))
+    expect(await screen.findByText(/more than your daily limit/)).toBeTruthy()
+  })
+
+  it('sends no account when the trader turns the account test off', async () => {
+    api.runLab.mockResolvedValue(RESULT)
+    renderPanel()
+    fireEvent.click(screen.getByLabelText('Test on my account'))
+    fireEvent.click(screen.getByRole('button', { name: /Run the replay/ }))
+    await waitFor(() => expect(api.runLab).toHaveBeenCalled())
+    expect(api.runLab.mock.calls[0][0].account).toBeUndefined()
   })
 })

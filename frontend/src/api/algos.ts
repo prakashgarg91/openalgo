@@ -123,6 +123,27 @@ export interface LabResult {
   skipped: { reason: string; days: number }[]
   notes: string[]
   caveats: string[]
+  account?: AccountResult
+}
+
+export interface AccountResult {
+  lots: number
+  message?: string
+  capital?: number
+  max_daily_loss?: number
+  worst_case_per_trade?: number
+  days_traded?: number
+  final_equity?: number
+  return_pct?: number
+  worst_day?: number
+  best_day?: number
+  max_drawdown?: number
+  max_drawdown_pct?: number
+  lowest_equity?: number
+  ruined?: boolean
+  within_daily_cap?: boolean
+  cap_breaches?: { date: string; loss: number }[]
+  curve?: [string, number][]
 }
 
 export interface LabRequest {
@@ -130,6 +151,7 @@ export interface LabRequest {
   model: LabModel
   gated: boolean
   start?: string
+  account?: { capital: number; max_daily_loss: number }
 }
 
 export const algoQueryKeys = {

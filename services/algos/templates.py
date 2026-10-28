@@ -311,6 +311,12 @@ def condor_config(
 CUSTOM_SPECS: dict[str, Any] = {}
 
 
+def algo_width_pts(algo_id: str) -> int:
+    """The most points one spread of this algo can lose per lot: its strike width."""
+    spec = CUSTOM_SPECS.get(algo_id)
+    return int(spec.width_pts) if spec is not None else SPREAD_WIDTH_PTS
+
+
 def _skip(algo_id: str, reason: str) -> Plan:
     return Plan(algo_id, "skip", reason, None, 0, None, None)
 
