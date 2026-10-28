@@ -42,6 +42,8 @@ made; the claim "faster than Stratzy" is unsupported.
 
 ## Still open
 
+- Other algo families: ETF momentum rotation earned after costs on the history tested but is mostly equity and gold exposure ([universe-results.md](universe-results.md)); the rotation script has never run against a broker.
+
 - Rs 1,00,000 / Rs 20,000-a-day mandate: no algo earns after costs on real prices; results in [mandate-results.md](mandate-results.md). The chooser stands aside.
 
 - The four engines and how each was verified: [engines.md](engines.md). The main trading engine has not run against a live broker feed here.

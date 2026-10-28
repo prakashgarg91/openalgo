@@ -3,7 +3,9 @@
 Asked: test trading with Rs 1,00,000 and a Rs 20,000 daily loss limit, and have the engine find or
 create an algo that earns better than Zen on bullish days, and the best for the other situations.
 
-**Answer: it found none that earns.** On real option prices, after costs, on data it was not chosen on,
+**Answer for option spreads: it found none that earns.** (Other algo families are in [universe-results.md](universe-results.md); one of them did earn after costs.)
+
+**Option spreads:** On real option prices, after costs, on data it was not chosen on,
 every candidate in the three searches lost money or showed no edge. The best available is to stand
 aside, which is what the chooser does.
 

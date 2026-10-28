@@ -410,3 +410,49 @@ export async function removeEventDay(date: string): Promise<EventDay[]> {
   const response = await webClient.delete<{ data: EventDay[] }>(`${BASE}/events/${date}`)
   return response.data.data
 }
+
+export interface UniverseStats {
+  cagr: number
+  total: number
+  max_drawdown: number
+  worst_day: number
+  days: number
+}
+
+export interface UniverseResult {
+  kind: 'universe'
+  data_from: string
+  data_to: string
+  trials: number
+  segments: Record<'train' | 'validate' | 'test', [string, string]>
+  lost_to_cash_on_test: number
+  baselines: Record<'buy_and_hold' | 'cash', Record<'train' | 'validate' | 'test', UniverseStats>>
+  winner: { name: string; stats: Record<'train' | 'validate' | 'test', UniverseStats> }
+  rules: {
+    name: string
+    family: string
+    train_cagr: number
+    validate_cagr: number
+    test_cagr: number
+    test_excess_over_cash: number
+  }[]
+  verdict: {
+    edge_shown: boolean
+    beats_cash: boolean
+    beats_buy_and_hold: boolean
+    lowers_risk_like_buy_and_hold: boolean
+    within_daily_cap: boolean
+    headline: string
+    reasons: string[]
+  }
+  account: AccountResult
+  caveats: string[]
+}
+
+export async function startUniverseSearch(account: {
+  capital: number
+  max_daily_loss: number
+}): Promise<string> {
+  const response = await webClient.post<{ job_id: string }>(`${BASE}/universe/search`, { account })
+  return response.data.job_id
+}

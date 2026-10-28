@@ -276,3 +276,7 @@ See `examples/simple_ema_strategy.py` for a complete working example that:
 - Integrates with OpenAlgo API
 - Handles errors gracefully
 - Uses environment parameters
+
+## Example: ETF momentum rotation
+
+`examples/etf_momentum_rotation.py` rotates monthly between a Nifty ETF, a gold ETF and cash. It prints the orders it would place unless `DRY_RUN=false`. Read its header and `docs/algos/universe-results.md` before using it, and run it in Sandbox first.

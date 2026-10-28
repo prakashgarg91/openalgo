@@ -27,6 +27,7 @@ import { DebuggerPanel, ExplainRecent } from '@/components/algos/DebuggerPanel'
 import { EventDaysPanel } from '@/components/algos/EventDaysPanel'
 import { LabPanel } from '@/components/algos/LabPanel'
 import { ReadinessPanel, StartHere } from '@/components/algos/ReadinessPanel'
+import { UniversePanel } from '@/components/algos/UniversePanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -307,7 +308,8 @@ export default function AlgosVibe() {
           <ReadinessPanel />
         </TabsContent>
 
-        <TabsContent value="build" className="pt-3">
+        <TabsContent value="build" className="space-y-4 pt-3">
+          <UniversePanel />
           <BuilderPanel />
         </TabsContent>
 

@@ -34,6 +34,15 @@ fix, live in [docs/releases](releases/).
 - Days to sit out (My algos): list the budget, a central-bank decision or big
   results, and every algo stands aside on that day and the trading day before
   it. There is no built-in event calendar.
+- Search every kind of algo (Build your own): beyond option spreads, it searches trend
+  following, momentum rotation between a Nifty ETF and a gold ETF, dip buying and calendar
+  rules on 15 years of ETF prices, and judges them against leaving the money in cash and
+  against buying and holding, on years they were not chosen on. On the history tested,
+  rotating monthly between the Nifty ETF, the gold ETF and cash earned after costs, but
+  holding half Nifty and half gold did almost as well, so most of it is owning equities and
+  gold. A ready strategy for the Python page is in
+  strategies/examples/etf_momentum_rotation.py (practice mode by default; not run against a
+  broker). See docs/algos/universe-results.md.
 - Test on my account (Lab): enter your capital and the most you will lose in a
   day, and the Lab replays an algo through that account: lots, ending balance,
   worst day, deepest fall, and whether any day passed your limit. Setting
