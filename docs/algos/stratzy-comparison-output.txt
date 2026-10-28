@@ -1,0 +1,85 @@
+warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be removed in a future release. Use `UV_SYSTEM_CERTS` instead.
+Real prices 2022-01-03 to 2026-10-26  (1188 days)
+
+OTM1/OTM4 follow-lean   exit-open  vix any  
+  all  n=492 win=42.1% total=  -93490 maxDD=-107846
+  2022-01..2023-06 n=113 win=47.8% total=    5990 maxDD= -11956
+  2023-07..2024-12 n=176 win=42.0% total=  -37687 maxDD= -41389
+  2025-01..2026-12 n=203 win=38.9% total=  -61794 maxDD= -65560
+OTM1/OTM4 follow-lean   exit-open  vix 13-20
+  all  n=264 win=42.0% total=  -48549 maxDD= -64874
+  2022-01..2023-06 n= 83 win=44.6% total=    5491 maxDD=  -9282
+  2023-07..2024-12 n= 94 win=39.4% total=  -28152 maxDD= -30398
+  2025-01..2026-12 n= 87 win=42.5% total=  -25888 maxDD= -31624
+OTM1/OTM4 follow-lean   exit-close vix any  
+  all  n=492 win=56.7% total= -134260 maxDD=-182059
+  2022-01..2023-06 n=113 win=66.4% total=   31924 maxDD= -20064
+  2023-07..2024-12 n=176 win=56.2% total=  -60166 maxDD= -76040
+  2025-01..2026-12 n=203 win=51.7% total= -106019 maxDD=-115068
+OTM1/OTM4 follow-lean   exit-close vix 13-20
+  all  n=264 win=54.9% total=  -84236 maxDD=-121873
+  2022-01..2023-06 n= 83 win=63.9% total=   17738 maxDD= -19900
+  2023-07..2024-12 n= 94 win=52.1% total=  -47433 maxDD= -50474
+  2025-01..2026-12 n= 87 win=49.4% total=  -54541 maxDD= -65068
+OTM1/OTM4 bull-put-only exit-open  vix any  
+  all  n=131 win=46.6% total=  -19354 maxDD= -24157
+  2022-01..2023-06 n= 33 win=54.5% total=     476 maxDD=  -7421
+  2023-07..2024-12 n= 55 win=45.5% total=   -7703 maxDD= -12532
+  2025-01..2026-12 n= 43 win=41.9% total=  -12127 maxDD= -16082
+OTM1/OTM4 bull-put-only exit-open  vix 13-20
+  all  n= 65 win=41.5% total=  -21554 maxDD= -23123
+  2022-01..2023-06 n= 18 win=38.9% total=   -3607 maxDD=  -7421
+  2023-07..2024-12 n= 29 win=37.9% total=  -10746 maxDD= -12902
+  2025-01..2026-12 n= 18 win=50.0% total=   -7201 maxDD= -11042
+OTM1/OTM4 bull-put-only exit-close vix any  
+  all  n=131 win=63.4% total=     940 maxDD= -32294
+  2022-01..2023-06 n= 33 win=69.7% total=   15572 maxDD=  -6617
+  2023-07..2024-12 n= 55 win=63.6% total=    1500 maxDD= -12815
+  2025-01..2026-12 n= 43 win=58.1% total=  -16132 maxDD= -22711
+OTM1/OTM4 bull-put-only exit-close vix 13-20
+  all  n= 65 win=56.9% total=   -9171 maxDD= -19836
+  2022-01..2023-06 n= 18 win=55.6% total=    2029 maxDD=  -6617
+  2023-07..2024-12 n= 29 win=62.1% total=    2825 maxDD= -10808
+  2025-01..2026-12 n= 18 win=50.0% total=  -14025 maxDD= -16683
+OTM2/OTM5 follow-lean   exit-open  vix any  
+  all  n=492 win=43.5% total=  -89640 maxDD=-105343
+  2022-01..2023-06 n=113 win=51.3% total=    4076 maxDD= -14260
+  2023-07..2024-12 n=176 win=41.5% total=  -31473 maxDD= -37886
+  2025-01..2026-12 n=203 win=40.9% total=  -62242 maxDD= -66556
+OTM2/OTM5 follow-lean   exit-open  vix 13-20
+  all  n=264 win=42.0% total=  -48261 maxDD= -66317
+  2022-01..2023-06 n= 83 win=45.8% total=    2532 maxDD= -12520
+  2023-07..2024-12 n= 94 win=36.2% total=  -26830 maxDD= -29935
+  2025-01..2026-12 n= 87 win=44.8% total=  -23964 maxDD= -30630
+OTM2/OTM5 follow-lean   exit-close vix any  
+  all  n=492 win=59.6% total= -124898 maxDD=-160279
+  2022-01..2023-06 n=113 win=68.1% total=   23846 maxDD= -17848
+  2023-07..2024-12 n=176 win=60.8% total=  -57117 maxDD= -68652
+  2025-01..2026-12 n=203 win=53.7% total=  -91627 maxDD=-101452
+OTM2/OTM5 follow-lean   exit-close vix 13-20
+  all  n=264 win=57.2% total=  -74488 maxDD=-105803
+  2022-01..2023-06 n= 83 win=65.1% total=   14497 maxDD= -16818
+  2023-07..2024-12 n= 94 win=57.4% total=  -41163 maxDD= -43513
+  2025-01..2026-12 n= 87 win=49.4% total=  -47821 maxDD= -58262
+OTM2/OTM5 bull-put-only exit-open  vix any  
+  all  n=131 win=47.3% total=  -16916 maxDD= -19525
+  2022-01..2023-06 n= 33 win=51.5% total=   -4617 maxDD=  -9888
+  2023-07..2024-12 n= 55 win=47.3% total=   -3340 maxDD= -10108
+  2025-01..2026-12 n= 43 win=44.2% total=   -8959 maxDD= -12631
+OTM2/OTM5 bull-put-only exit-open  vix 13-20
+  all  n= 65 win=40.0% total=  -13285 maxDD= -17495
+  2022-01..2023-06 n= 18 win=33.3% total=   -6661 maxDD=  -9177
+  2023-07..2024-12 n= 29 win=37.9% total=   -6455 maxDD=  -9087
+  2025-01..2026-12 n= 18 win=50.0% total=    -169 maxDD=  -5443
+OTM2/OTM5 bull-put-only exit-close vix any  
+  all  n=131 win=65.6% total=     139 maxDD= -25297
+  2022-01..2023-06 n= 33 win=72.7% total=   10725 maxDD=  -6132
+  2023-07..2024-12 n= 55 win=65.5% total=    -454 maxDD= -11671
+  2025-01..2026-12 n= 43 win=60.5% total=  -10132 maxDD= -16679
+OTM2/OTM5 bull-put-only exit-close vix 13-20
+  all  n= 65 win=58.5% total=   -7142 maxDD= -14890
+  2022-01..2023-06 n= 18 win=55.6% total=     715 maxDD=  -6132
+  2023-07..2024-12 n= 29 win=65.5% total=    1415 maxDD= -10094
+  2025-01..2026-12 n= 18 win=50.0% total=   -9271 maxDD= -12126
+
+16 cells tried; 16 lost money in the untouched last period.

@@ -155,10 +155,12 @@ class RealPrices:
             return None
         return value
 
-    def mark(self, entry_day, exit_day, expiry, strike, kind) -> tuple[float, float] | None:
-        """(close on the entry day, open on the exit day) for one contract, or None."""
+    def mark(
+        self, entry_day, exit_day, expiry, strike, kind, exit_field: str = "open"
+    ) -> tuple[float, float] | None:
+        """(close on the entry day, open or close on the exit day) for one contract, or None."""
         entry = self._price(entry_day, expiry, strike, kind, "close")
-        exit_ = self._price(exit_day, expiry, strike, kind, "open")
+        exit_ = self._price(exit_day, expiry, strike, kind, exit_field)
         return None if entry is None or exit_ is None else (entry, exit_)
 
 
@@ -416,6 +418,7 @@ def _real_trade(
     t1: pd.Timestamp,
     expiry: pd.Timestamp,
     spot: float,
+    exit_field: str = "open",
 ) -> tuple[float, float] | None:
     """(net, cost) per lot from actual prices, or None when any contract has no print."""
     atm = round(spot / 50) * 50
@@ -424,7 +427,7 @@ def _real_trade(
         steps = int(str(leg["atm_offset"]).replace("OTM", "") or 0)
         kind = leg["option_type"]
         strike = atm + 50 * steps if kind == "CE" else atm - 50 * steps
-        marks = real.mark(t, t1, expiry, strike, kind)
+        marks = real.mark(t, t1, expiry, strike, kind, exit_field)
         if marks is None:
             return None
         e, x = marks
@@ -452,6 +455,7 @@ def run_lab(
     real: RealPrices | None = None,
     trace: dict[str, Any] | None = None,
     hold: int = 1,
+    exit_field: str = "open",
 ) -> LabResult:
     """Replay one algo over the history. Raises ``KeyError`` for an unknown algo or model.
 
@@ -466,12 +470,19 @@ def run_lab(
     at the open ``hold`` days later. More than one needs ``real`` prices (the models only know
     one night) and is for research: the live engine exits the next morning.
 
+    ``exit_field`` is the exit price on real-price trades: the next day's ``open`` (the default, what the
+    live engine does) or its ``close`` (research: about the 3 PM exit another provider describes).
+
     ``trace``, when given, is filled with what happened on the day(s) replayed:
     the inputs, the regime, the plan and the pricing. The debugger replays a single
     day with it; nothing else sets it.
     """
     if hold < 1 or (hold > 1 and real is None):
         raise ValueError("hold above one day needs real option prices")
+    if exit_field not in ("open", "close"):
+        raise ValueError("exit_field must be open or close")
+    if exit_field == "close" and real is None:
+        raise ValueError("exiting at the close needs real option prices")
     spec = ALGOS[algo_id]
     pricing = MODELS[model]
     frames = history.frames
@@ -587,7 +598,14 @@ def run_lab(
         priced = False
         if real is not None and spec.overnight:
             outcome = _real_trade(
-                pricing, plan.config["legs"], real, t, dates[i + hold], expiry, float(cls.iloc[i])
+                pricing,
+                plan.config["legs"],
+                real,
+                t,
+                dates[i + hold],
+                expiry,
+                float(cls.iloc[i]),
+                exit_field,
             )
             if outcome is None:
                 skipped["A contract had no opening price"] = (

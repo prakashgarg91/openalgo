@@ -451,3 +451,40 @@ def test_a_hold_with_no_price_on_the_exit_day_is_skipped_and_counted(history):
     result = run_lab(history, "zen", gated=False, real=real, plan_fn=_one_leg_plan, hold=3)
     assert result.skipped.get("No option prices for this day", 0) > 0
     assert not any(t["date"] == d0.strftime("%Y-%m-%d") for t in result.trades)
+
+
+# --- exit price field (research) ---------------------------------------------
+
+
+def test_real_prices_mark_can_exit_at_the_close():
+    real = lab.RealPrices(
+        {
+            pd.Timestamp("2024-03-01"): _real_day(
+                "2024-03-01", "2024-03-07", [(22000, "PE", 90.0, 80.0, 500)]
+            ),
+            pd.Timestamp("2024-03-04"): _real_day(
+                "2024-03-04", "2024-03-07", [(22000, "PE", 70.0, 60.0, 400)]
+            ),
+        }
+    )
+    assert real.mark("2024-03-01", "2024-03-04", "2024-03-07", 22000, "PE", "close") == (80.0, 60.0)
+    assert real.mark("2024-03-01", "2024-03-04", "2024-03-07", 22000, "PE") == (80.0, 70.0)
+
+
+def test_exiting_at_the_close_prices_the_exit_from_the_close(history):
+    d0, d1, dk, real = _hold_world(history, 3)
+    # The exit day carries only an opening print, so a close exit finds no price and skips it.
+    at_open = run_lab(history, "zen", gated=False, real=real, plan_fn=_one_leg_plan)
+    at_close = run_lab(
+        history, "zen", gated=False, real=real, plan_fn=_one_leg_plan, exit_field="close"
+    )
+    day = d0.strftime("%Y-%m-%d")
+    assert any(t["date"] == day for t in at_open.trades)
+    assert not any(t["date"] == day for t in at_close.trades)
+
+
+def test_exit_field_is_validated(history):
+    with pytest.raises(ValueError):
+        run_lab(history, "zen", exit_field="vwap")
+    with pytest.raises(ValueError):
+        run_lab(history, "zen", exit_field="close")

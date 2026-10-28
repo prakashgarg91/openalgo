@@ -10,6 +10,11 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Stratzy comparison (docs/algos/stratzy-comparison.md): Zen's published recipe
+  (exit 3 PM next day, India VIX 13 to 20) replayed on real NSE option prices.
+  Neither difference earned in the untouched 2025-26 period; an exit at the
+  close raises win rate to about 60% without raising profit. The Lab gained a
+  research-only exit_field option; the live engine is unchanged.
 - New Algos page (/algos): ready-made regime algos (Zen, Mirror Zen, Calm
   Condor, Morning Gap) that you add with a capital amount and turn on. Each
   starts in Sandbox. Going Live needs the Live checklist to pass and you to
