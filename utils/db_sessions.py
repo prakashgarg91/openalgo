@@ -59,6 +59,7 @@ SCOPED_SESSION_MODULES = [
     ("database.symbol", "db_session"),
     ("database.strategy_book_db", "db_session"),
     ("database.algo_db", "db_session"),
+    ("database.phone_login_db", "db_session"),
     ("database.strategy_module_db", "db_session"),
     ("database.oauth_db", "db_session"),
     ("database.whatsapp_db", "db_session"),

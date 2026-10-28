@@ -85,6 +85,7 @@ from blueprints.oitracker import oitracker_bp  # Import the OI tracker blueprint
 from blueprints.openscript import openscript_bp  # Trader authored OpenScript sources
 from blueprints.openscript_runner import openscript_runner_bp  # Runs one saved strategy
 from blueprints.orders import orders_bp
+from blueprints.phone_login import phone_bp  # Sign in with the registered phone number
 from blueprints.platforms import platforms_bp
 from blueprints.playground import playground_bp  # Import the API playground blueprint
 from blueprints.pnltracker import pnltracker_bp  # Import the pnl tracker blueprint
@@ -131,6 +132,7 @@ from database.flow_db import init_db as ensure_flow_tables_exists
 from database.historify_db import init_database as ensure_historify_tables_exists
 from database.latency_db import init_latency_db as ensure_latency_tables_exists
 from database.leverage_db import init_db as ensure_leverage_tables_exists
+from database.phone_login_db import init_db as ensure_phone_login_table_exists
 from database.sandbox_db import init_db as ensure_sandbox_tables_exists
 from database.scalping_db import init_db as ensure_scalping_tables_exists
 from database.settings_db import init_db as ensure_settings_tables_exists
@@ -319,6 +321,7 @@ def create_app():
     app.register_blueprint(health_bp)  # Register Health monitoring blueprint
     app.register_blueprint(strategy_module_bp)  # Register Strategy Module blueprint
     app.register_blueprint(algos_bp)  # Register Algo Catalogue blueprint
+    app.register_blueprint(phone_bp)  # Register phone sign-in blueprint
     app.register_blueprint(master_contract_status_bp)
     app.register_blueprint(websocket_bp)  # Register WebSocket example blueprint
     app.register_blueprint(chart_test_bp)  # Register standalone chart test page (dev/testing only)
@@ -763,6 +766,7 @@ def setup_environment(app):
                 ("Sandbox DB", ensure_sandbox_tables_exists),
                 ("Strategy Module DB", ensure_strategy_module_tables_exists),
                 ("Algo DB", ensure_algo_tables_exists),
+                ("Phone Login DB", ensure_phone_login_table_exists),
                 ("Action Center DB", ensure_action_center_tables_exists),
                 ("Chart Prefs DB", ensure_chart_prefs_tables_exists),
                 ("Market Calendar DB", ensure_market_calendar_tables_exists),
