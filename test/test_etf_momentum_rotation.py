@@ -218,3 +218,81 @@ def test_it_does_nothing_in_the_middle_of_a_month(harness, monkeypatch, capsys):
     monkeypatch.setenv("DRY_RUN", "false")
     assert rot.main() == 0
     assert FakeClient.instances[0].orders == [] and "Nothing to do" in capsys.readouterr().out
+
+
+# -- trend and hold modes, and the state kept after a partial rebalance -----------------------------------
+
+
+@pytest.mark.parametrize("n", [50, 100, 200])
+def test_trend_mode_holds_exactly_what_the_tested_trend_rule_holds(n):
+    b = bars(days=700, seed=5)
+    held = u.held_trend(b, n)
+    eq, gd = b["equity"]["Close"], b["gold"]["Close"]
+    checked = 0
+    for i in range(n + 2, len(eq) - 1):
+        weights = rot.signal_weights(list(eq.iloc[:i]), list(gd.iloc[:i]), n, "trend")
+        assert weights[rot.EQUITY] == pytest.approx(held["equity"].iloc[i])
+        assert weights[rot.GOLD] == 0.0
+        checked += 1
+    assert checked > 100
+
+
+def test_hold_mode_is_half_and_half_and_an_unknown_mode_is_refused():
+    series = [100.0 + i * 0.1 for i in range(200)]
+    assert rot.signal_weights(series, series, 126, "hold") == {rot.EQUITY: 0.5, rot.GOLD: 0.5}
+    with pytest.raises(ValueError):
+        rot.signal_weights(series, series, 126, "gold only")
+
+
+def test_trend_mode_acts_every_trading_day_and_not_twice_in_one_day(harness, monkeypatch, capsys):
+    from datetime import datetime as real_datetime
+
+    class Mid(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return real_datetime(
+                2026, 11, 3, 15, 16, tzinfo=rot.IST
+            )  # a day that is not a month start
+
+    monkeypatch.setattr(rot, "datetime", Mid)
+    monkeypatch.setenv("DRY_RUN", "false")
+    monkeypatch.setenv("ETF_MODE", "trend")
+    monkeypatch.setenv("ETF_LOOKBACK", "100")
+
+    def history(self, *, symbol, **kw):
+        idx = pd.bdate_range(end="2026-11-03", periods=400)
+        return pd.DataFrame(
+            {"close": np.linspace(100, 160, 400)}, index=idx
+        )  # rising: above its average
+
+    monkeypatch.setattr(FakeClient, "history", history)
+    assert rot.main() == 0
+    (order,) = FakeClient.instances[0].orders
+    assert (
+        order["symbol"] == rot.EQUITY
+        and order["action"] == "BUY"
+        and order["strategy"] == "ETF rotation trend"
+    )
+    assert rot.load_state(harness)["last_rebalanced"] == "2026-11-03"
+    capsys.readouterr()
+    assert rot.main() == 0
+    assert "already done today" in capsys.readouterr().out and not FakeClient.instances[1].orders
+
+
+def test_a_refused_buy_after_a_sell_keeps_the_record_true(harness, monkeypatch, capsys):
+    monkeypatch.setenv("DRY_RUN", "false")
+    rot.save_state(harness, {"book": {rot.EQUITY: 100}, "last_rebalanced": "2026-10"})
+    calls = []
+
+    def place(self, **kw):
+        calls.append(kw["action"])
+        return {"status": "success" if kw["action"] == "SELL" else "error"}
+
+    monkeypatch.setattr(FakeClient, "placeorder", place)
+    assert rot.main() == 1
+    assert calls == ["SELL", "BUY"]
+    state = rot.load_state(harness)
+    assert state["book"].get(rot.EQUITY, 0) == 0  # the sell went through and is recorded
+    assert state["last_rebalanced"] == "2026-10"  # the month is not marked finished
+    out = capsys.readouterr().out
+    assert "price now against the last finished close" in out

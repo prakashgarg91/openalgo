@@ -24,7 +24,11 @@ Safety
 Settings (environment variables, set them when you add the strategy in /python)
     ETF_CAPITAL      rupees to allocate (default 100000)
     ETF_LOOKBACK     trading days (default 126)
-    ETF_MODE         best (one ETF) or all (split among the ones that rose) (default best)
+    ETF_MODE         best (one ETF) or all (split among the ones that rose) (default best);
+                     trend (the Nifty ETF while it closes above its ETF_LOOKBACK-day average, else
+                     cash; set ETF_LOOKBACK=100; judged every trading day); hold (half and half, the
+                     benchmark that shows whether timing adds anything). Run them side by side, each
+                     with its own ETF_STATE_FILE and its own strategy entry.
     DRY_RUN          true or false (default true)
     ETF_RUN_AT       time of day to act, IST, HH:MM (default 15:15)
     ETF_STATE_FILE   where it remembers what it holds (default strategies/state/etf_rotation.json)
@@ -51,12 +55,19 @@ def signal_weights(equity_closes, gold_closes, lookback=126, mode="best"):
     """Target weights from closing prices up to and including the last finished day."""
     if len(equity_closes) <= lookback or len(gold_closes) <= lookback:
         return {EQUITY: 0.0, GOLD: 0.0}
+    if mode not in ("best", "all", "trend", "hold"):
+        raise ValueError(f"ETF_MODE must be best, all, trend or hold, not {mode}")
     rises = {
         EQUITY: equity_closes[-1] / equity_closes[-1 - lookback] - 1,
         GOLD: gold_closes[-1] / gold_closes[-1 - lookback] - 1,
     }
     positive = {k: v for k, v in rises.items() if v > 0}
     weights = {EQUITY: 0.0, GOLD: 0.0}
+    if mode == "hold":  # the plain benchmark: half and half, no timing
+        return {EQUITY: 0.5, GOLD: 0.5}
+    if mode == "trend":  # the Nifty ETF while it closes above its own average, else cash
+        average = sum(equity_closes[-lookback:]) / lookback
+        return {EQUITY: 1.0 if equity_closes[-1] > average else 0.0, GOLD: 0.0}
     if not positive:
         return weights
     if mode == "best":
@@ -128,7 +139,7 @@ def main():
     dry_run = os.getenv("DRY_RUN", "true").lower() != "false"
     state_file = os.getenv("ETF_STATE_FILE", "strategies/state/etf_rotation.json")
     client = api(api_key=api_key, host=host)
-    strategy = "ETF Momentum Rotation"
+    strategy = f"ETF rotation {mode}"
 
     _wait_until(os.getenv("ETF_RUN_AT", "15:15"))
     today = datetime.now(IST).date()
@@ -145,14 +156,15 @@ def main():
         df = df[df.index.date < today]  # finished days only: today's bar is still forming
         closes[symbol] = [float(x) for x in df["close"]]
         last_bar = df.index[-1].date()
-    if not is_first_trading_day_of_month(last_bar, today):
+    daily = mode == "trend"  # the trend filter is judged every trading day, the others once a month
+    if not daily and not is_first_trading_day_of_month(last_bar, today):
         print(f"{today}: not the first trading day of the month. Nothing to do.")
         return 0
 
     state = load_state(state_file)
-    month = today.strftime("%Y-%m")
+    month = today.isoformat() if daily else today.strftime("%Y-%m")
     if state.get("last_rebalanced") == month:
-        print(f"{month}: already done this month.")
+        print(f"{month}: already done {'today' if daily else 'this month'}.")
         return 0
 
     weights = signal_weights(closes[EQUITY], closes[GOLD], lookback, mode)
@@ -161,7 +173,10 @@ def main():
         quote = client.quotes(symbol=symbol, exchange="NSE")
         prices[symbol] = float(quote["data"]["ltp"])
     orders = plan_orders(state.get("book", {}), weights, prices, capital)
+    # The tested rule trades at the close after the signal; this trades at the 15:15 price. Record the gap.
+    gap = {s: round(prices[s] / closes[s][-1] - 1, 4) for s in prices}
     print(f"{month}: target {weights}, prices {prices}, orders {orders}")
+    print(f"{month}: price now against the last finished close: {gap}")
 
     book = dict(state.get("book", {}))
     for action, symbol, qty in orders:
@@ -180,6 +195,9 @@ def main():
         print(f"{action} {qty} {symbol}: {result}")
         if isinstance(result, dict) and result.get("status") == "success":
             book[symbol] = book.get(symbol, 0) + (qty if action == "BUY" else -qty)
+            # Saved after every accepted order: if a later order is refused, the record still
+            # matches what was really done, and the period is not marked finished.
+            save_state(state_file, {"book": book, "last_rebalanced": state.get("last_rebalanced")})
         else:
             print(f"The {action} of {symbol} was not accepted, so it is not recorded as done.")
             return 1
