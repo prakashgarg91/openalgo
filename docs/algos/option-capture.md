@@ -7,7 +7,7 @@ Nothing here places an order. It reads candles and writes them to the Historify 
 ## What it saves
 
 - The Nifty index minute candles of the last week and the India VIX daily closes of the last six weeks, which the forward shadow test ([forward-test-registration.md](forward-test-registration.md)) reads.
-- The nearest Nifty weekly expiry, calls and puts, 16 strikes either side of the at-the-money strike (about 800 points), taken from the Nifty close of the day.
+- The nearest Nifty weekly expiry, calls and puts, 16 strikes either side of the at-the-money strike (about 800 points) taken from the Nifty close of the day, widened to cover the day's whole Nifty range and the previous session's range plus 500 points, so the far leg of a 400-point spread opened earlier is stored even after a big move. Days captured before 29 October 2026 evening used the plain band.
 - One-minute candles for that day, with open interest, stored in Historify as exchange NFO, interval 1m. No schema change, so there is no migration to run.
 - Re-running the same day is safe: Historify updates rows instead of duplicating them.
 
@@ -31,7 +31,7 @@ On Windows, double-click `scripts/algo_backtest/windows/install_capture_task.cmd
 
 Antivirus note for Windows: Avast sets a `SSLKEYLOGFILE` variable that points at one of its own devices. Python exits silently, with the line `no OPENSSL_Applink`, the first time it opens a secure connection, so `uv run app.py` and the capture both fail. `capture_option_candles.cmd` clears the variable for its own run. For the app, clear it first in the same terminal (`set SSLKEYLOGFILE=`). The same antivirus also made the first scheduled run slow: importing pandas took 59 seconds inside the task against half a second by hand. A later run finished in under two minutes. If yours stays slow, add the OpenAlgo folder to the antivirus exclusions.
 
-It prints how many contracts it saved. On a market holiday it finds no Nifty candles, says so and saves nothing. A contract that fails is skipped and counted; the exit code is 2 if any failed.
+It prints how many contracts it saved. Exit codes: 0 all saved (or a weekend); 2 a contract or the index/VIX context failed, or nothing was saved; 3 a weekday with no Nifty candles. Upstox answers a refused token and a market holiday the same way, with no candles, so 3 cannot tell them apart: on an exchange holiday it is expected, on any other day check the token. A contract that fails is skipped and counted.
 
 ## Reading it back
 

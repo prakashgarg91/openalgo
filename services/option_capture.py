@@ -48,14 +48,30 @@ def nearest_expiry(expiries: list[str], today: datetime) -> str | None:
     return upcoming[0][1] if upcoming else None
 
 
-def select_contracts(rows: list[dict], spot: float, expiry: str) -> list[dict]:
+REACH_MARGIN = 500  # a 400-point spread sold at the day's extreme, plus one 100-point margin
+
+
+def select_contracts(
+    rows: list[dict],
+    spot: float,
+    expiry: str,
+    reach: tuple[tuple[float, float], ...] = (),
+) -> list[dict]:
     """Option rows of one expiry within STRIKES_EACH_SIDE strikes of the at-the-money strike.
+
+    ``reach`` is the (low, high) Nifty range of sessions whose positions may still be open, usually
+    today and the previous session. A spread opened anywhere in a range has its far leg up to
+    REACH_MARGIN beyond it, so the band grows to cover that: a day Nifty moved 400 points after the
+    10:15 entry no longer loses the protective leg. The band never shrinks below the plain one.
 
     Each row needs symbol, expiry, strike and instrumenttype (CE or PE).
     """
     atm = round(spot / STRIKE_STEP) * STRIKE_STEP
     low = atm - STRIKES_EACH_SIDE * STRIKE_STEP
     high = atm + STRIKES_EACH_SIDE * STRIKE_STEP
+    for day_low, day_high in reach:
+        low = min(low, day_low - REACH_MARGIN)
+        high = max(high, day_high + REACH_MARGIN)
     return [
         r
         for r in rows
@@ -160,8 +176,13 @@ def capture_context(day: str, history: HistoryFn, store: StoreFn) -> dict:
         start = (end - timedelta(days=back)).strftime("%Y-%m-%d")
         try:
             frame = history(symbol, INDEX_EXCHANGE, interval, start, day)
-            if frame is not None and not frame.empty:
-                result[key] = store(frame, symbol, INDEX_EXCHANGE, interval)
+            if frame is None or frame.empty:
+                # The broker layer turns a refused request into an empty frame, so an empty
+                # answer for a week of index minutes or six weeks of VIX is a failure, not a quiet day.
+                result["failed"] += 1
+                logger.error("No candles came back for %s", symbol)
+                continue
+            result[key] = store(frame, symbol, INDEX_EXCHANGE, interval)
         except Exception:
             result["failed"] += 1
             logger.exception("Could not capture %s", symbol)
@@ -215,3 +236,25 @@ def spot_from_index(history: HistoryFn, day: str) -> float | None:
     if frame is None or frame.empty:
         return None
     return float(frame.sort_values("timestamp")["close"].iloc[-1])
+
+
+def index_ranges(
+    history: HistoryFn, day: str, back: int = CONTEXT_DAYS_INDEX
+) -> dict[str, tuple[float, float]]:
+    """(low, high) of the Nifty index for each India session in the last ``back`` days to ``day``.
+
+    One request. Keys are YYYY-MM-DD in India time. Empty when the broker returns nothing.
+    """
+    start = (datetime.strptime(day, "%Y-%m-%d") - timedelta(days=back)).strftime("%Y-%m-%d")
+    frame = history(INDEX_SYMBOL, INDEX_EXCHANGE, INTERVAL, start, day)
+    if frame is None or frame.empty:
+        return {}
+    stamps = pd.to_datetime(frame["timestamp"], unit="s", utc=True).dt.tz_convert("Asia/Kolkata")
+    grouped = frame.assign(_day=stamps.dt.strftime("%Y-%m-%d")).groupby("_day")
+    return {d: (float(g["low"].min()), float(g["high"].max())) for d, g in grouped}
+
+
+def reach_for(ranges: dict[str, tuple[float, float]], day: str) -> tuple[tuple[float, float], ...]:
+    """Ranges of ``day`` and of the latest session before it, the two that can hold a position."""
+    wanted = [d for d in sorted(ranges) if d <= day][-2:]
+    return tuple(ranges[d] for d in wanted)

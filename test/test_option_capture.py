@@ -139,3 +139,48 @@ def test_capture_context_stores_the_index_and_vix_and_survives_a_failure():
     assert result == {"index_candles": 1, "vix_days": 0, "failed": 1}
     index_call = asked[0]
     assert index_call[3] < "2026-10-29" and index_call[4] == "2026-10-29"
+
+
+def test_a_wide_day_keeps_the_far_leg_of_a_spread_opened_before_the_move():
+    data = rows(range(23000, 27000, 50))
+    close = 25000.0
+    plain = {c["strike"] for c in oc.select_contracts(data, close, EXPIRY)}
+    assert max(plain) == 25800
+    # Nifty was 24,500 at 10:15 and rallied 500: a put spread sold at 24,500 holds 24,100.
+    wide = {c["strike"] for c in oc.select_contracts(data, close, EXPIRY, ((24450.0, 25020.0),))}
+    assert min(wide) == 23950 and 24100 in wide
+    assert max(wide) == 25800  # never narrower than the plain band
+
+
+def test_the_previous_session_range_keeps_the_strikes_of_an_overnight_position():
+    data = rows(range(22000, 27000, 50))
+    ranges = {"2026-10-28": (24400.0, 24800.0), "2026-10-29": (25600.0, 26000.0)}
+    reach = oc.reach_for(ranges, "2026-10-29")
+    assert len(reach) == 2
+    strikes = {c["strike"] for c in oc.select_contracts(data, 25900.0, EXPIRY, reach)}
+    assert 23900 in strikes  # long leg of a put spread sold at 24,300 the evening before
+
+
+def test_index_ranges_groups_candles_by_india_session():
+    # 2026-10-29 09:15 IST is 03:45 UTC
+    base = int(pd.Timestamp("2026-10-29 03:45", tz="UTC").timestamp())
+    f = pd.DataFrame(
+        {
+            "timestamp": [base, base + 60, base - 86400],
+            "high": [101.0, 105.0, 90.0],
+            "low": [99.0, 98.0, 80.0],
+            "close": [100.0, 100.0, 85.0],
+        }
+    )
+    got = oc.index_ranges(lambda *a: f, "2026-10-29")
+    assert got == {"2026-10-28": (80.0, 90.0), "2026-10-29": (98.0, 105.0)}
+    assert oc.index_ranges(lambda *a: pd.DataFrame(), "2026-10-29") == {}
+
+
+def test_an_empty_context_answer_counts_as_a_failure_not_a_quiet_day():
+    stored = []
+    result = oc.capture_context(
+        "2026-10-29", lambda *a: pd.DataFrame(), lambda *a: stored.append(a) or 0
+    )
+    assert stored == []
+    assert result == {"index_candles": 0, "vix_days": 0, "failed": 2}

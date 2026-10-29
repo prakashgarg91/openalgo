@@ -8,6 +8,10 @@ fix, live in [docs/releases](releases/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Nightly option capture (docs/algos/option-capture.md): a weekday with no Nifty candles now exits with code 3 and says Upstox may have refused the token, instead of being reported as a possible holiday with exit 0; a run that saves no option contract exits 2; an empty answer for the Nifty minutes or India VIX counts as a failure. The strike band now also covers the day's whole Nifty range and the previous session's, so a day that moved 400 points after the 10:15 entry no longer loses the far leg of the spread the shadow test holds (previously that leg was missing or carried a stale price). Capture days before this change used the narrower band. A market holiday on a weekday still shows exit 3 in Task Scheduler; nothing is wrong then.
+
 ### Added
 
 - Forward shadow runner for the three registered side rules (docs/algos/forward-test-registration.md): `scripts/algo_backtest/run_forward_shadow.py` replays each rule from the stored candles, writes a ledger and a progress read of the pass gates, and the nightly capture now also saves Nifty index minutes and India VIX and runs it. It places no order, and no result exists yet: one session is stored.
