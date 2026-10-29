@@ -10,6 +10,7 @@ The functions that choose contracts and loop over them take their data source an
 arguments, so they run without a broker or a database; ``default_*`` wire the real ones.
 """
 
+import time
 from collections.abc import Callable
 from datetime import datetime
 
@@ -97,10 +98,50 @@ def capture(
     }
 
 
+MAX_REQUESTS_PER_SECOND = 3  # the analytics token is shared with another app's market-data readers
+RATE_LIMIT_PAUSE_SECONDS = 60
+
+
+def paced(
+    history: HistoryFn,
+    per_second: float = MAX_REQUESTS_PER_SECOND,
+    pause: float = RATE_LIMIT_PAUSE_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> HistoryFn:
+    """Wrap a history source so it never exceeds ``per_second`` requests.
+
+    A rate-limit reply (the text "429" in the error) waits ``pause`` seconds and tries once more.
+    Any other error is raised unchanged for the caller to count.
+    """
+    gap = 1.0 / per_second
+    last = [float("-inf")]
+
+    def wait() -> None:
+        ahead = last[0] + gap - clock()
+        if ahead > 0:
+            sleep(ahead)
+        last[0] = clock()
+
+    def call(*args: str) -> pd.DataFrame:
+        wait()
+        try:
+            return history(*args)
+        except Exception as exc:
+            if "429" not in str(exc):
+                raise
+            logger.warning("Upstox rate limit reached; waiting %s seconds", pause)
+            sleep(pause)
+            wait()
+            return history(*args)
+
+    return call
+
+
 def default_history(token: str) -> HistoryFn:
     from broker.upstox.api.data import BrokerData
 
-    return BrokerData(token).get_history
+    return paced(BrokerData(token).get_history)
 
 
 def default_store() -> StoreFn:

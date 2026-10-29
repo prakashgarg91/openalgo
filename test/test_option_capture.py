@@ -77,3 +77,41 @@ def test_spot_is_the_last_close_or_none():
     f = frame().assign(close=[10.0, 20.0])
     assert oc.spot_from_index(lambda *a: f, "2025-10-29") == 20.0
     assert oc.spot_from_index(lambda *a: pd.DataFrame(), "2025-10-29") is None
+
+
+def test_paced_spaces_requests_and_retries_once_after_a_rate_limit():
+    now = [0.0]
+    waits = []
+
+    def sleep(seconds):
+        waits.append(seconds)
+        now[0] += seconds
+
+    calls = []
+
+    def history(*args):
+        calls.append(args)
+        if len(calls) == 2:
+            raise RuntimeError("HTTP 429 Too Many Requests")
+        return pd.DataFrame({"x": [1]})
+
+    fetch = oc.paced(history, per_second=2, pause=60, sleep=sleep, clock=lambda: now[0])
+    fetch("a")
+    fetch("b")
+    assert len(calls) == 3  # the rate-limited call was tried a second time
+    assert 60 in waits
+    assert all(w <= 60 for w in waits)
+    assert 0.5 in waits  # the second request waited half a second for the 2 per second cap
+
+
+def test_paced_raises_other_errors_unchanged():
+    def history(*args):
+        raise ValueError("bad symbol")
+
+    fetch = oc.paced(history, sleep=lambda s: None, clock=lambda: 0.0)
+    try:
+        fetch("a")
+    except ValueError as exc:
+        assert "bad symbol" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
