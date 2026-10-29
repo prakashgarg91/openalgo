@@ -136,3 +136,70 @@ On a Rs 1 lakh account with a Rs 20k daily cap, Zen's structure fits only at one
 ## Decision
 
 No change to the live engine. The two published differences do not pass the untouched period, and the structure reverse-engineered from the trade table cannot be tested fairly without intraday option prices. The close-exit option stays research only in `run_lab(exit_field="close")`. The bull-put-only finding is a lead, not an edge: it breaks even before the last period turns it negative.
+
+## Zen's rules on real 5-minute option prices (run 2026-10-29)
+
+Data: Upstox Plus expired-contract history, 70 weekly Nifty expiries, 4,185 contract files, 328 sessions from 1 July 2025 to 27 October 2026. Run with `scripts/algo_backtest/stratzy_zen_intraday.py`; method in [intraday-test.md](intraday-test.md). Nothing was ordered.
+
+### Part 1: do the exit rules reproduce Zen's published trades?
+
+The 204 published entries were replayed with the 43.8-point stop, the 10-point target and the 15:00 next-session exit. 201 could be priced from the bars.
+
+| | Published | Replay |
+| --- | --- | --- |
+| Points, 201 trades | 2,191 | 2,569 |
+| Points per trade | 10.9 | 12.8 |
+| Win rate | 56% | 54% |
+| Stops | 97 | 83 (78 of them on the same trades) |
+
+Correlation per trade is +0.91 and the total is 17% above the published one, so the check (correlation 0.8 or more, total within 25%) passes. Entry credit from the bars is within 5 points of the published credit on 65% of trades (median error 2.9 points). The replay is kinder than the published fills by about 2 points a trade, so any result below is, if anything, flattering.
+
+What this proves: the exit rules (stop, target, next-session exit) behave like Zen's on Zen's own entries. It does not prove anything about how Zen chooses the side, which is the part we cannot see.
+
+### Part 2: 36 pre-registered cells, one lot, conservative costs
+
+Six side rules (always put, always call, follow the previous close, follow the morning move, lean, flip) by three exit styles (stop and reverse, stop only, no stop) by two filters (none, or VIX under 20 and no 1% gap down). Totals are Rs per lot over the whole window; thirds are the first, middle and last third of the period.
+
+| Side rule | Exit | Filter | Total | Thirds |
+| --- | --- | --- | --- | --- |
+| put | stop+reverse | none / zen | -159,141 / -105,894 | -1,963, -82,931, -74,248 / -1,963, -28,079, -75,852 |
+| put | stop only | none / zen | -200,167 / -156,199 | 548, -134,618, -66,097 / 548, -93,889, -62,858 |
+| put | no stop | none / zen | -170,980 / -151,722 | -940, -123,494, -46,546 (both) |
+| call | stop+reverse | none / zen | -12,292 / -10,450 | 16,678, -5,519, -23,451 / 16,678, 1,167, -28,294 |
+| call | stop only | none / zen | +31,622 / +61,860 | 38,714, -3,454, -3,638 / 38,714, 31,627, -8,481 |
+| call | no stop | none / zen | +92,817 / +118,495 | 28,794, 43,730, 20,293 / 28,794, 69,408, 20,293 |
+| follow previous close | stop+reverse | none / zen | -80,962 / -58,628 | 34,552, -40,808, -74,705 / 34,552, -13,631, -79,549 |
+| follow previous close | stop only | none / zen | -70,837 / -14,381 | 61,538, -74,203, -58,172 / 61,538, -12,903, -63,016 |
+| follow previous close | no stop | none / zen | -93,866 / -32,247 | 55,046, -60,873, -88,040 / 55,046, 747, -88,040 |
+| follow morning move | stop+reverse | none / zen | -176,468 / -146,593 | -17,092, -56,094, -103,282 / -17,092, -21,375, -108,126 |
+| follow morning move | stop only | none / zen | -139,998 / -102,813 | -10,663, -57,100, -72,234 / -10,663, -15,072, -77,078 |
+| follow morning move | no stop | none / zen | -164,340 / -131,694 | -9,982, -76,798, -77,560 / -9,982, -44,152, -77,560 |
+| lean | stop+reverse | none / zen | -47,892 / -4,129 | 32,884, -36,350, -44,427 / 32,884, 9,018, -46,031 |
+| lean | stop only | none / zen | -62,154 / -25,204 | 30,943, -62,202, -30,896 / 30,943, -28,490, -27,658 |
+| lean | no stop | none / zen | +18,524 / +29,295 | 76,879, -55,938, -2,418 / 76,879, -45,166, -2,418 |
+| flip | stop+reverse | none / zen | -88,745 / -50,800 | -19,167, -56,519, -13,059 / -19,167, -5,669, -25,964 |
+| flip | stop only | none / zen | -166,688 / -58,550 | -9,500, -115,566, -41,622 / -9,500, -34,730, -14,320 |
+| flip | no stop | none / zen | -218,417 / -116,375 | -7,857, -152,968, -57,593 / -7,857, -50,926, -57,593 |
+
+Count: 36 cells tried, 34 lost money in the last third. Two were positive in all three thirds: always sell the call spread with no stop, with and without the Zen filter.
+
+### What the two survivors are, and why they are not an edge
+
+- They sell a call spread every day and hold it to the next session. Nifty fell 10.9% over this window (25,542 to 22,753), so selling the side a falling market does not touch pays. That is a view on direction, not a rule.
+- With the Zen filter: 175 trades, mean +Rs 677 per trade, t-statistic 1.84. Without: 188 trades, mean +Rs 494, t-statistic 1.29. Neither reaches the usual 2.
+- Two of 36 cells being positive in every third is within what chance gives when cells are this correlated.
+- The worst single trade was -Rs 18,296 (-Rs 16,785 with the filter), against a daily limit of Rs 20,000 on one lot. A single gap would use almost all of the loss budget.
+- Adding the stop makes the same call rule worse (the stop trades are where the money goes), which is the opposite of what Zen is meant to do.
+- All 12 stop-and-reverse cells (Zen's actual structure, both sides) lost money in the last third, by between Rs 13,059 and Rs 108,126.
+
+### What cannot be known from this run
+
+- How Zen picks the side. The exit rules reproduce; none of our six side rules does. If Zen's side choice has an edge, it is not among these six.
+- Real fills. Bars have no bid or ask, the stop is filled at the trigger plus 2 points, and a live market stop would be worse.
+- Inside a 5-minute bar. The stop assumes the worst high; the target needs the close.
+- Anything outside 1 July 2025 to 27 October 2026, and only one market regime (a falling Nifty).
+- Untouched data: all 36 cells were run once on the full window and reported in thirds. There is no separate holdout beyond the last third, so a rule picked from this table would need new data before it is trusted.
+
+### Verdict
+
+No rule earns after costs in a way that survives. The exit rules of Zen are real (they reproduce), but run as Zen runs them, with any of the six side rules we could write down, the result lost money in the last third. The Zen in the catalogue is not changed.

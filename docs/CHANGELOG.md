@@ -10,6 +10,7 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Result of the intraday Zen test on real Upstox 5-minute option prices (docs/algos/stratzy-comparison.md): the replay reproduces Zen's 204 published trades (correlation +0.91), but of 36 pre-registered rule cells 34 lost money in the last third and the two survivors only sell call spreads into a falling Nifty. No edge found; the Zen in the catalogue is unchanged.
 - Intraday test of Zen's rules on real 5-minute option prices (docs/algos/intraday-test.md):
   a resumable Upstox downloader for expired Nifty weekly options (needs the Plus plan),
   a replay engine with the 10:15 entry, a 43.8-point stop that reverses, a target and the

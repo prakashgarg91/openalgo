@@ -43,6 +43,7 @@ made; the claim "faster than Stratzy" is unsupported.
 ## Still open
 
 - Zen's real rules (400-point spread sold at the money at about 10:15, fixed 43.8-point stop that reverses, VIX ceiling near 20) are written down in [stratzy-comparison.md](stratzy-comparison.md). Our Zen is still the 150-point overnight approximation. Whether the real rules earn needs 5-minute option prices for expired contracts: the downloader, replay and runner are built ([intraday-test.md](intraday-test.md)) and wait for an Upstox Plus token stored as an environment secret. Until that run validates against the 204 published trades, no change is made to the Zen in the catalogue.
+  Run on 2026-10-29: see "Zen's rules on real 5-minute option prices" in [stratzy-comparison.md](stratzy-comparison.md). The replay reproduces the published trades (correlation +0.91, total within 17%), but 34 of 36 pre-registered rule cells lost money in the last third and the two that did not (always sell the call spread, no stop) are a bet on a falling Nifty (t-statistic 1.3 and 1.8, worst trade -Rs 18,296 on one lot). No edge; the catalogue Zen is unchanged. Unknown: how Zen picks its side, and real fills.
 
 - Other algo families: ETF momentum rotation earned after costs on the history tested but is mostly equity and gold exposure ([universe-results.md](universe-results.md)); the rotation script has never run against a broker.
 
