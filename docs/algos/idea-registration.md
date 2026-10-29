@@ -56,3 +56,12 @@ A pass means only that the machinery and the pre-written numbers held in the per
 - Fills are modelled. Closing prices are not bids and asks.
 - A daily stop cannot guarantee a loss ceiling for overnight positions. Gaps can pass it.
 - Nothing here shows an edge. It only fixes what we will measure.
+
+## Amendments (version 2026-10-29-v1, written before the first ledger day, after review by GPT-6.1 Sol)
+
+1. Accounting contract for ideas 1 to 3 and their benchmarks, in `services/algos/etf_ledger.py`: every ledger starts as Rs 1,00,000 cash on its own; cash earns nothing and never goes negative; a signal uses closes through the previous session and trades at the next session's close; whole shares; sells first, then buys scaled to what the cash can pay including charges; leftover cash stays idle; costs are the itemised schedule in `services/algos/universe.py` (frozen as of this date) and the doubled-cost variant re-runs the sizing with every charge doubled.
+2. First signal date is 30 October 2026, so the first trade is the following session's close. Every ledger and benchmark starts from cash on that close. Month-end means the last stored session of a calendar month, judged from the next stored session.
+3. Benchmarks are held, not rebalanced: Rs 50,000 and Rs 50,000; Rs 40,000 and Rs 40,000 with Rs 20,000 cash; and, for each idea, an exposure-matched hold whose NIFTYBEES and GOLDBEES weights are the mean post-trade weights of that idea on a replay of 18 January 2013 to 29 October 2026 (written once to `db/etf_ledger/matched_weights.json`, never recomputed from forward results). Idea 1 averaged about 32 percent Nifty ETF and 21 percent gold ETF, idea 2 about 34 and 31, idea 3 about 42 and 37.
+4. Certification: forward results are labelled SHADOW and provisional because splits and distributions are not modelled and prices are raw closes. A missing close on a stored session blocks the run; it is never filled forward. A correction regenerates the affected sessions and the original output is kept.
+5. The nightly capture now also saves NIFTYBEES and GOLDBEES daily closes (about 14 months), and the Windows task runs `scripts/algo_backtest/run_etf_ledgers.py` after the capture. It places no order.
+6. Not built: orders, broker connection, a dashboard, an optimiser, new signals, or any change to a rule after seeing results.

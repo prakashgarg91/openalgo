@@ -135,8 +135,14 @@ def test_capture_context_stores_the_index_and_vix_and_survives_a_failure():
         return len(frame_)
 
     result = oc.capture_context("2026-10-29", history, store)
-    assert stored == [("NIFTY", "NSE_INDEX", "1m")]
-    assert result == {"index_candles": 1, "vix_days": 0, "failed": 1}
+    assert stored == [
+        ("NIFTY", "NSE_INDEX", "1m"),
+        ("NIFTYBEES", "NSE", "D"),
+        ("GOLDBEES", "NSE", "D"),
+    ]
+    assert result == {"index_candles": 1, "vix_days": 0, "etf_days": 2, "failed": 1}
+    etf_call = next(c for c in asked if c[0] == "NIFTYBEES")
+    assert etf_call[3] <= "2025-09-05"  # about 420 days back, enough for a 252-session window
     index_call = asked[0]
     assert index_call[3] < "2026-10-29" and index_call[4] == "2026-10-29"
 
@@ -183,4 +189,4 @@ def test_an_empty_context_answer_counts_as_a_failure_not_a_quiet_day():
         "2026-10-29", lambda *a: pd.DataFrame(), lambda *a: stored.append(a) or 0
     )
     assert stored == []
-    assert result == {"index_candles": 0, "vix_days": 0, "failed": 2}
+    assert result == {"index_candles": 0, "vix_days": 0, "etf_days": 0, "failed": 4}

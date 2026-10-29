@@ -16,4 +16,5 @@ uv run python scripts\algo_backtest\capture_option_candles.py >> log\capture.log
 set CAPTURE_RESULT=%errorlevel%
 rem Then read what is stored and update the forward shadow test (read only; places no order).
 uv run python scripts\algo_backtest\run_forward_shadow.py >> log\capture.log 2>&1
+uv run python scripts\algo_backtest\run_etf_ledgers.py >> log\capture.log 2>&1
 exit /b %CAPTURE_RESULT%

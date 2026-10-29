@@ -157,32 +157,39 @@ def paced(
 VIX_SYMBOL = "INDIAVIX"
 CONTEXT_DAYS_INDEX = 7
 CONTEXT_DAYS_VIX = 45
+ETF_SYMBOLS = (
+    "NIFTYBEES",
+    "GOLDBEES",
+)  # daily closes for the ETF ledgers (docs/algos/idea-registration.md)
+ETF_EXCHANGE = "NSE"
+CONTEXT_DAYS_ETF = 420  # a 252-session momentum window needs about 14 months of closes
 
 
 def capture_context(day: str, history: HistoryFn, store: StoreFn) -> dict:
-    """Save the Nifty index minutes and India VIX days that the forward shadow test reads.
+    """Save the Nifty index minutes, India VIX days and ETF daily closes that the forward tests read.
 
     The index minutes cover the last week so the previous session's close is always there, and
     India VIX covers about six weeks of daily closes. Each source is saved on its own: one that
     fails is counted and logged, and the other is still saved.
     """
     end = datetime.strptime(day, "%Y-%m-%d")
-    result = {"index_candles": 0, "vix_days": 0, "failed": 0}
+    result = {"index_candles": 0, "vix_days": 0, "etf_days": 0, "failed": 0}
     sources = (
-        ("index_candles", INDEX_SYMBOL, INTERVAL, CONTEXT_DAYS_INDEX),
-        ("vix_days", VIX_SYMBOL, "D", CONTEXT_DAYS_VIX),
+        ("index_candles", INDEX_SYMBOL, INDEX_EXCHANGE, INTERVAL, CONTEXT_DAYS_INDEX),
+        ("vix_days", VIX_SYMBOL, INDEX_EXCHANGE, "D", CONTEXT_DAYS_VIX),
+        *(("etf_days", sym, ETF_EXCHANGE, "D", CONTEXT_DAYS_ETF) for sym in ETF_SYMBOLS),
     )
-    for key, symbol, interval, back in sources:
+    for key, symbol, exchange, interval, back in sources:
         start = (end - timedelta(days=back)).strftime("%Y-%m-%d")
         try:
-            frame = history(symbol, INDEX_EXCHANGE, interval, start, day)
+            frame = history(symbol, exchange, interval, start, day)
             if frame is None or frame.empty:
                 # The broker layer turns a refused request into an empty frame, so an empty
                 # answer for a week of index minutes or six weeks of VIX is a failure, not a quiet day.
                 result["failed"] += 1
                 logger.error("No candles came back for %s", symbol)
                 continue
-            result[key] = store(frame, symbol, INDEX_EXCHANGE, interval)
+            result[key] += store(frame, symbol, exchange, interval)
         except Exception:
             result["failed"] += 1
             logger.exception("Could not capture %s", symbol)
