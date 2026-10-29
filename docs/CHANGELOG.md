@@ -10,6 +10,7 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Nightly capture of 1-minute candles for the active weekly Nifty option contracts (docs/algos/option-capture.md): a command to schedule each evening that saves them to the Historify database using the Upstox read-only token, so a later test of Zen's rules has data nobody has tuned to. No schema change. Read-only; places no order. Not yet run against a live feed.
 - Result of the intraday Zen test on real Upstox 5-minute option prices (docs/algos/stratzy-comparison.md): the replay reproduces Zen's 204 published trades (correlation +0.91), but of 36 pre-registered rule cells 34 lost money in the last third and the two survivors only sell call spreads into a falling Nifty. No edge found; the Zen in the catalogue is unchanged.
 - Intraday test of Zen's rules on real 5-minute option prices (docs/algos/intraday-test.md):
   a resumable Upstox downloader for expired Nifty weekly options (needs the Plus plan),
