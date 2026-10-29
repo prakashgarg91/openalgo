@@ -6,6 +6,7 @@ Nothing here places an order. It reads candles and writes them to the Historify 
 
 ## What it saves
 
+- The Nifty index minute candles of the last week and the India VIX daily closes of the last six weeks, which the forward shadow test ([forward-test-registration.md](forward-test-registration.md)) reads.
 - The nearest Nifty weekly expiry, calls and puts, 16 strikes either side of the at-the-money strike (about 800 points), taken from the Nifty close of the day.
 - One-minute candles for that day, with open interest, stored in Historify as exchange NFO, interval 1m. No schema change, so there is no migration to run.
 - Re-running the same day is safe: Historify updates rows instead of duplicating them.

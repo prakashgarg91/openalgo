@@ -47,9 +47,12 @@ def main() -> int:
     print(f"{len(contracts)} contracts for the {expiry} expiry around Nifty {spot:.0f}")
     if args.dry_run:
         return 0
-    result = oc.capture(contracts, args.day, history, oc.default_store())
+    store = oc.default_store()
+    result = oc.capture(contracts, args.day, history, store)
     print(result)
-    return 0 if result["failed"] == 0 else 2
+    context = oc.capture_context(args.day, history, store)
+    print(context)
+    return 0 if result["failed"] == 0 and context["failed"] == 0 else 2
 
 
 if __name__ == "__main__":

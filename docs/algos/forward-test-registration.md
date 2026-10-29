@@ -33,16 +33,26 @@ All gates must hold. Too few episodes at the end is "inconclusive", not a pass. 
 
 All three rules, including the control, and the 36 earlier cells. Any change to a rule, filter, exit, expiry choice or cost assumption is a new variant, is listed, and a repair that changes a trading decision restarts the sample under a new version.
 
-## Open points to settle in code before the first trade (not tuned afterwards)
+## Open points, settled in code before the first trade (version 2026-10-29-v1)
 
-- Whether the target near 10 points means profit taken or remaining value.
-- Which weekly expiry is used on expiry day.
-- Whether a reversal keeps the original next-day exit.
-- How the gap and VIX filters treat a reversal and a position held overnight.
-- Fill model: the capture holds candles, not bid and ask, so results stay provisional. If a stop and a target fall in one bar, the worse order is assumed.
+- Target near 10 points means the spread's remaining value at a candle close is 10 points or less, not profit taken.
+- Expiry: the nearest weekly on or after the day, so on expiry day it is that day. A position still held at the expiry close leaves there.
+- A reversal keeps the same exits as an entry (15:00 the next session, stop, target). It reverses only if the stop was hit the same day at or before 14:30, up to 3 times.
+- The VIX and gap filters are read once, at the first entry of a day, from the previous session's India VIX close and from P against the previous close. They do not apply to a reversal. A position held overnight blocks the next day's entry.
+- A missing number (no 09:15 or 10:14 index candle, no previous close, no VIX) means no entry that day, and the reason is counted. The previous session is the latest earlier date with index candles through 15:29; a day whose capture stopped early, or a VIX close missing for that date, is not used, so a missed evening can never feed a stale value into a decision.
+- The strike is the price at 10:14 rounded to the nearest 50 (an exact half rounds to the even hundred, as in the Zen replay).
+- Drawdown and the Rs 20,000 daily cap are marked to market using the worst spread value reached inside each session a position is held, not only the closing value. A day with no stored candle for a held position carries its last value forward.
+- A position on an expiry day that is only partly stored is treated as still open, not closed at a mid-session candle.
+- The report says "not due yet" until 252 sessions are stored; `all_gates` and a pass can only appear at that point.
+- No-trade days count as zero in the daily series used by the statistical gates.
+- Fills are candle prices at the open of the entry candle, with the stop taken at the pessimistic spread high plus 2 points. Costs are the conservative model already used in the Zen replay. A candle that could hold both a stop and a target takes the stop. Results stay provisional until checked against real bid and ask.
+
+## Where it runs
+
+Nothing here places an order, in sandbox mode or any other. One Nifty sandbox account cannot hold three independent books, so each rule is a separate shadow ledger replayed from the stored candles, which also makes every night's result repeatable. The code is `services/algos/forward_shadow.py` (rules, replay, gates; no database) and `forward_shadow_data.py` (reads Historify). `scripts/algo_backtest/run_forward_shadow.py` prints where the test stands and writes `db/forward_shadow/`; the Windows capture task runs it after each evening's capture. The capture now also saves the Nifty index minutes and India VIX days the rules need.
 
 ## Limits
 
 - An overnight position can gap through the Rs 20,000 daily cap. The spread limits the terminal loss (worst published trade on one lot was about Rs 13,300) but the cap is not guaranteed.
 - A sample without rising, falling and flat periods cannot show that a rule works in all weather.
-- Nothing has been built yet. This page is the registration, not a result.
+- The runner is built and tested on constructed days and on the first stored day (29 October 2026, one session). That is a working check, not a result. Any change to the code that alters a decision starts a new version and a new sample.

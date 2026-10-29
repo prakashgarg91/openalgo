@@ -115,3 +115,27 @@ def test_paced_raises_other_errors_unchanged():
         assert "bad symbol" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_capture_context_stores_the_index_and_vix_and_survives_a_failure():
+    stored = []
+    frame = pd.DataFrame(
+        {"timestamp": [1], "open": [1.0], "high": [1.0], "low": [1.0], "close": [1.0]}
+    )
+    asked = []
+
+    def history(symbol, exchange, interval, start, end):
+        asked.append((symbol, exchange, interval, start, end))
+        if symbol == "INDIAVIX":
+            raise RuntimeError("feed down")
+        return frame
+
+    def store(frame_, symbol, exchange, interval):
+        stored.append((symbol, exchange, interval))
+        return len(frame_)
+
+    result = oc.capture_context("2026-10-29", history, store)
+    assert stored == [("NIFTY", "NSE_INDEX", "1m")]
+    assert result == {"index_candles": 1, "vix_days": 0, "failed": 1}
+    index_call = asked[0]
+    assert index_call[3] < "2026-10-29" and index_call[4] == "2026-10-29"
