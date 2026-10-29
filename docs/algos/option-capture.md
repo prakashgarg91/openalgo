@@ -26,6 +26,8 @@ uv run python scripts/algo_backtest/capture_option_candles.py --dry-run
 0 16 * * 1-5  cd /path/to/openalgo && uv run python scripts/algo_backtest/capture_option_candles.py
 ```
 
+On Windows, double-click `scripts/algo_backtest/windows/install_capture_task.cmd` instead. It creates a Task Scheduler task, "OpenAlgo option capture", for Monday to Friday at 16:00 on the computer's clock, running `capture_option_candles.cmd` next to it, which writes to `log\capture.log`. Set the token once first with `setx UPSTOX_ANALYTICS_TOKEN your-token`, then sign out and back in. The computer must be on and you must be signed in at that time; a missed day is not made up. Check it with `schtasks /run /tn "OpenAlgo option capture"` and read `log\capture.log`. These two files were written on Linux and have not been run on Windows.
+
 It prints how many contracts it saved. On a market holiday it finds no Nifty candles, says so and saves nothing. A contract that fails is skipped and counted; the exit code is 2 if any failed.
 
 ## Reading it back
