@@ -9,5 +9,8 @@ if "%UPSTOX_ANALYTICS_TOKEN%"=="" (
   echo UPSTOX_ANALYTICS_TOKEN is not set for this Windows user. Run setx UPSTOX_ANALYTICS_TOKEN your-token once, then sign out and in. >> log\capture.log
   exit /b 1
 )
+rem Some antivirus programs (Avast) set SSLKEYLOGFILE to one of their own devices, which makes Python exit
+rem silently the moment it opens a secure connection. Clear it for this run only.
+set SSLKEYLOGFILE=
 uv run python scripts\algo_backtest\capture_option_candles.py >> log\capture.log 2>&1
 exit /b %errorlevel%
