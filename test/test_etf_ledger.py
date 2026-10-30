@@ -160,3 +160,50 @@ def test_exposure_matched_weights_are_the_mean_of_the_replay_weights():
     held = el.run_ledger("idea2", c, str(c.index[150].date()), matched=weights).rows
     assert held["ledger_id"].iloc[0] == "hold_matched_idea2"
     assert held["nifty_shares"].nunique() == 1  # bought once, never rebalanced
+
+
+def test_idea3_never_lets_the_invested_part_stay_above_its_cap_after_a_month_end():
+    idx = pd.bdate_range("2022-01-03", periods=700)
+    rising = pd.DataFrame(
+        {N: 100 * 1.003 ** np.arange(700), G: 50 * 1.003 ** np.arange(700)}, index=idx
+    )
+    rows = el.run_ledger("idea3", rising, str(idx[100].date())).rows.set_index("session")
+    invested = rows["nifty_shares"] * rows["nifty_close"] + rows["gold_shares"] * rows["gold_close"]
+    month_ends = [
+        d for d, nxt in zip(rows.index[:-1], rows.index[1:], strict=True) if nxt.month != d.month
+    ]
+    after = invested.loc[[rows.index[rows.index.get_loc(d) + 1] for d in month_ends]]
+    assert (after <= el.IDEA1_CAP * (el.TRIM_TOLERANCE + 0.01)).all()
+
+
+def _first_sessions_of_months(rows):
+    sessions = list(rows["session"])
+    return {d for prev, d in zip(sessions[:-1], sessions[1:], strict=True) if d.month != prev.month}
+
+
+@pytest.mark.parametrize(
+    ("idea", "cap", "days"), [("idea1", el.IDEA1_CAP, 600), ("idea2", el.SLEEVE, 400)]
+)
+def test_a_held_position_is_traded_only_to_open_it_or_trim_it_to_its_cap_at_a_month_end(
+    idea, cap, days
+):
+    idx = pd.bdate_range("2022-01-03", periods=days)
+    rising = pd.DataFrame(
+        {N: 100 * 1.003 ** np.arange(days), G: 50.0 + 0 * np.arange(days)}, index=idx
+    )
+    rows = el.run_ledger(idea, rising, str(idx[int(days * 0.5)].date())).rows
+    trades = rows[(rows["buy_notional"] > 0) | (rows["sell_notional"] > 0)]
+    later = trades.iloc[1:]
+    assert len(later) > 0 and set(later["session"]) <= _first_sessions_of_months(rows)
+    assert (later["buy_notional"] == 0).all()  # a trim sells, it never buys more
+    for session in later["session"]:
+        row = rows[rows["session"] == session].iloc[0]
+        assert row["nifty_shares"] * row["nifty_close"] <= cap * 1.02, (idea, session)
+
+
+def test_a_signal_that_never_changes_and_never_outgrows_the_cap_means_one_purchase():
+    idx = pd.bdate_range("2023-01-02", periods=400)
+    slow = pd.DataFrame({N: 100 + np.arange(400) * 0.01, G: 50 + np.arange(400) * 0.005}, index=idx)
+    rows = el.run_ledger("idea2", slow, str(idx[150].date())).rows
+    trades = rows[(rows["buy_notional"] > 0) | (rows["sell_notional"] > 0)]
+    assert len(trades) == 1

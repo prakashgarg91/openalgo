@@ -52,6 +52,7 @@ TREND_DAYS = 100
 IDEA1_CAP = 80_000.0
 SLEEVE = 40_000.0
 BAND = (0.40, 0.60)
+TRIM_TOLERANCE = 1.05  # a month-end trim happens only once a position is 5 percent over its cap
 
 
 class Blocked(Exception):
@@ -90,6 +91,20 @@ def _returns(series: pd.Series, i: int, n: int) -> float | None:
     return None if i < n else float(series.iloc[i] / series.iloc[i - n] - 1)
 
 
+def _hold_or(amount: float, symbol: str, book: Book, price: float, month_end: bool) -> float | None:
+    """What to hold in ``symbol``: a rupee target, or None for no trade.
+
+    A position that is held and whose signal is unchanged is kept as it is, so the cap is not re-bought
+    every month or every day as the price moves. But the cap is a cap: at a month end a position that has
+    grown more than TRIM_TOLERANCE past it is trimmed back to it, so exposure never compounds beyond what was registered.
+    """
+    if amount <= 0 or book.shares[symbol] == 0:
+        return amount
+    if month_end and book.shares[symbol] * price > amount * TRIM_TOLERANCE:
+        return amount
+    return None
+
+
 def targets(
     idea: str, closes: pd.DataFrame, i: int, book: Book, last: bool
 ) -> dict[str, float] | None:
@@ -107,14 +122,18 @@ def targets(
             return None
         best = max(r, key=lambda s: (r[s], s))
         pick = best if r[best] > 0 else None
-        return {s: (IDEA1_CAP if s == pick else 0.0) for s in (NIFTY, GOLD)}
+        return {
+            s: _hold_or(IDEA1_CAP if s == pick else 0.0, s, book, float(closes[s].iloc[i]), True)
+            for s in (NIFTY, GOLD)
+        }
     if idea == "idea2":
         if i + 1 < TREND_DAYS:
             return None
         out = {}
         for s in (NIFTY, GOLD):
             average = float(closes[s].iloc[i + 1 - TREND_DAYS : i + 1].mean())
-            out[s] = SLEEVE if float(closes[s].iloc[i]) > average else 0.0
+            want = SLEEVE if float(closes[s].iloc[i]) > average else 0.0
+            out[s] = _hold_or(want, s, book, float(closes[s].iloc[i]), month_end)
         return out
     if idea == "idea3":
         if last:
@@ -126,7 +145,12 @@ def targets(
             return None
         weight = held[NIFTY] / invested
         if BAND[0] <= weight <= BAND[1]:
-            return None
+            if invested <= IDEA1_CAP * TRIM_TOLERANCE:
+                return None
+            scale = (
+                IDEA1_CAP / invested
+            )  # inside the band but over the cap: trim both, keep the weights
+            return {NIFTY: held[NIFTY] * scale, GOLD: held[GOLD] * scale}
         half = min(invested, IDEA1_CAP) / 2
         return {NIFTY: half, GOLD: half}
     if idea == "hold_5050":
@@ -137,10 +161,11 @@ def targets(
 
 
 def trade(
-    book: Book, want: dict[str, float], prices: dict[str, float], costs: Costs
+    book: Book, want: dict[str, float | None], prices: dict[str, float], costs: Costs
 ) -> tuple[float, float]:
     """Move the book to the rupee targets at ``prices``. Returns (buy notional, sell notional)."""
     sell_total = buy_total = 0.0
+    want = {s: v for s, v in want.items() if v is not None}  # None: keep this holding untouched
     for s in sorted(want):
         target_shares = int(math.floor(want[s] / prices[s]))
         if target_shares < book.shares[s]:
