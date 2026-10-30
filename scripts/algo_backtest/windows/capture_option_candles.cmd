@@ -17,4 +17,6 @@ set CAPTURE_RESULT=%errorlevel%
 rem Then read what is stored and update the forward shadow test (read only; places no order).
 uv run python scripts\algo_backtest\run_forward_shadow.py >> log\capture.log 2>&1
 uv run python scripts\algo_backtest\run_etf_ledgers.py >> log\capture.log 2>&1
+rem Last, a read-only copy of the finished day for other tools (db\snapshots), so they never wait on a lock.
+uv run python scripts\algo_backtest\snapshot_historify.py >> log\capture.log 2>&1
 exit /b %CAPTURE_RESULT%
