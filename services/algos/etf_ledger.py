@@ -55,6 +55,13 @@ BAND = (0.40, 0.60)
 TRIM_TOLERANCE = 1.05  # a month-end trim happens only once a position is 5 percent over its cap
 
 
+def all_rules() -> tuple[str, ...]:
+    """Every rule that has a ledger: ideas 1 to 3 and the twelve candidates."""
+    from services.algos import etf_candidates
+
+    return (*IDEAS, *etf_candidates.NAMES)
+
+
 class Blocked(Exception):
     """Raised when the stored closes cannot be used (a session is missing one of the two closes)."""
 
@@ -112,6 +119,10 @@ def targets(
 
     ``last`` is True on the first execution of a ledger, when the starting allocation is bought.
     """
+    from services.algos import etf_candidates
+
+    if idea in etf_candidates.RULES:
+        return etf_candidates.RULES[idea](closes, i, book, is_month_end(closes, i))
     held = {s: book.shares[s] * float(closes[s].iloc[i]) for s in (NIFTY, GOLD)}
     month_end = is_month_end(closes, i)
     if idea == "idea1":
@@ -281,7 +292,9 @@ def run_all(
     """Every ledger in both cost variants, keyed ``<ledger>:<variant>``."""
     out: dict[str, Ledger] = {}
     for variant, costs in (("base", COSTS_V1), ("double", DOUBLE_COSTS)):
-        for name in (*IDEAS, *BENCHMARKS):
+        from services.algos import etf_candidates
+
+        for name in (*IDEAS, *BENCHMARKS, *etf_candidates.NAMES):
             out[f"{name}:{variant}"] = run_ledger(name, closes, start, costs, variant)
         for idea, weights in (matched or {}).items():
             out[f"hold_matched_{idea}:{variant}"] = run_ledger(

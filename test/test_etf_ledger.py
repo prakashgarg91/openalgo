@@ -149,7 +149,7 @@ def test_running_twice_gives_identical_rows_and_the_double_cost_variant_is_sized
     base, double = a["hold_5050:base"].rows.iloc[-1], a["hold_5050:double"].rows.iloc[-1]
     assert double["cumulative_cost"] > 1.9 * base["cumulative_cost"]
     assert double["nav"] < base["nav"]
-    assert len({k.split(":")[0] for k in a}) == len(el.IDEAS) + len(el.BENCHMARKS)
+    assert len({k.split(":")[0] for k in a}) == len(el.all_rules()) + len(el.BENCHMARKS)
 
 
 def test_exposure_matched_weights_are_the_mean_of_the_replay_weights():

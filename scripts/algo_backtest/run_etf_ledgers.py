@@ -59,7 +59,8 @@ def frozen_weights() -> dict[str, dict[str, float]] | None:
     ).dropna()
     start = str(history.index[REPLAY_WARMUP_SESSIONS].date())
     weights = {
-        idea: el.average_weights(el.run_ledger(idea, history, start).rows) for idea in el.IDEAS
+        idea: el.average_weights(el.run_ledger(idea, history, start).rows)
+        for idea in el.all_rules()
     }
     weights["window"] = f"{start} to {history.index[-1].date()}"
     OUT.mkdir(parents=True, exist_ok=True)
@@ -78,7 +79,9 @@ def main() -> int:
         print(f"Blocked: {why}. Nothing was run; fix or re-capture the closes and run again.")
         return 2
     weights = frozen_weights()
-    matched = {k: v for k, v in weights.items() if k in el.IDEAS} if weights is not None else None
+    matched = (
+        {k: v for k, v in weights.items() if k in el.all_rules()} if weights is not None else None
+    )
     ledgers = el.run_all(closes, FIRST_SIGNAL_DATE, matched)
     OUT.mkdir(parents=True, exist_ok=True)
     for key, ledger in ledgers.items():

@@ -33,14 +33,14 @@ def main() -> int:
         }
     ).dropna()
     start = str(closes.index[WARMUP].date())
-    weights = {i: el.average_weights(el.run_ledger(i, closes, start).rows) for i in el.IDEAS}
+    weights = {i: el.average_weights(el.run_ledger(i, closes, start).rows) for i in el.all_rules()}
     ledgers = el.run_all(closes, start, weights)
     years = (closes.index[-1] - pd.Timestamp(start)).days / 365.25
     print(
         f"Screening {start} to {closes.index[-1].date()} ({years:.1f} years, development data, NOT a test)"
     )
     print(
-        f"{'ledger':32s} {'CAGR':>6s} {'end Rs':>9s} {'deepest fall':>12s} {'worst day':>10s} {'costs':>7s}"
+        f"{"ledger":34s} {'CAGR':>6s} {'end Rs':>9s} {'deepest fall':>12s} {'worst day':>10s} {'costs':>7s}"
     )
     for key, led in ledgers.items():
         if not key.endswith(":base"):
@@ -48,7 +48,7 @@ def main() -> int:
         r = led.rows
         end = float(r["nav"].iloc[-1])
         print(
-            f"{key[:-5]:32s} {((end / el.CAPITAL) ** (1 / years) - 1) * 100:5.1f}% {end:9,.0f} "
+            f"{key[:-5]:34s} {((end / el.CAPITAL) ** (1 / years) - 1) * 100:5.1f}% {end:9,.0f} "
             f"{r['drawdown'].max():12,.0f} {r['daily_pnl'].min():10,.0f} {r['cumulative_cost'].iloc[-1]:7,.0f}"
         )
     print("Doubled costs, ending value:")
