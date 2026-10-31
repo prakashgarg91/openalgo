@@ -40,6 +40,8 @@ the source file in `docs/` and every reader sees the change.
 
 Research option data lives in the private repository `prakashgarg91/openalgo-data`, not here and not on a cloud session's disk. Where it is, how it is pulled and the daily broker login are in [`docs/algos/research-data.md`](docs/algos/research-data.md).
 
+**Session memory.** [`docs/algos/SESSION_MEMORY.md`](docs/algos/SESSION_MEMORY.md) carries the trader's standing rules, where things are, the daily routine and the current state between sessions; a start hook prints it. Read it first, and update it and commit it before a work block ends (what ran, numbers, what is running, the next step). No secrets in it.
+
 ## Skills
 
 Detailed procedures live in `.claude/skills/` and load on demand:
