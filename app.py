@@ -97,6 +97,7 @@ from blueprints.react_app import (  # Import React frontend blueprint
     react_bp,
     serve_react_app,
 )
+from blueprints.research import research_bp  # Research page: cross-market linkage study
 from blueprints.sandbox import sandbox_bp  # Import the sandbox blueprint
 from blueprints.scalping import scalping_bp  # Import the Scalping terminal blueprint
 from blueprints.search import search_bp
@@ -321,6 +322,7 @@ def create_app():
     app.register_blueprint(health_bp)  # Register Health monitoring blueprint
     app.register_blueprint(strategy_module_bp)  # Register Strategy Module blueprint
     app.register_blueprint(algos_bp)  # Register Algo Catalogue blueprint
+    app.register_blueprint(research_bp)  # Register Research page blueprint
     app.register_blueprint(phone_bp)  # Register phone sign-in blueprint
     app.register_blueprint(master_contract_status_bp)
     app.register_blueprint(websocket_bp)  # Register WebSocket example blueprint

@@ -626,6 +626,12 @@ def react_algos():
     return serve_react_app()
 
 
+# Research - cross-market linkage study
+@react_bp.route("/research", strict_slashes=False)
+def react_research():
+    return serve_react_app()
+
+
 # Leverage Configuration (Crypto)
 @react_bp.route("/leverage", strict_slashes=False)
 def react_leverage():

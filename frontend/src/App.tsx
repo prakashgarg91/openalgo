@@ -110,6 +110,7 @@ const FlowKeyboardShortcuts = lazy(() => import('@/pages/flow/FlowKeyboardShortc
 
 // Leverage page (crypto brokers only)
 const Algos = lazy(() => import('@/pages/Algos'))
+const Research = lazy(() => import('@/pages/Research'))
 const Leverage = lazy(() => import('@/pages/Leverage'))
 
 /** Route guard: only renders children if leverage_config is true, else redirects to dashboard */
@@ -237,6 +238,7 @@ function App() {
                 <Route path="/oiprofile" element={<OIProfile />} />
                 <Route path="/arbitrage" element={<Arbitrage />} />
                 <Route path="/algos" element={<Algos />} />
+                <Route path="/research" element={<Research />} />
                 <Route path="/strategybuilder" element={<StrategyBuilder />} />
                 <Route path="/strategybuilder/portfolio" element={<StrategyPortfolio />} />
                 {/* Legacy /tools/strategy paths — redirect to the new route. */}

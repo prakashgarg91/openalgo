@@ -31,6 +31,7 @@ Plain notes that carry context between Claude sessions. No secrets, ever: report
 - One-click Windows launcher: `scripts/algo_backtest/windows/download_research_data.cmd` (pulls the data repo, refreshes context data, resumes the option pull). A button inside the app does not exist yet.
 - Range model done (docs/algos/range-model-results.md): baseline (India VIX of D-1, range of D-1) stays; its 5 groups rank days well (top group 3.6x the bottom range).
 - NEXT STEP when all 109 expiries are in MANIFEST.csv: run ONCE `uv run --no-sync python scripts/algo_backtest/regime_spread_study.py /home/user/openalgo-data` (registration: docs/algos/regime-spread-registration.md; selection on the first two thirds, then the held-out third). `--check` only reports coverage. Do not run cells before the pull is complete. Index file `openalgo-data/index/nifty_1m.csv` (Nifty 1-minute, 20 Sep 2024 to 30 Oct 2026) was downloaded by `fetch_index_1m.py`; refresh if more days are needed.
+- Research page built (`/research`): `blueprints/research.py`, `frontend/src/pages/Research.tsx`, `frontend/src/components/research/LinkageMap.tsx`, data `docs/algos/research/linkage.json` from `scripts/algo_backtest/export_linkage_graph.py <data_repo>` (re-run it after any new study result). Verified in a browser (dark theme, mobile, no console errors). `frontend/dist` is rebuilt locally and never staged; CI builds it on main.
 - Goal in force: check status every 15 minutes (send_later chain), keep the option pull alive, finish analysis and building.
 - Zen result so far: exits reproduce, no side rule has an edge in the last third (34 of 36 cells lost). Catalogue Zen unchanged.
 - Plan agreed with the trader: find cross-market and sector links on the long daily history first (15+ years), keep only links with a written reason that were known before 10:15 India time, then translate survivors to spread outcomes on the option data, with the last third untouched and every trial counted. News and sentiment are deferred. NSE's site blocks the cloud session (403), so FII and DII flows need another route.
@@ -50,3 +51,4 @@ Plain notes that carry context between Claude sessions. No secrets, ever: report
 - 2026-10-31: attached `openalgo-data`, started the 109-expiry pull, added this file.
 - 2026-10-31: pushed 110 context series to the data repo.
 - 2026-10-31: linkage study run and recorded; one-click download launcher added.
+- 2026-10-31: Research page added.

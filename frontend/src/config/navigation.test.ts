@@ -10,7 +10,7 @@ import {
 describe('Navigation Config', () => {
   describe('navItems', () => {
     it('contains the expected main navigation items', () => {
-      expect(navItems).toHaveLength(10)
+      expect(navItems).toHaveLength(11)
 
       const labels = navItems.map((item) => item.label)
       expect(labels).toContain('Dashboard')
@@ -20,6 +20,7 @@ describe('Navigation Config', () => {
       expect(labels).toContain('Platforms')
       expect(labels).toContain('Trading')
       expect(labels).toContain('Strategies')
+      expect(labels).toContain('Research')
 
       // Algos is the page a new trader starts on, so it sits right after Dashboard and
       // never collapses into the More menu.

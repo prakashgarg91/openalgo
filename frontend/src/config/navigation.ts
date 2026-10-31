@@ -19,6 +19,7 @@ import {
   type LucideIcon,
   MessageCircle,
   MessageSquare,
+  Network,
   Search,
   Settings,
   TrendingUp,
@@ -45,6 +46,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/algos', label: 'Algos', icon: Bot },
+  { href: '/research', label: 'Research', icon: Network, collapseBelow: 'xl' },
   { href: '/orderbook', label: 'Orderbook', icon: ClipboardList },
   { href: '/tradebook', label: 'Tradebook', icon: FileText, collapseBelow: 'lg' },
   { href: '/positions', label: 'Positions', icon: TrendingUp },
