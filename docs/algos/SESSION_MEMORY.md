@@ -35,6 +35,7 @@ Plain notes that carry context between Claude sessions. No secrets, ever: report
 - Domino chain test done (docs/algos/domino-chain-results.md): foreign to sector/stock opening gaps is real (152 of 491 verified), but the second step to the Nifty after the open is almost absent (4 of 58); nothing usable. India VIX open in the Yahoo data is stale (90% equal to previous close): the VIX open is untested; CNXFIN and CNXMEDIA have one row each.
 - Literature notes + variance risk premium test done (docs/algos/literature-notes.md, vrp-results.md): premium positive in both halves (VIX above realised on 78% of days, +3.7 vol points) but fat-tailed; expected-premium gate FAILED (q5 minus q1 payoff -45, t -0.23). Remaining candidates: the range-group gate on option data; intraday momentum on Nifty 1-minute bars (not yet registered).
 - Research page now has a Chains tab. After any new study, rerun `scripts/algo_backtest/export_linkage_graph.py <data_repo>` and rebuild.
+- Multi-horizon study done (docs/algos/horizon-study-results.md): no direction predictor at 5 or 20 days (3 selected, 0 verified; joint R2 about 0); volatility is predictable (165 of 180 verified for 5-day) but the 3-input baseline (India VIX, own 20-day vol, 20-day return) beats the 288-input model (R2 0.553 vs 0.488). Conclusion across all studies: no market predicts Nifty direction after the open; keep VIX + range as the volatility input.
 - Goal in force: check status every 15 minutes (send_later chain), keep the option pull alive, finish analysis and building.
 - Zen result so far: exits reproduce, no side rule has an edge in the last third (34 of 36 cells lost). Catalogue Zen unchanged.
 - Plan agreed with the trader: find cross-market and sector links on the long daily history first (15+ years), keep only links with a written reason that were known before 10:15 India time, then translate survivors to spread outcomes on the option data, with the last third untouched and every trial counted. News and sentiment are deferred. NSE's site blocks the cloud session (403), so FII and DII flows need another route.
@@ -57,3 +58,4 @@ Plain notes that carry context between Claude sessions. No secrets, ever: report
 - 2026-10-31: Research page added.
 - 2026-10-31: domino chain test run and recorded.
 - 2026-10-31: literature notes, VRP test, chains tab.
+- 2026-10-31: multi-horizon study run and recorded.
