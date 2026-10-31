@@ -58,7 +58,7 @@ NAMES = {
     "TCS.NS": "TCS", "ITC.NS": "ITC", "LT.NS": "L&T", "SBIN.NS": "SBI", "AXISBANK.NS": "Axis Bank",
     "BHARTIARTL.NS": "Bharti Airtel", "KOTAKBANK.NS": "Kotak Bank", "HINDUNILVR.NS": "Hindustan Unilever",
     "BAJFINANCE.NS": "Bajaj Finance", "MARUTI.NS": "Maruti", "SUNPHARMA.NS": "Sun Pharma",
-    "TATAMOTORS.NS": "Tata Motors", "M"M&M.NS": "M&M",M.NS": "M&M", "M_M.NS": "M&M", "NTPC.NS": "NTPC", "ONGC.NS": "ONGC", "TATASTEEL.NS": "Tata Steel",
+    "TATAMOTORS.NS": "Tata Motors", "M&M.NS": "M&M", "M_M.NS": "M&M", "NTPC.NS": "NTPC", "ONGC.NS": "ONGC", "TATASTEEL.NS": "Tata Steel",
 }  # fmt: skip
 
 

@@ -206,7 +206,7 @@
   },
   {
    "id": "M_M.NS",
-   "label": "M_M",
+   "label": "M&M",
    "group": "india_heavyweights",
    "kind": "driver"
   },
@@ -3317,7 +3317,7 @@
     "driver": "EPI",
     "driver_label": "India fund (EPI)",
     "middle": "M_M.NS",
-    "middle_label": "M_M",
+    "middle_label": "M&M",
     "end": "range",
     "end_label": "Day's range",
     "stage1_beta": 0.0256,
@@ -3473,7 +3473,7 @@
     "driver": "_FVX",
     "driver_label": "US 5-year yield",
     "middle": "M_M.NS",
-    "middle_label": "M_M",
+    "middle_label": "M&M",
     "end": "range",
     "end_label": "Day's range",
     "stage1_beta": 0.0073,
@@ -3551,7 +3551,7 @@
     "driver": "_TNX",
     "driver_label": "US 10-year yield",
     "middle": "M_M.NS",
-    "middle_label": "M_M",
+    "middle_label": "M&M",
     "end": "range",
     "end_label": "Day's range",
     "stage1_beta": 0.0077,
@@ -3819,7 +3819,7 @@
    },
    {
     "middle": "M_M.NS",
-    "middle_label": "M_M",
+    "middle_label": "M&M",
     "end": "intraday",
     "end_label": "Move after the open",
     "beta_disc": 0.3513,
@@ -3830,7 +3830,7 @@
    },
    {
     "middle": "M_M.NS",
-    "middle_label": "M_M",
+    "middle_label": "M&M",
     "end": "range",
     "end_label": "Day's range",
     "beta_disc": -0.129,
