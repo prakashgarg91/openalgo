@@ -21,7 +21,7 @@ Method and thresholds: [linkage-study-registration.md](linkage-study-registratio
 
 ## What did not verify
 
-- **Intraday (open to close): nothing.** In 2008 to 2017 a rising US close was followed by a Nifty that kept rising after the open (twelve pairs, t near 4 to 5). In 2017 to 2026 the same pairs are slightly negative (S&P 500 slope -0.03, Nifty futures -0.04, India ETF EPI -0.08 with t = -2.1). None verified, seven flipped sign, and the joint model has an out-of-sample R-squared of -0.03. The market now prices the foreign signal at the open; what was an edge in the first half is gone in the second.
+- **Intraday (open to close): nothing.** In 2008 to 2017 a rising US close was followed by a Nifty that kept rising after the open (twelve pairs, t between 2.5 and 5.1). In 2017 to 2026 the same pairs are slightly negative (S&P 500 slope -0.03, Nifty futures -0.04, India ETF EPI -0.08 with t = -2.1). None verified, 11 of the 12 flipped sign, and the joint model has an out-of-sample R-squared of -0.03. The market now prices the foreign signal at the open; what was an edge in the first half is gone in the second.
 - Some sector and stock links flipped too (Axis Bank, SBI, Tata Steel, Energy and Auto indices).
 
 ## What it means for the algos
