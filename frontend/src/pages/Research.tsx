@@ -9,7 +9,9 @@ import {
   researchQueryKeys,
 } from '@/api/research'
 import { ChainMap } from '@/components/research/ChainMap'
+import { HorizonPanel } from '@/components/research/HorizonPanel'
 import { GROUP_COLOR, LinkageMap, statusLabel } from '@/components/research/LinkageMap'
+import { PremiumPanel } from '@/components/research/PremiumPanel'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -539,6 +541,31 @@ function HowToRead({ data }: { data: LinkageData }) {
             several steps (for example crude, then the rupee, then banks, then the Nifty).
           </li>
         </ul>
+        <div className="space-y-2">
+          <p className="font-medium">What each test found</p>
+          <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+            <li>
+              One day ahead (Map, All links): the US close explains the opening gap; nothing after
+              the open held up.
+            </li>
+            <li>
+              Chains (Chains): a foreign move does shift how sectors and stocks open, but the second
+              step to the Nifty is almost absent.
+            </li>
+            <li>
+              A week or a month ahead (Horizons): no direction predictor; volatility is predictable
+              and a three-number baseline is enough.
+            </li>
+            <li>
+              Premium (Premium): India VIX has paid more than it delivered, but with fat tails, and
+              selling only when it looks rich did not help.
+            </li>
+            <li>
+              Range (Models): India VIX and yesterday's range rank how wide a day will be; adding
+              other inputs did not improve it.
+            </li>
+          </ul>
+        </div>
         <Alert>
           <Info className="size-4" />
           <AlertDescription>
@@ -617,6 +644,8 @@ export default function Research() {
               <TabsTrigger value="map">Map</TabsTrigger>
               <TabsTrigger value="links">All links</TabsTrigger>
               <TabsTrigger value="chains">Chains</TabsTrigger>
+              <TabsTrigger value="horizons">Horizons</TabsTrigger>
+              <TabsTrigger value="premium">Premium</TabsTrigger>
               <TabsTrigger value="models">Models</TabsTrigger>
               <TabsTrigger value="read">How to read</TabsTrigger>
             </TabsList>
@@ -628,6 +657,12 @@ export default function Research() {
             </TabsContent>
             <TabsContent value="chains" className="mt-4">
               <ChainsTab data={query.data} />
+            </TabsContent>
+            <TabsContent value="horizons" className="mt-4">
+              {query.data.horizon ? <HorizonPanel data={query.data.horizon} /> : null}
+            </TabsContent>
+            <TabsContent value="premium" className="mt-4">
+              {query.data.vrp ? <PremiumPanel data={query.data.vrp} /> : null}
             </TabsContent>
             <TabsContent value="models" className="mt-4">
               <ModelsTab data={query.data} />

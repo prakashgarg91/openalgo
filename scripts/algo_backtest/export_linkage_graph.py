@@ -67,6 +67,95 @@ def label_for(stem: str) -> str:
 
 
 END_LABELS = {"intraday": "Move after the open", "range": "Day's range"}
+OUTCOME_LABELS = {
+    "ret5": "Return, next 5 days",
+    "ret20": "Return, next 20 days",
+    "lvol5": "Volatility, next 5 days",
+    "lvol20": "Volatility, next 20 days",
+    "dd5": "Worst fall, next 5 days",
+}
+DERIVED = {
+    "derived__ln_india_vix": "India VIX level",
+    "derived__own_rv20": "Nifty's own 20-day volatility",
+    "derived__us_over_india_vix": "US VIX relative to India VIX",
+    "derived__curve_10y_3m": "US yield curve (10-year minus 3-month)",
+}
+
+
+def horizon_label(name: str) -> str:
+    if name in DERIVED:
+        return DERIVED[name]
+    stem, _, w = name.partition("__r")
+    who = "Nifty" if stem == "_NSEI" else label_for(stem)
+    return f"{who}, {w}-day move"
+
+
+def vrp_block(folder: Path) -> dict:
+    v = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
+
+    def row(label: str, d: dict) -> dict:
+        return {
+            "label": label,
+            "days": d["days"],
+            "premium_pts": round(d["mean_premium"] * 100, 2),
+            "payoff": round(d["mean_payoff"] * 1e4, 1),
+            "t": round(d["t"], 1),
+            "positive": round(d["share_positive"], 3),
+            "worst": round(d["worst_1pct_payoff"] * 1e4),
+        }
+
+    return {
+        "periods": [
+            row("First half, 2008 to 2017", v["first_half"]),
+            row("Second half, 2017 to 2026", v["second_half"]),
+            row("All days", v["all"]),
+            row("All, without Feb to Apr 2020", v["all_without_crash_window"]),
+            row("Second half, without Feb to Apr 2020", v["second_half_without_crash_window"]),
+        ],
+        "quintiles": [
+            {**row(f"Group {q['quintile']}", q), "group": q["quintile"]}
+            for q in v["second_half_by_expected_premium"]
+        ],
+        "top_minus_bottom": {
+            "payoff": round(v["quintile5_minus_1"]["payoff"] * 1e4, 1),
+            "t": round(v["quintile5_minus_1"]["t"], 2),
+        },
+        "forecast_r2": round(v["har_r2_second_half"], 3),
+    }
+
+
+def horizon_block(folder: Path) -> dict:
+    v = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
+    ver = pd.read_csv(folder / "verification.csv")
+    top = (
+        ver[ver["verified"]].assign(a=lambda d: d["t_ver"].abs()).sort_values("a", ascending=False)
+    )
+    return {
+        "pairs_tried": v["pairs_tried"],
+        "selected": v["selected"],
+        "verified": v["verified"],
+        "chance_mean": round(v["chance"]["mean"], 4),
+        "outcomes": [
+            {"outcome": o, "label": OUTCOME_LABELS[o], **v["by_outcome"][o]} for o in OUTCOME_LABELS
+        ],
+        "joint_model": [
+            {
+                "label": OUTCOME_LABELS[m["outcome"]],
+                "r2_full": round(m["r2_full"], 4),
+                "r2_baseline": round(m["r2_baseline"], 4),
+            }
+            for m in v["joint_model"]
+        ],
+        "top_links": [
+            {
+                "input": horizon_label(r["input"]),
+                "outcome": OUTCOME_LABELS[r["outcome"]],
+                "beta_ver": round(float(r["beta_ver"]), 3),
+                "t_ver": round(float(r["t_ver"]), 1),
+            }
+            for _, r in top.head(14).iterrows()
+        ],
+    }
 
 
 def domino_block(folder: Path) -> dict:
@@ -179,6 +268,12 @@ def main() -> int:
     domino = repo / "research" / "domino"
     if (domino / "summary.json").exists():
         payload["domino"] = domino_block(domino)
+    for key, folder, fn in (
+        ("vrp", repo / "research" / "vrp", vrp_block),
+        ("horizon", repo / "research" / "horizon", horizon_block),
+    ):
+        if (folder / "summary.json").exists():
+            payload[key] = fn(folder)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=1), encoding="utf-8")
     print(f"{len(nodes)} nodes, {len(links)} links, {OUT.stat().st_size // 1024} KB -> {OUT}")

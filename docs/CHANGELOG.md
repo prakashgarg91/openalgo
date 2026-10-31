@@ -14,6 +14,7 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Research page Horizons and Premium tabs, and a one-line verdict for every study in How to read: the week-and-month-ahead study (no direction predictor, volatility baseline is enough) and the India VIX premium test (premium exists with fat tails, selling only when it looks rich did not help).
 - Research page Chains tab: foreign market to sector or stock to Nifty chains from the domino chain test, with the step-2 table. The second step is too weak to use.
 - Research page (`/research`, in the main navigation): a map of the foreign markets, sectors and Nifty heavyweights that move with the Nifty, with a table of every link tried, the models, and a plain-language reading guide. It reads `docs/algos/research/linkage.json`, written by `scripts/algo_backtest/export_linkage_graph.py` from the linkage study and the range model. It is research only: it places no order and no algo uses these links. Update OpenAlgo to get the page and the data. Two things to know: the intraday links reversed between 2008-2017 and 2017-2026, and news, institutional flows and multi-step chains are not covered.
 - `scripts/algo_backtest/fetch_upstox_expired_all.py`: downloads 5-minute candles of every expired weekly Nifty option the Upstox Plus plan serves (109 expiries from 3 Oct 2024) into a separate private data repository, one archive per expiry, committed and pushed as each finishes so a lost session resumes. It needs no local history folders. Upstox data should stay in a private repository; do not publish it.

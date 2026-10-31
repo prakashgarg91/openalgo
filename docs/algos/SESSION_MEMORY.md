@@ -59,3 +59,4 @@ Plain notes that carry context between Claude sessions. No secrets, ever: report
 - 2026-10-31: domino chain test run and recorded.
 - 2026-10-31: literature notes, VRP test, chains tab.
 - 2026-10-31: multi-horizon study run and recorded.
+- 2026-10-31: Research page now also has Horizons and Premium tabs (rerun export_linkage_graph.py after new studies).

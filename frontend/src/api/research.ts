@@ -86,6 +86,33 @@ export interface DominoData {
   stage2_pairs: DominoStage2Pair[]
 }
 
+export interface VrpRow {
+  label: string
+  days: number
+  premium_pts: number
+  payoff: number
+  t: number
+  positive: number
+  worst: number
+}
+
+export interface VrpData {
+  periods: VrpRow[]
+  quintiles: (VrpRow & { group: number })[]
+  top_minus_bottom: { payoff: number; t: number }
+  forecast_r2: number
+}
+
+export interface HorizonData {
+  pairs_tried: number
+  selected: number
+  verified: number
+  chance_mean: number
+  outcomes: { outcome: string; label: string; selected: number; verified: number }[]
+  joint_model: { label: string; r2_full: number; r2_baseline: number }[]
+  top_links: { input: string; outcome: string; beta_ver: number; t_ver: number }[]
+}
+
 export interface LinkageData {
   generated: string
   meta: {
@@ -104,6 +131,8 @@ export interface LinkageData {
   links: ResearchLink[]
   joint_model: JointModelRow[]
   domino?: DominoData
+  vrp?: VrpData
+  horizon?: HorizonData
   range_model: {
     models: RangeModelRow[]
     calibration: RangeCalibration[]

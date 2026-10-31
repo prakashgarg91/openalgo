@@ -3873,5 +3873,262 @@
     "verified": true
    }
   ]
+ },
+ "vrp": {
+  "periods": [
+   {
+    "label": "First half, 2008 to 2017",
+    "days": 2274,
+    "premium_pts": 4.13,
+    "payoff": 106.5,
+    "t": 2.5,
+    "positive": 0.77,
+    "worst": -2164
+   },
+   {
+    "label": "Second half, 2017 to 2026",
+    "days": 2275,
+    "premium_pts": 3.22,
+    "payoff": 42.2,
+    "t": 1.3,
+    "positive": 0.793,
+    "worst": -1386
+   },
+   {
+    "label": "All days",
+    "days": 4549,
+    "premium_pts": 3.67,
+    "payoff": 74.4,
+    "t": 2.7,
+    "positive": 0.781,
+    "worst": -2005
+   },
+   {
+    "label": "All, without Feb to Apr 2020",
+    "days": 4491,
+    "premium_pts": 3.85,
+    "payoff": 94.0,
+    "t": 4.2,
+    "positive": 0.786,
+    "worst": -1673
+   },
+   {
+    "label": "Second half, without Feb to Apr 2020",
+    "days": 2217,
+    "premium_pts": 3.56,
+    "payoff": 81.2,
+    "t": 7.3,
+    "positive": 0.803,
+    "worst": -731
+   }
+  ],
+  "quintiles": [
+   {
+    "label": "Group 1",
+    "days": 649,
+    "premium_pts": 2.87,
+    "payoff": 57.5,
+    "t": 2.8,
+    "positive": 0.77,
+    "worst": -1347,
+    "group": 1
+   },
+   {
+    "label": "Group 2",
+    "days": 665,
+    "premium_pts": 2.94,
+    "payoff": 48.1,
+    "t": 3.8,
+    "positive": 0.805,
+    "worst": -567,
+    "group": 2
+   },
+   {
+    "label": "Group 3",
+    "days": 508,
+    "premium_pts": 2.99,
+    "payoff": 15.8,
+    "t": 0.3,
+    "positive": 0.785,
+    "worst": -1075,
+    "group": 3
+   },
+   {
+    "label": "Group 4",
+    "days": 309,
+    "premium_pts": 4.12,
+    "payoff": 55.2,
+    "t": 0.8,
+    "positive": 0.819,
+    "worst": -587,
+    "group": 4
+   },
+   {
+    "label": "Group 5",
+    "days": 144,
+    "premium_pts": 5.0,
+    "payoff": 12.2,
+    "t": 0.1,
+    "positive": 0.819,
+    "worst": -8877,
+    "group": 5
+   }
+  ],
+  "top_minus_bottom": {
+   "payoff": -45.3,
+   "t": -0.23
+  },
+  "forecast_r2": 0.499
+ },
+ "horizon": {
+  "pairs_tried": 1420,
+  "selected": 260,
+  "verified": 190,
+  "chance_mean": 0.0547,
+  "outcomes": [
+   {
+    "outcome": "ret5",
+    "label": "Return, next 5 days",
+    "selected": 2,
+    "verified": 0
+   },
+   {
+    "outcome": "ret20",
+    "label": "Return, next 20 days",
+    "selected": 1,
+    "verified": 0
+   },
+   {
+    "outcome": "lvol5",
+    "label": "Volatility, next 5 days",
+    "selected": 180,
+    "verified": 165
+   },
+   {
+    "outcome": "lvol20",
+    "label": "Volatility, next 20 days",
+    "selected": 67,
+    "verified": 24
+   },
+   {
+    "outcome": "dd5",
+    "label": "Worst fall, next 5 days",
+    "selected": 10,
+    "verified": 1
+   }
+  ],
+  "joint_model": [
+   {
+    "label": "Return, next 5 days",
+    "r2_full": -0.0051,
+    "r2_baseline": -0.001
+   },
+   {
+    "label": "Return, next 20 days",
+    "r2_full": -0.0038,
+    "r2_baseline": 0.0018
+   },
+   {
+    "label": "Volatility, next 5 days",
+    "r2_full": 0.488,
+    "r2_baseline": 0.5532
+   },
+   {
+    "label": "Volatility, next 20 days",
+    "r2_full": 0.5617,
+    "r2_baseline": 0.6359
+   },
+   {
+    "label": "Worst fall, next 5 days",
+    "r2_full": 0.0506,
+    "r2_baseline": 0.0714
+   }
+  ],
+  "top_links": [
+   {
+    "input": "India VIX level",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": 0.4,
+    "t_ver": 15.5
+   },
+   {
+    "input": "India VIX level",
+    "outcome": "Volatility, next 20 days",
+    "beta_ver": 0.35,
+    "t_ver": 12.4
+   },
+   {
+    "input": "Nifty's own 20-day volatility",
+    "outcome": "Volatility, next 20 days",
+    "beta_ver": 0.28,
+    "t_ver": 6.9
+   },
+   {
+    "input": "Nifty's own 20-day volatility",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": 0.319,
+    "t_ver": 6.9
+   },
+   {
+    "input": "Maruti, 60-day move",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": -0.263,
+    "t_ver": -6.0
+   },
+   {
+    "input": "Bajaj Finance, 60-day move",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": -0.226,
+    "t_ver": -5.0
+   },
+   {
+    "input": "Sensex, 20-day move",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": -0.245,
+    "t_ver": -4.8
+   },
+   {
+    "input": "US yield curve (10-year minus 3-month)",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": 0.079,
+    "t_ver": 4.7
+   },
+   {
+    "input": "Nifty, 20-day move",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": -0.24,
+    "t_ver": -4.7
+   },
+   {
+    "input": "Sensex, 60-day move",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": -0.256,
+    "t_ver": -4.6
+   },
+   {
+    "input": "Nifty Realty, 20-day move",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": -0.196,
+    "t_ver": -4.5
+   },
+   {
+    "input": "Nifty, 60-day move",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": -0.248,
+    "t_ver": -4.5
+   },
+   {
+    "input": "Bank Nifty, 60-day move",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": -0.239,
+    "t_ver": -4.5
+   },
+   {
+    "input": "Nasdaq futures, 5-day move",
+    "outcome": "Volatility, next 5 days",
+    "beta_ver": -0.105,
+    "t_ver": -4.4
+   }
+  ]
  }
 }
