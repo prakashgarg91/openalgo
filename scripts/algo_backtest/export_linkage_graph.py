@@ -58,12 +58,55 @@ NAMES = {
     "TCS.NS": "TCS", "ITC.NS": "ITC", "LT.NS": "L&T", "SBIN.NS": "SBI", "AXISBANK.NS": "Axis Bank",
     "BHARTIARTL.NS": "Bharti Airtel", "KOTAKBANK.NS": "Kotak Bank", "HINDUNILVR.NS": "Hindustan Unilever",
     "BAJFINANCE.NS": "Bajaj Finance", "MARUTI.NS": "Maruti", "SUNPHARMA.NS": "Sun Pharma",
-    "TATAMOTORS.NS": "Tata Motors", "M&M.NS": "M&M", "NTPC.NS": "NTPC", "ONGC.NS": "ONGC", "TATASTEEL.NS": "Tata Steel",
+    "TATAMOTORS.NS": "Tata Motors", "M"M&M.NS": "M&M",M.NS": "M&M", "M_M.NS": "M&M", "NTPC.NS": "NTPC", "ONGC.NS": "ONGC", "TATASTEEL.NS": "Tata Steel",
 }  # fmt: skip
 
 
 def label_for(stem: str) -> str:
     return NAMES.get(stem) or stem.removesuffix(".NS").title()
+
+
+END_LABELS = {"intraday": "Move after the open", "range": "Day's range"}
+
+
+def domino_block(folder: Path) -> dict:
+    summary = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
+    chains = pd.read_csv(folder / "chains.csv")
+    stage2 = pd.read_csv(folder / "stage2.csv")
+    stage2 = stage2[stage2["selected"]]
+    return {
+        "stage1": {
+            "tried": summary["stage1"]["tried"], "selected": summary["stage1"]["selected"],
+            "verified": summary["stage1"]["verified"],
+            "chance_mean": round(summary["stage1"]["chance"]["mean"], 4),
+        },
+        "stage2": {
+            "tried": summary["stage2"]["tried"], "selected": summary["stage2"]["selected"],
+            "verified": summary["stage2"]["verified"],
+            "chance_mean": round(summary["stage2"]["chance"]["mean"], 4),
+        },
+        "chains": [
+            {
+                "driver": r["driver"], "driver_label": label_for(r["driver"]),
+                "middle": r["middle"], "middle_label": label_for(r["middle"]),
+                "end": r["end"], "end_label": END_LABELS[r["end"]],
+                "stage1_beta": round(float(r["stage1_beta"]), 4), "stage1_t": round(float(r["stage1_t"]), 2),
+                "stage2_beta": round(float(r["stage2_beta"]), 4), "stage2_t": round(float(r["stage2_t"]), 2),
+                "carried": bool(r["carried"]),
+            }
+            for _, r in chains.iterrows()
+        ],
+        "stage2_pairs": [
+            {
+                "middle": r["x"], "middle_label": label_for(r["x"]),
+                "end": r["y"], "end_label": END_LABELS[r["y"]],
+                "beta_disc": round(float(r["beta_disc"]), 4), "t_disc": round(float(r["t_disc"]), 2),
+                "beta_ver": round(float(r["beta_ver"]), 4), "t_ver": round(float(r["t_ver"]), 2),
+                "verified": bool(r["verified"]),
+            }
+            for _, r in stage2.iterrows()
+        ],
+    }  # fmt: skip
 
 
 def main() -> int:
@@ -133,6 +176,9 @@ def main() -> int:
             "top_to_bottom": round(rng["top_to_bottom"], 2),
         },
     }  # fmt: skip
+    domino = repo / "research" / "domino"
+    if (domino / "summary.json").exists():
+        payload["domino"] = domino_block(domino)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=1), encoding="utf-8")
     print(f"{len(nodes)} nodes, {len(links)} links, {OUT.stat().st_size // 1024} KB -> {OUT}")

@@ -46,6 +46,46 @@ export interface RangeCalibration {
   mean_range_pct: number
 }
 
+export interface DominoChain {
+  driver: string
+  driver_label: string
+  middle: string
+  middle_label: string
+  end: string
+  end_label: string
+  stage1_beta: number
+  stage1_t: number
+  stage2_beta: number
+  stage2_t: number
+  carried: boolean
+}
+
+export interface DominoStage {
+  tried: number
+  selected: number
+  verified: number
+  chance_mean: number
+}
+
+export interface DominoStage2Pair {
+  middle: string
+  middle_label: string
+  end: string
+  end_label: string
+  beta_disc: number
+  t_disc: number
+  beta_ver: number
+  t_ver: number
+  verified: boolean
+}
+
+export interface DominoData {
+  stage1: DominoStage
+  stage2: DominoStage
+  chains: DominoChain[]
+  stage2_pairs: DominoStage2Pair[]
+}
+
 export interface LinkageData {
   generated: string
   meta: {
@@ -63,6 +103,7 @@ export interface LinkageData {
   nodes: ResearchNode[]
   links: ResearchLink[]
   joint_model: JointModelRow[]
+  domino?: DominoData
   range_model: {
     models: RangeModelRow[]
     calibration: RangeCalibration[]

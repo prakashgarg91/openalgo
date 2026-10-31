@@ -8,6 +8,7 @@ import {
   type ResearchLink,
   researchQueryKeys,
 } from '@/api/research'
+import { ChainMap } from '@/components/research/ChainMap'
 import { GROUP_COLOR, LinkageMap, statusLabel } from '@/components/research/LinkageMap'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -307,6 +308,117 @@ function LinksTab({ data }: { data: LinkageData }) {
   )
 }
 
+function ChainsTab({ data }: { data: LinkageData }) {
+  const [selected, setSelected] = useState<string | null>(null)
+  const d = data.domino
+  if (!d) {
+    return (
+      <Alert>
+        <Info className="size-4" />
+        <AlertDescription>The chain results are not in this copy yet.</AlertDescription>
+      </Alert>
+    )
+  }
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat
+          label="Step 1: foreign move to a sector or stock"
+          value={`${d.stage1.verified} of ${d.stage1.selected}`}
+          hint={`held up; ${pct(d.stage1.chance_mean)} expected by luck`}
+        />
+        <Stat
+          label="Step 2: that gap to the Nifty after the open"
+          value={`${d.stage2.verified} of ${d.stage2.selected}`}
+          hint={`held up; ${pct(d.stage2.chance_mean)} expected by luck`}
+        />
+        <Stat
+          label="Chains through both steps"
+          value={String(d.chains.length)}
+          hint={`really ${new Set(d.chains.map((c) => `${c.middle}|${c.end}`)).size} second steps`}
+        />
+        <Stat
+          label="Usable as an algo input"
+          value="None"
+          hint="the second step is too weak and decays"
+        />
+      </div>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">
+            Foreign market to sector or stock to the Nifty
+          </CardTitle>
+          <CardDescription>
+            Left to right: a foreign move, the sector or stock that opens differently because of it,
+            and what the Nifty does after the open. Green means the same direction, red the
+            opposite. Click any name to follow its chains.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChainMap chains={d.chains} selected={selected} onSelect={setSelected} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Step 2 on its own: every link found</CardTitle>
+          <CardDescription>
+            Does a sector or stock opening stronger than the Nifty predict the Nifty's day? Only the
+            ones marked held up passed the later period.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Sector or stock</TableHead>
+                <TableHead>Affects</TableHead>
+                <TableHead className="text-right">Effect, first period</TableHead>
+                <TableHead className="text-right">Effect, second period</TableHead>
+                <TableHead>Result</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...d.stage2_pairs]
+                .sort(
+                  (a, b) =>
+                    Number(b.verified) - Number(a.verified) || Math.abs(b.t_ver) - Math.abs(a.t_ver)
+                )
+                .map((p) => (
+                  <TableRow key={`${p.middle}-${p.end}`}>
+                    <TableCell className="font-medium">{p.middle_label}</TableCell>
+                    <TableCell>{p.end_label}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.beta_disc.toFixed(3)} ({p.t_disc.toFixed(1)})
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.beta_ver.toFixed(3)} ({p.t_ver.toFixed(1)})
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          'font-normal',
+                          p.verified ? STATUS_TONE.verified : STATUS_TONE.flipped
+                        )}
+                      >
+                        {p.verified ? 'Held up' : 'Did not hold'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+          <p className="mt-3 text-sm text-muted-foreground">
+            The numbers in brackets are the strength of the link. The one link to the move after the
+            open (Tata Steel) fell to a fifth of its first-period size. The measure is open to
+            close, so it includes the first hour that a 10:15 entry cannot trade.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function ModelsTab({ data }: { data: LinkageData }) {
   const names = new Map(data.nodes.map((n) => [n.id, n.label]))
   const top = Math.max(...data.range_model.calibration.map((c) => c.mean_range_pct))
@@ -504,6 +616,7 @@ export default function Research() {
             <TabsList>
               <TabsTrigger value="map">Map</TabsTrigger>
               <TabsTrigger value="links">All links</TabsTrigger>
+              <TabsTrigger value="chains">Chains</TabsTrigger>
               <TabsTrigger value="models">Models</TabsTrigger>
               <TabsTrigger value="read">How to read</TabsTrigger>
             </TabsList>
@@ -512,6 +625,9 @@ export default function Research() {
             </TabsContent>
             <TabsContent value="links" className="mt-4">
               <LinksTab data={query.data} />
+            </TabsContent>
+            <TabsContent value="chains" className="mt-4">
+              <ChainsTab data={query.data} />
             </TabsContent>
             <TabsContent value="models" className="mt-4">
               <ModelsTab data={query.data} />
