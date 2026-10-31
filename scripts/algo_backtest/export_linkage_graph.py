@@ -82,6 +82,56 @@ DERIVED = {
 }
 
 
+SIDE_LABELS = {"A": "Continuation", "B": "Opening-move fade", "C": "Always sell calls"}
+CONDITION_LABELS = {
+    "all": "All days",
+    "volatile": "Volatile days",
+    "calm": "Calm days",
+    "expiry": "Expiry days",
+}
+PREDICTOR_LABELS = {
+    "first30": "First half-hour",
+    "prev30": "Half-hour before the last",
+    "gap": "Opening gap",
+}
+
+
+def spread_block(folder: Path) -> dict:
+    sel = json.loads((folder / "selection.json").read_text(encoding="utf-8"))["cells"]
+    held = json.loads((folder / "held_out.json").read_text(encoding="utf-8"))
+    rows = []
+    for side in ("A", "B", "C"):
+        for gate, gate_label in (("none", "No gate"), ("g12", "Only the two calmest groups")):
+            key = f"{side}_{gate}"
+            rows.append(
+                {
+                    "rule": SIDE_LABELS[side], "gate": gate_label,
+                    "sel_episodes": sel[key]["episodes"], "sel_net": round(sel[key]["net"]),
+                    "sel_net_2x": round(sel[key]["net_double_cost"]),
+                    "held_episodes": held["cells"][key]["episodes"], "held_net": round(held["cells"][key]["net"]),
+                    "held_net_2x": round(held["cells"][key]["net_double_cost"]),
+                    "held_drawdown": round(held["cells"][key]["max_drawdown"]),
+                }
+            )  # fmt: skip
+    return {"rows": rows, "qualified": 0, "cells": 12, "cells_lost_held": held["cells_lost_money"]}
+
+
+def momentum_block(folder: Path) -> dict:
+    v = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
+    return {
+        "sessions": v["sessions"], "joint_r2": round(v["joint_r2_second_half"], 3),
+        "pairs": [
+            {
+                "condition": CONDITION_LABELS[p["condition"]], "predictor": PREDICTOR_LABELS[p["predictor"]],
+                "beta_first": round(p["beta_first"], 3), "t_first": round(p["t_first"], 2),
+                "beta_second": round(p["beta_second"], 3), "t_second": round(p["t_second"], 2),
+                "verified": bool(p["verified"]),
+            }
+            for p in v["pairs"]
+        ],
+    }  # fmt: skip
+
+
 def horizon_label(name: str) -> str:
     if name in DERIVED:
         return DERIVED[name]
@@ -271,8 +321,10 @@ def main() -> int:
     for key, folder, fn in (
         ("vrp", repo / "research" / "vrp", vrp_block),
         ("horizon", repo / "research" / "horizon", horizon_block),
+        ("spread", repo / "research" / "regime_spread", spread_block),
+        ("momentum", repo / "research" / "intraday_momentum", momentum_block),
     ):
-        if (folder / "summary.json").exists():
+        if (folder / ("held_out.json" if key == "spread" else "summary.json")).exists():
             payload[key] = fn(folder)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=1), encoding="utf-8")

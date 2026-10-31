@@ -11,6 +11,7 @@ import {
 import { ChainMap } from '@/components/research/ChainMap'
 import { HorizonPanel } from '@/components/research/HorizonPanel'
 import { GROUP_COLOR, LinkageMap, statusLabel } from '@/components/research/LinkageMap'
+import { OptionTestsPanel } from '@/components/research/OptionTestsPanel'
 import { PremiumPanel } from '@/components/research/PremiumPanel'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -646,6 +647,7 @@ export default function Research() {
               <TabsTrigger value="chains">Chains</TabsTrigger>
               <TabsTrigger value="horizons">Horizons</TabsTrigger>
               <TabsTrigger value="premium">Premium</TabsTrigger>
+              <TabsTrigger value="options">Option tests</TabsTrigger>
               <TabsTrigger value="models">Models</TabsTrigger>
               <TabsTrigger value="read">How to read</TabsTrigger>
             </TabsList>
@@ -663,6 +665,9 @@ export default function Research() {
             </TabsContent>
             <TabsContent value="premium" className="mt-4">
               {query.data.vrp ? <PremiumPanel data={query.data.vrp} /> : null}
+            </TabsContent>
+            <TabsContent value="options" className="mt-4">
+              <OptionTestsPanel spread={query.data.spread} momentum={query.data.momentum} />
             </TabsContent>
             <TabsContent value="models" className="mt-4">
               <ModelsTab data={query.data} />

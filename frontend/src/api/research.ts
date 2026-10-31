@@ -113,6 +113,39 @@ export interface HorizonData {
   top_links: { input: string; outcome: string; beta_ver: number; t_ver: number }[]
 }
 
+export interface SpreadRow {
+  rule: string
+  gate: string
+  sel_episodes: number
+  sel_net: number
+  sel_net_2x: number
+  held_episodes: number
+  held_net: number
+  held_net_2x: number
+  held_drawdown: number
+}
+
+export interface SpreadData {
+  rows: SpreadRow[]
+  qualified: number
+  cells: number
+  cells_lost_held: number
+}
+
+export interface MomentumData {
+  sessions: number
+  joint_r2: number
+  pairs: {
+    condition: string
+    predictor: string
+    beta_first: number
+    t_first: number
+    beta_second: number
+    t_second: number
+    verified: boolean
+  }[]
+}
+
 export interface LinkageData {
   generated: string
   meta: {
@@ -133,6 +166,8 @@ export interface LinkageData {
   domino?: DominoData
   vrp?: VrpData
   horizon?: HorizonData
+  spread?: SpreadData
+  momentum?: MomentumData
   range_model: {
     models: RangeModelRow[]
     calibration: RangeCalibration[]

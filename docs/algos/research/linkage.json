@@ -4130,5 +4130,192 @@
     "t_ver": -4.4
    }
   ]
+ },
+ "spread": {
+  "rows": [
+   {
+    "rule": "Continuation",
+    "gate": "No gate",
+    "sel_episodes": 220,
+    "sel_net": -92386,
+    "sel_net_2x": -180238,
+    "held_episodes": 94,
+    "held_net": -65782,
+    "held_net_2x": -104746,
+    "held_drawdown": 97761
+   },
+   {
+    "rule": "Continuation",
+    "gate": "Only the two calmest groups",
+    "sel_episodes": 214,
+    "sel_net": -108327,
+    "sel_net_2x": -194754,
+    "held_episodes": 82,
+    "held_net": -66446,
+    "held_net_2x": -98761,
+    "held_drawdown": 80495
+   },
+   {
+    "rule": "Opening-move fade",
+    "gate": "No gate",
+    "sel_episodes": 216,
+    "sel_net": -83242,
+    "sel_net_2x": -171183,
+    "held_episodes": 96,
+    "held_net": -59811,
+    "held_net_2x": -101213,
+    "held_drawdown": 72675
+   },
+   {
+    "rule": "Opening-move fade",
+    "gate": "Only the two calmest groups",
+    "sel_episodes": 210,
+    "sel_net": -65557,
+    "sel_net_2x": -147951,
+    "held_episodes": 84,
+    "held_net": -65287,
+    "held_net_2x": -98356,
+    "held_drawdown": 72163
+   },
+   {
+    "rule": "Always sell calls",
+    "gate": "No gate",
+    "sel_episodes": 218,
+    "sel_net": -21582,
+    "sel_net_2x": -111251,
+    "held_episodes": 93,
+    "held_net": -9858,
+    "held_net_2x": -47697,
+    "held_drawdown": 39860
+   },
+   {
+    "rule": "Always sell calls",
+    "gate": "Only the two calmest groups",
+    "sel_episodes": 212,
+    "sel_net": -18499,
+    "sel_net_2x": -105462,
+    "held_episodes": 81,
+    "held_net": -27015,
+    "held_net_2x": -58778,
+    "held_drawdown": 39860
+   }
+  ],
+  "qualified": 0,
+  "cells": 12,
+  "cells_lost_held": 12
+ },
+ "momentum": {
+  "sessions": 1107,
+  "joint_r2": -0.028,
+  "pairs": [
+   {
+    "condition": "All days",
+    "predictor": "First half-hour",
+    "beta_first": -0.05,
+    "t_first": -1.11,
+    "beta_second": 0.036,
+    "t_second": 1.31,
+    "verified": false
+   },
+   {
+    "condition": "All days",
+    "predictor": "Half-hour before the last",
+    "beta_first": 0.015,
+    "t_first": 0.19,
+    "beta_second": -0.139,
+    "t_second": -1.76,
+    "verified": false
+   },
+   {
+    "condition": "All days",
+    "predictor": "Opening gap",
+    "beta_first": 0.011,
+    "t_first": 0.54,
+    "beta_second": -0.025,
+    "t_second": -1.06,
+    "verified": false
+   },
+   {
+    "condition": "Volatile days",
+    "predictor": "First half-hour",
+    "beta_first": -0.034,
+    "t_first": -0.51,
+    "beta_second": -0.001,
+    "t_second": -0.02,
+    "verified": false
+   },
+   {
+    "condition": "Volatile days",
+    "predictor": "Half-hour before the last",
+    "beta_first": 0.023,
+    "t_first": 0.22,
+    "beta_second": -0.232,
+    "t_second": -2.62,
+    "verified": false
+   },
+   {
+    "condition": "Volatile days",
+    "predictor": "Opening gap",
+    "beta_first": 0.013,
+    "t_first": 0.5,
+    "beta_second": 0.004,
+    "t_second": 0.26,
+    "verified": false
+   },
+   {
+    "condition": "Calm days",
+    "predictor": "First half-hour",
+    "beta_first": -0.073,
+    "t_first": -2.36,
+    "beta_second": 0.084,
+    "t_second": 1.91,
+    "verified": false
+   },
+   {
+    "condition": "Calm days",
+    "predictor": "Half-hour before the last",
+    "beta_first": 0.038,
+    "t_first": 0.4,
+    "beta_second": 0.006,
+    "t_second": 0.08,
+    "verified": false
+   },
+   {
+    "condition": "Calm days",
+    "predictor": "Opening gap",
+    "beta_first": 0.005,
+    "t_first": 0.21,
+    "beta_second": -0.082,
+    "t_second": -2.11,
+    "verified": false
+   },
+   {
+    "condition": "Expiry days",
+    "predictor": "First half-hour",
+    "beta_first": -0.02,
+    "t_first": -0.38,
+    "beta_second": 0.034,
+    "t_second": 0.72,
+    "verified": false
+   },
+   {
+    "condition": "Expiry days",
+    "predictor": "Half-hour before the last",
+    "beta_first": 0.122,
+    "t_first": 1.07,
+    "beta_second": -0.116,
+    "t_second": -0.63,
+    "verified": false
+   },
+   {
+    "condition": "Expiry days",
+    "predictor": "Opening gap",
+    "beta_first": 0.048,
+    "t_first": 1.29,
+    "beta_second": -0.047,
+    "t_second": -2.94,
+    "verified": false
+   }
+  ]
  }
 }

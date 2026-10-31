@@ -15,6 +15,7 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Research page Option tests tab: the regime-gated spread results and the intraday momentum results.
 - Regime-gated spread test results (docs/algos/regime-spread-results.md): on 108 expired weekly Nifty expiries all twelve cells (three side rules by four range gates) lose money in the selection period and in the held-out third, and none qualifies. The range gate does not rescue the structure.
 - Intraday momentum on the Nifty run once on 1,107 sessions (docs/algos/intraday-momentum-results.md): 12 pairs, none verified in the second half, joint out-of-sample R-squared -0.028; the first half-hour effect published for the S&P 500 is not present on the Nifty in 2022 to 2026. Also a nightly data check (scripts/algo_backtest/check_nightly.py, written by an AWF GLM worker and reviewed here) that says in plain words when a day's candles, VIX or ETF closes did not arrive. The 16:00 Windows task ran by itself on 30 October.
 - Research page Horizons and Premium tabs, and a one-line verdict for every study in How to read: the week-and-month-ahead study (no direction predictor, volatility baseline is enough) and the India VIX premium test (premium exists with fat tails, selling only when it looks rich did not help).
