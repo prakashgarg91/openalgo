@@ -26,7 +26,9 @@ Plain notes that carry context between Claude sessions. No secrets, ever: report
 ## Current state (update this section)
 
 - Option data pull: `uv run --no-sync python scripts/algo_backtest/fetch_upstox_expired_all.py /home/user/openalgo-data 2024-10-01 2026-10-31 --sleep 1.0 >> log/data_pull.log`. Resumes from `MANIFEST.csv`. 109 expiries (3 Oct 2024 to 27 Oct 2026), 7,907 requests, about 3.5 hours at 1.0 s. Upstox limit is 2,000 requests per 30 minutes; stay under it.
+- Context data (done 2026-10-31): `openalgo-data/context/{daily,hourly,min5}/<symbol>.csv` and `context/MANIFEST.csv` from `scripts/algo_backtest/fetch_context_data.py` (Yahoo, no login). 110 series: US and global risk, US futures, FX, commodities, Asia, Europe, India sector indices, 20 Nifty heavyweights; daily since 1970 to 2007 depending on series (Nifty 2007, India VIX 2008), hourly about 2 years and 5-minute about 60 days for 18 key series (5-minute is a rolling snapshot: refresh it, or it is lost). TATAMOTORS.NS returned nothing (symbol changed after the demerger; use the new ticker). Timestamps are UTC.
 - Zen result so far: exits reproduce, no side rule has an edge in the last third (34 of 36 cells lost). Catalogue Zen unchanged.
+- Plan agreed with the trader: find cross-market and sector links on the long daily history first (15+ years), keep only links with a written reason that were known before 10:15 India time, then translate survivors to spread outcomes on the option data, with the last third untouched and every trial counted. News and sentiment are deferred. NSE's site blocks the cloud session (403), so FII and DII flows need another route.
 - Next: when the pull is complete, write the pre-registered test plan for a regime-aware rule set (choose on the early part, hold back the last third), then run it once.
 
 ## Gotchas that cost time
@@ -41,3 +43,4 @@ Plain notes that carry context between Claude sessions. No secrets, ever: report
 ## Log
 
 - 2026-10-31: attached `openalgo-data`, started the 109-expiry pull, added this file.
+- 2026-10-31: pushed 110 context series to the data repo.
