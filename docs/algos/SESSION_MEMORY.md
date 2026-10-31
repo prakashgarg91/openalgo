@@ -60,3 +60,4 @@ Plain notes that carry context between Claude sessions. No secrets, ever: report
 - 2026-10-31: literature notes, VRP test, chains tab.
 - 2026-10-31: multi-horizon study run and recorded.
 - 2026-10-31: Research page now also has Horizons and Premium tabs (rerun export_linkage_graph.py after new studies).
+- 2026-10-31 (cloud): the cloud option pull died once because the data repo moved (the trader's local session pushed the extended Nifty 1-minute file and the intraday momentum table). Fix: `git -C /home/user/openalgo-data pull --rebase origin main`, then restart the fetch. Both machines push to the data repo, so always pull --rebase before restarting. The intraday momentum test is done (0 of 12 verified, docs/algos/intraday-momentum-results.md): do not rerun. Remaining: regime-gated spread test once the manifest has 109 expiries, then add it and the momentum result to the Research page.
