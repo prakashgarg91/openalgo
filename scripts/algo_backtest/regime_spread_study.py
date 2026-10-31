@@ -13,6 +13,7 @@ import json
 import sys
 import tarfile
 import tempfile
+from datetime import time as dtime
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +27,9 @@ from services.algos.intraday import OptionBars  # noqa: E402
 MIN_SELECT_EPISODES = 60
 MIN_HELD_EPISODES = 30
 SIDES = ("A", "B", "C")
+OPTION_LAST_BAR = dtime(
+    15, 25
+)  # the last 5-minute bar of a full session in the expired-contract data
 
 
 def read_daily(path: Path) -> pd.DataFrame:
@@ -80,7 +84,7 @@ def cell_metrics(result: fs.ShadowResult, days: list[pd.Timestamp]) -> dict:
 
 def run_cell(side: str, gate: str, bars, index, vix, days, grp) -> fs.ShadowResult:
     allowed = {d for d in days if d in grp.index and rg.GATES[gate](int(grp[d]))}
-    return fs.simulate_rule(side, rg.GatedBars(bars, allowed), index, vix)
+    return fs.simulate_rule(side, rg.GatedBars(bars, allowed), index, vix, last_bar=OPTION_LAST_BAR)
 
 
 def main() -> int:

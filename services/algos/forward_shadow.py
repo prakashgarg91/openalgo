@@ -174,8 +174,14 @@ def simulate_rule(
     vix_daily: pd.Series,
     rules: Rules = REGISTERED,
     model: lab.Model | None = None,
+    last_bar: dtime = LAST_INDEX_CANDLE,
 ) -> ShadowResult:
-    """Replay one side rule over every stored session, oldest first."""
+    """Replay one side rule over every stored session, oldest first.
+
+    ``last_bar`` is the start time of the last candle of a full session in the option data: 15:29 for
+    the 1-minute candles of the nightly capture (the default), 15:25 for 5-minute expired-contract bars.
+    An expiry-day exit earlier than it means the day is only partly stored and the position stays open.
+    """
     model = model or lab.CONSERVATIVE
     result = ShadowResult(rule)
     free_at = pd.Timestamp.min
@@ -221,11 +227,7 @@ def simulate_rule(
                 break
             sold, long_, pair, entry = opened
             walk = intraday.walk_position(pair, ts, entry[0] - entry[1], expiry, rules)
-            if (
-                walk is not None
-                and walk.reason == "expiry"
-                and walk.exit_ts.time() < LAST_INDEX_CANDLE
-            ):
+            if walk is not None and walk.reason == "expiry" and walk.exit_ts.time() < last_bar:
                 walk = None  # the expiry day is only partly stored: the position is still open
             if walk is None:
                 held = pair.loc[ts:]

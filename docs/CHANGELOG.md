@@ -10,10 +10,12 @@ fix, live in [docs/releases](releases/).
 
 ### Fixed
 
+- `services/algos/forward_shadow.py`: an expiry-day exit was treated as an unfinished position unless it fell at or after 15:29, which suits 1-minute candles but made every expiry-day spread in 5-minute data stay open for ever and block later entries. `simulate_rule` now takes `last_bar` (default 15:29, so the nightly capture's forward shadow test is unchanged); the regime-gated study passes 15:25.
 - Nightly option capture (docs/algos/option-capture.md): a weekday with no Nifty candles now exits with code 3 and says Upstox may have refused the token, instead of being reported as a possible holiday with exit 0; a run that saves no option contract exits 2; an empty answer for the Nifty minutes or India VIX counts as a failure. The strike band now also covers the day's whole Nifty range and the previous session's, so a day that moved 400 points after the 10:15 entry no longer loses the far leg of the spread the shadow test holds (previously that leg was missing or carried a stale price). Capture days before this change used the narrower band. A market holiday on a weekday still shows exit 3 in Task Scheduler; nothing is wrong then.
 
 ### Added
 
+- Regime-gated spread test results (docs/algos/regime-spread-results.md): on 108 expired weekly Nifty expiries all twelve cells (three side rules by four range gates) lose money in the selection period and in the held-out third, and none qualifies. The range gate does not rescue the structure.
 - Intraday momentum on the Nifty run once on 1,107 sessions (docs/algos/intraday-momentum-results.md): 12 pairs, none verified in the second half, joint out-of-sample R-squared -0.028; the first half-hour effect published for the S&P 500 is not present on the Nifty in 2022 to 2026. Also a nightly data check (scripts/algo_backtest/check_nightly.py, written by an AWF GLM worker and reviewed here) that says in plain words when a day's candles, VIX or ETF closes did not arrive. The 16:00 Windows task ran by itself on 30 October.
 - Research page Horizons and Premium tabs, and a one-line verdict for every study in How to read: the week-and-month-ahead study (no direction predictor, volatility baseline is enough) and the India VIX premium test (premium exists with fat tails, selling only when it looks rich did not help).
 - Research page Chains tab: foreign market to sector or stock to Nifty chains from the domino chain test, with the step-2 table. The second step is too weak to use.

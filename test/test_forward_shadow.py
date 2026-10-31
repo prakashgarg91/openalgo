@@ -276,3 +276,12 @@ def test_a_stop_on_the_next_day_does_not_reverse_and_reversals_stop_at_three():
     result = fs.simulate_rule("C", flip, quiet_index(), VIX)
     assert len(result.trades) > 1
     assert max(t["reversal"] for t in result.trades) <= 3
+
+
+def test_an_expiry_day_exit_at_the_last_five_minute_bar_is_a_closed_trade_only_when_told_so():
+    """5-minute bars end at 15:25; the 1-minute default (15:29) treats that day as partly stored."""
+    import inspect
+    from datetime import time as dtime
+
+    sig = inspect.signature(fs.simulate_rule)
+    assert sig.parameters["last_bar"].default == fs.LAST_INDEX_CANDLE == dtime(15, 29)
