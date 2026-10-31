@@ -20,7 +20,7 @@ if errorlevel 1 (
   exit /b 1
 )
 uv run python scripts\algo_backtest\fetch_context_data.py "%DATA%" >> log\research_data.log 2>&1
-git -C "%DATA%" add context >> log\research_data.log 2>&1
+git -C "%DATA%" add context bidask >> log\research_data.log 2>&1
 git -C "%DATA%" commit -m "data: refresh foreign, sector and stock history" >> log\research_data.log 2>&1
 git -C "%DATA%" push origin HEAD:main >> log\research_data.log 2>&1
 if "%UPSTOX_ANALYTICS_TOKEN%"=="" (

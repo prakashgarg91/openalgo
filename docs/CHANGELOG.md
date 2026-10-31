@@ -15,6 +15,8 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Bid and ask snapshots (docs/algos/bid-ask-snapshots.md): `scripts/algo_backtest/snapshot_bidask.py` saves the best bid and ask of the active weekly Nifty options three times a day, `summarize_bidask.py` reads them back, and `windows/install_bidask_tasks.cmd` creates the three Windows tasks. Read only; places no order. It needs the trader's Windows computer, the read-only token and the data repository.
+- Retail-realistic cost scenario (docs/algos/cost-scenario-results.md, `services/algos/costs.py`): about Rs 155 a trade against about Rs 270 in the conservative model. No spread cell qualifies under it either.
 - Research page Option tests tab: the regime-gated spread results and the intraday momentum results.
 - Regime-gated spread test results (docs/algos/regime-spread-results.md): on 108 expired weekly Nifty expiries all twelve cells (three side rules by four range gates) lose money in the selection period and in the held-out third, and none qualifies. The range gate does not rescue the structure.
 - Intraday momentum on the Nifty run once on 1,107 sessions (docs/algos/intraday-momentum-results.md): 12 pairs, none verified in the second half, joint out-of-sample R-squared -0.028; the first half-hour effect published for the S&P 500 is not present on the Nifty in 2022 to 2026. Also a nightly data check (scripts/algo_backtest/check_nightly.py, written by an AWF GLM worker and reviewed here) that says in plain words when a day's candles, VIX or ETF closes did not arrive. The 16:00 Windows task ran by itself on 30 October.
