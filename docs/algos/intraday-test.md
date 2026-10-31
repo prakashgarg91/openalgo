@@ -48,3 +48,7 @@ Part 2 is 36 pre-registered cells (6 side rules, 3 exit styles, 2 filters) in th
 - A leg with no trade in a bar carries its last close. Far out-of-the-money legs trade rarely.
 - Bars have no bid or ask, so slippage is the conservative cost model plus 2 points on stops.
 - Lot size is 75 before 30 December 2025 and 65 after; points are the figure to trust across the change.
+
+## Downloading everything into a private data repository
+
+`scripts/algo_backtest/fetch_upstox_expired_all.py <data_repo> [start] [end] [--dry-run]` needs only the Plus token. It takes the expiry list and the Nifty range from Upstox, writes `bars5m/<expiry>.tar.gz` (one CSV per contract) and `MANIFEST.csv` into the data repository, and commits and pushes after each expiry, so it resumes where it stopped. A dry run on 31 October 2026 counted 109 expiries (3 Oct 2024 to 27 Oct 2026) and 7,907 requests. The first expiry stored 86 contracts and 31,616 rows in about 90 seconds. Keep the data repository private: it is Upstox data.
