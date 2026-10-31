@@ -38,6 +38,8 @@ Read `docs/INDEX.md` first, then open only the specific doc you need instead of
 scanning the tree. Do **not** copy or restate docs into a second location — edit
 the source file in `docs/` and every reader sees the change.
 
+Research option data lives in the private repository `prakashgarg91/openalgo-data`, not here and not on a cloud session's disk. Where it is, how it is pulled and the daily broker login are in [`docs/algos/research-data.md`](docs/algos/research-data.md).
+
 ## Skills
 
 Detailed procedures live in `.claude/skills/` and load on demand:
