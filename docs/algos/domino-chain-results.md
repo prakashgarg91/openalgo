@@ -19,7 +19,7 @@ Rules: [domino-chain-registration.md](domino-chain-registration.md), committed b
 
 ## Chains
 
-24 chains verified at both steps, and all 24 passed the mediation check. Read that count with care: it is only four distinct second steps reached from many different drivers (20 of the 24 run through Tata Steel and the move after the open, from US indices, Europe, futures and copper). The mediation check is trivial here because the foreign driver adds nothing to the second step on its own.
+24 chains verified at both steps, and all 24 passed the mediation check. Read that count with care: it is only four distinct second steps reached from many different drivers (17 of the 24 run through Tata Steel and the move after the open, from US indices, Europe, futures and copper; 3 each through M&M and Nifty Metal, 1 through Nifty Realty). The mediation check is trivial here because the foreign driver adds nothing to the second step on its own.
 
 ## What it means
 
