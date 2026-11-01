@@ -1,4 +1,4 @@
-import type { CostData, MomentumData, SpreadData } from '@/api/research'
+import type { CostData, MomentumData, SpreadData, StructuresData } from '@/api/research'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -18,10 +18,12 @@ export function OptionTestsPanel({
   spread,
   momentum,
   cost,
+  structures,
 }: {
   spread?: SpreadData
   momentum?: MomentumData
   cost?: CostData
+  structures?: StructuresData
 }) {
   return (
     <div className="space-y-4">
@@ -160,6 +162,79 @@ export function OptionTestsPanel({
               calls turns positive under realistic costs but goes negative again at twice those
               costs, and its drawdown is far beyond a Rs 20,000 loss limit. It is also a bet on a
               falling market. Nothing here can pass: the last third has been seen before.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+      {structures ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Four other structures: the two that sell only calls made money, but none passed
+            </CardTitle>
+            <CardDescription>
+              No stop and no reversal; the weekly ones are held to expiry. Results are in rupees for
+              one lot under the realistic cost model. A structure passed only if it kept its
+              drawdown within Rs 20,000 and cleared a statistical test in the last third. The last
+              third had already been seen, so even a pass would only mean a trial on new days in
+              sandbox mode.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Structure</TableHead>
+                  <TableHead className="text-right">First two thirds</TableHead>
+                  <TableHead className="text-right">At twice the costs</TableHead>
+                  <TableHead className="text-right">Last third</TableHead>
+                  <TableHead className="text-right">At twice the costs</TableHead>
+                  <TableHead className="text-right">Worst drawdown</TableHead>
+                  <TableHead>Result</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {structures.rows.map((r) => (
+                  <TableRow key={r.name}>
+                    <TableCell className="font-medium">{r.label}</TableCell>
+                    <TableCell className={cn('text-right tabular-nums', tone(r.sel_realistic))}>
+                      {rupees(r.sel_realistic)}
+                    </TableCell>
+                    <TableCell className={cn('text-right tabular-nums', tone(r.sel_realistic_2x))}>
+                      {rupees(r.sel_realistic_2x)}
+                    </TableCell>
+                    <TableCell className={cn('text-right tabular-nums', tone(r.held_realistic))}>
+                      {rupees(r.held_realistic)}
+                    </TableCell>
+                    <TableCell className={cn('text-right tabular-nums', tone(r.held_realistic_2x))}>
+                      {rupees(r.held_realistic_2x)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {rupees(-r.held_drawdown)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className="bg-muted font-normal text-muted-foreground"
+                      >
+                        {r.passed
+                          ? 'Passed'
+                          : r.candidate
+                            ? 'Too much drawdown, not proven'
+                            : 'Lost money, dropped'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Taking away the stop is what changed the picture. The weekly condors, which also sell
+              puts, lost money; the two call-only structures earned Rs 38,000 to Rs 73,000 under
+              realistic costs, but their drawdown on one lot (Rs 26,000 to Rs 27,000 in the last
+              third) is above a Rs 20,000 loss limit, and the profit was too uneven to prove the
+              average day is positive. They sell upside, so a sharp rally is their risk. Nothing
+              here is a result to trade on.
             </p>
           </CardContent>
         </Card>

@@ -152,6 +152,29 @@ export interface CostData {
   rows: CostRow[]
 }
 
+export interface StructureRow {
+  name: string
+  label: string
+  candidate: boolean
+  passed: boolean
+  failed: string[]
+  sel_trades: number
+  sel_pre_cost: number
+  sel_realistic: number
+  sel_realistic_2x: number
+  sel_drawdown: number
+  held_trades: number
+  held_pre_cost: number
+  held_realistic: number
+  held_realistic_2x: number
+  held_drawdown: number
+  held_worst_day: number
+}
+
+export interface StructuresData {
+  rows: StructureRow[]
+}
+
 export interface MomentumData {
   sessions: number
   joint_r2: number
@@ -189,6 +212,7 @@ export interface LinkageData {
   spread?: SpreadData
   momentum?: MomentumData
   cost?: CostData
+  structures?: StructuresData
   range_model: {
     models: RangeModelRow[]
     calibration: RangeCalibration[]

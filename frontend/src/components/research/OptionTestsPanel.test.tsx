@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { CostData } from '@/api/research'
+import type { CostData, StructuresData } from '@/api/research'
 import { OptionTestsPanel } from './OptionTestsPanel'
 
 const cost: CostData = {
@@ -37,5 +37,57 @@ describe('OptionTestsPanel cost card', () => {
   it('renders nothing for a result that is not there yet', () => {
     render(<OptionTestsPanel />)
     expect(screen.queryByText(/realistic cost model/)).toBeNull()
+  })
+})
+
+const structures: StructuresData = {
+  rows: [
+    {
+      name: 'S3',
+      label: 'Weekly call spread, 250 wide',
+      candidate: true,
+      passed: false,
+      failed: ['drawdown', 'bootstrap'],
+      sel_trades: 67,
+      sel_pre_cost: 70732,
+      sel_realistic: 60033,
+      sel_realistic_2x: 49335,
+      sel_drawdown: 31881,
+      held_trades: 30,
+      held_pre_cost: 77873,
+      held_realistic: 73189,
+      held_realistic_2x: 68504,
+      held_drawdown: 26723,
+      held_worst_day: -13352,
+    },
+    {
+      name: 'S2',
+      label: 'Weekly iron condor',
+      candidate: false,
+      passed: false,
+      failed: [],
+      sel_trades: 68,
+      sel_pre_cost: 339,
+      sel_realistic: -19873,
+      sel_realistic_2x: -40084,
+      sel_drawdown: 57776,
+      held_trades: 30,
+      held_pre_cost: 16068,
+      held_realistic: 7273,
+      held_realistic_2x: -1523,
+      held_drawdown: 32968,
+      held_worst_day: -22165,
+    },
+  ],
+}
+
+describe('OptionTestsPanel structures card', () => {
+  it('says why each structure did not pass', () => {
+    render(<OptionTestsPanel structures={structures} />)
+    expect(screen.getByText('Weekly call spread, 250 wide')).toBeTruthy()
+    expect(screen.getByText('Too much drawdown, not proven')).toBeTruthy()
+    expect(screen.getByText('Lost money, dropped')).toBeTruthy()
+    expect(screen.getByText('Rs 60,033')).toBeTruthy()
+    expect(screen.getByText('-Rs 40,084')).toBeTruthy()
   })
 })

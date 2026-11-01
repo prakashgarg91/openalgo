@@ -15,6 +15,7 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Research page, Option tests tab: the four alternative structures with their results and why none passed; and the registration of two narrower (100-point) call-only variants (docs/algos/structures-narrow-registration.md, not yet replayed).
 - Alternative structures replayed (docs/algos/structures-results.md, `services/algos/condor.py`, `scripts/algo_backtest/structures_study.py`): none of the four registered structures passed. Selling call spreads without a stop made money under realistic and doubled costs in both periods, but its drawdown breaches the Rs 20,000 limit and its statistical bound is below zero; the weekly condors lose.
 - Research page, Option tests tab: the realistic-cost result (the same trades under the earlier and the realistic cost model, both periods, with the Rs 20,000 loss limit in view), and the registration of four alternative structures (docs/algos/structures-registration.md, not yet replayed).
 - The bid and ask snapshot tool no longer saves on a Saturday or Sunday, when the exchange is shut and Upstox returns the last close as if it were a live quote (a test run on a Sunday did exactly that); use `--force` to test the tool on a weekend. The three Windows tasks for it are installed on the trader's computer (10:15, 14:30 and 15:00, Monday to Friday).

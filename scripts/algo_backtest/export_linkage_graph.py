@@ -138,6 +138,36 @@ def cost_block(folder: Path) -> dict:
     return {"rows": rows}
 
 
+STRUCTURE_LABELS = {
+    "S1": "Call spread, 250 wide, no stop",
+    "S2": "Weekly iron condor",
+    "S3": "Weekly call spread, 250 wide",
+    "S4": "Condor entered 14:30 the session before expiry",
+}
+
+
+def structures_block(folder: Path) -> dict:
+    sel = json.loads((folder / "selection.json").read_text(encoding="utf-8"))
+    held = json.loads((folder / "held_out.json").read_text(encoding="utf-8"))
+    rows = []
+    for name, label in STRUCTURE_LABELS.items():
+        s, h = sel["cells"][name], held["held_out"][name]
+        failed = [g for g, ok in h.get("gates", {}).items() if not ok]
+        rows.append(
+            {
+                "name": name, "label": label, "candidate": name in sel["candidates"],
+                "passed": name in held["passed"], "failed": failed,
+                "sel_trades": s["trades"], "sel_pre_cost": s["pre_cost_net"],
+                "sel_realistic": s["realistic_net"], "sel_realistic_2x": s["realistic_net_2x"],
+                "sel_drawdown": s["drawdown"],
+                "held_trades": h["trades"], "held_pre_cost": h["pre_cost_net"],
+                "held_realistic": h["realistic_net"], "held_realistic_2x": h["realistic_net_2x"],
+                "held_drawdown": h["drawdown"], "held_worst_day": h["worst_day"],
+            }
+        )  # fmt: skip
+    return {"rows": rows}
+
+
 def momentum_block(folder: Path) -> dict:
     v = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
     return {
@@ -346,9 +376,13 @@ def main() -> int:
         ("spread", repo / "research" / "regime_spread", spread_block),
         ("momentum", repo / "research" / "intraday_momentum", momentum_block),
         ("cost", repo / "research" / "regime_spread", cost_block),
+        ("structures", repo / "research" / "structures", structures_block),
     ):
         if (
-            folder / {"spread": "held_out.json", "cost": "recost.json"}.get(key, "summary.json")
+            folder
+            / {"spread": "held_out.json", "cost": "recost.json", "structures": "held_out.json"}.get(
+                key, "summary.json"
+            )
         ).exists():
             payload[key] = fn(folder)
     OUT.parent.mkdir(parents=True, exist_ok=True)

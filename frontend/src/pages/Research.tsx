@@ -671,6 +671,7 @@ export default function Research() {
                 spread={query.data.spread}
                 momentum={query.data.momentum}
                 cost={query.data.cost}
+                structures={query.data.structures}
               />
             </TabsContent>
             <TabsContent value="models" className="mt-4">
