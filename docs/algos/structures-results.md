@@ -30,7 +30,7 @@ Registered gates for S1 and S3: at least 20 trades (met), positive at realistic 
 
 ## What it says
 
-1. **Dropping the stop and the reversal changed the picture.** The earlier test lost money on every variant because the stop-and-reverse rule paid for almost every trade; on 250-point call spreads without a stop, the same data earns Rs 38,000 to Rs 60,000 before the last third's Rs 53,000 to Rs 73,000, and stays positive at twice the realistic costs.
+1. **Dropping the stop and the reversal changed the picture.** The earlier test lost money on every variant because the stop-and-reverse rule paid for almost every trade; on 250-point call spreads without a stop, the same data earns Rs 38,000 to Rs 60,000 in the selection period and Rs 53,000 to Rs 73,000 in the last third under realistic costs, and stays positive at twice those costs.
 2. **It is a call-selling result.** The two winners sell only calls. The weekly condor, which adds a put side, earned almost nothing before costs (+339 in selection) and loses after them: the put side gave back what the call side earned. S4 lost in selection too. The earlier finding stands in a new form: in this window the only thing that paid was selling upside, which is a view that the Nifty does not rally hard.
 3. **By trailing market** (sign of the Nifty's return over the 20 sessions before entry), realistic net, selection period: S1 +57,314 after non-falling stretches and -18,815 after falling stretches; S3 +74,090 and -14,056. So the profit was earned after flat or rising stretches and given back in part after falls, when rebounds hurt a short call. This does not support the simple reading that it only works because the market fell, and it does not clear it either; it is one window.
 4. **The loss limit is the binding problem.** The best structures draw down Rs 26,000 to Rs 32,000 on one lot, more than the Rs 20,000 a day limit and about a third of the account. With the Rs 1 lakh account, one lot of these structures is already too big for the risk rule.
@@ -45,4 +45,4 @@ Registered gates for S1 and S3: at least 20 trades (met), positive at realistic 
 
 ## Limits
 
-Candle fills with no bid and ask; one window in which the Nifty fell overall; selling only calls leaves unlimited-in-spirit upside risk capped here only by the 250-point wing; the condor pairs two spreads priced from separate candles; S1's trades overlap overnight; the held-out third had been seen twice.
+Candle fills with no bid and ask; one window in which the Nifty fell overall; selling only calls takes the full loss of a sharp rally, limited only by the 250-point wing; the condor pairs two spreads priced from separate candles; S1's trades overlap overnight; the held-out third had been seen twice.
