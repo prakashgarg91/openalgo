@@ -165,6 +165,26 @@ def structures_block(folder: Path) -> dict:
                 "held_drawdown": h["drawdown"], "held_worst_day": h["worst_day"],
             }
         )  # fmt: skip
+    narrow = folder.parent / "structures_narrow"
+    if (narrow / "held_out.json").exists():
+        nsel = json.loads((narrow / "selection.json").read_text(encoding="utf-8"))
+        nheld = json.loads((narrow / "held_out.json").read_text(encoding="utf-8"))
+        labels = {"S1n": "Call spread, 100 wide, no stop", "S3n": "Weekly call spread, 100 wide"}
+        for name, label in labels.items():
+            s, h = nsel["cells"][name], nheld["held_out"][name]
+            failed = [g for g, ok in h.get("gates", {}).items() if not ok]
+            rows.append(
+                {
+                    "name": name, "label": label, "candidate": name in nsel["candidates"],
+                    "passed": name in nheld["passed"], "failed": failed,
+                    "sel_trades": s["trades"], "sel_pre_cost": s["pre_cost_net"],
+                    "sel_realistic": s["realistic_net"], "sel_realistic_2x": s["realistic_net_2x"],
+                    "sel_drawdown": s["drawdown"],
+                    "held_trades": h["trades"], "held_pre_cost": h["pre_cost_net"],
+                    "held_realistic": h["realistic_net"], "held_realistic_2x": h["realistic_net_2x"],
+                    "held_drawdown": h["drawdown"], "held_worst_day": h["worst_day"],
+                }
+            )  # fmt: skip
     return {"rows": rows}
 
 

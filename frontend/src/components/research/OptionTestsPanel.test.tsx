@@ -81,7 +81,31 @@ const structures: StructuresData = {
   ],
 }
 
+const narrowRow: StructuresData['rows'][number] = {
+  name: 'S3n',
+  label: 'Weekly call spread, 100 wide',
+  candidate: true,
+  passed: false,
+  failed: ['bootstrap'],
+  sel_trades: 68,
+  sel_pre_cost: 46590,
+  sel_realistic: 35380,
+  sel_realistic_2x: 24171,
+  sel_drawdown: 15013,
+  held_trades: 30,
+  held_pre_cost: 40362,
+  held_realistic: 35530,
+  held_realistic_2x: 30697,
+  held_drawdown: 13425,
+  held_worst_day: -6916,
+}
+
 describe('OptionTestsPanel structures card', () => {
+  it('distinguishes a drawdown failure from a statistical one', () => {
+    render(<OptionTestsPanel structures={{ rows: [narrowRow] }} />)
+    expect(screen.getByText('Within the loss limit, not proven')).toBeTruthy()
+  })
+
   it('says why each structure did not pass', () => {
     render(<OptionTestsPanel structures={structures} />)
     expect(screen.getByText('Weekly call spread, 250 wide')).toBeTruthy()

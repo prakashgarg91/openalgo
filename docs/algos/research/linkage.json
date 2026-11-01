@@ -4446,6 +4446,44 @@
     "held_realistic_2x": 7821,
     "held_drawdown": 17210,
     "held_worst_day": -12159
+   },
+   {
+    "name": "S1n",
+    "label": "Call spread, 100 wide, no stop",
+    "candidate": false,
+    "passed": false,
+    "failed": [],
+    "sel_trades": 194,
+    "sel_pre_cost": 44525,
+    "sel_realistic": 12588,
+    "sel_realistic_2x": -19349,
+    "sel_drawdown": 30458,
+    "held_trades": 88,
+    "held_pre_cost": 28683,
+    "held_realistic": 14477,
+    "held_realistic_2x": 271,
+    "held_drawdown": 18082,
+    "held_worst_day": -6971
+   },
+   {
+    "name": "S3n",
+    "label": "Weekly call spread, 100 wide",
+    "candidate": true,
+    "passed": false,
+    "failed": [
+     "bootstrap"
+    ],
+    "sel_trades": 68,
+    "sel_pre_cost": 46590,
+    "sel_realistic": 35380,
+    "sel_realistic_2x": 24171,
+    "sel_drawdown": 15013,
+    "held_trades": 30,
+    "held_pre_cost": 40362,
+    "held_realistic": 35530,
+    "held_realistic_2x": 30697,
+    "held_drawdown": 13425,
+    "held_worst_day": -6916
    }
   ]
  }

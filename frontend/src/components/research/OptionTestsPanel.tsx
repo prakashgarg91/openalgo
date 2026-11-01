@@ -170,7 +170,7 @@ export function OptionTestsPanel({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Four other structures: the two that sell only calls made money, but none passed
+              Other structures: the ones that sell only calls made money, but none passed
             </CardTitle>
             <CardDescription>
               No stop and no reversal; the weekly ones are held to expiry. Results are in rupees for
@@ -220,7 +220,9 @@ export function OptionTestsPanel({
                         {r.passed
                           ? 'Passed'
                           : r.candidate
-                            ? 'Too much drawdown, not proven'
+                            ? r.failed.includes('drawdown')
+                              ? 'Too much drawdown, not proven'
+                              : 'Within the loss limit, not proven'
                             : 'Lost money, dropped'}
                       </Badge>
                     </TableCell>
@@ -230,11 +232,13 @@ export function OptionTestsPanel({
             </Table>
             <p className="mt-3 text-sm text-muted-foreground">
               Taking away the stop is what changed the picture. The weekly condors, which also sell
-              puts, lost money; the two call-only structures earned Rs 38,000 to Rs 73,000 under
-              realistic costs, but their drawdown on one lot (Rs 26,000 to Rs 27,000 in the last
-              third) is above a Rs 20,000 loss limit, and the profit was too uneven to prove the
-              average day is positive. They sell upside, so a sharp rally is their risk. Nothing
-              here is a result to trade on.
+              puts, lost money; the call-only structures earned money under realistic costs, but the
+              250-point ones drew down Rs 26,000 to Rs 27,000 on one lot, above a Rs 20,000 loss
+              limit. A 100-point weekly call spread stays inside the limit and earns about Rs 35,000
+              in each period, but with only about 30 weekly trades in the last third the profit is
+              too uneven to prove the average day is positive. They sell upside, so a sharp rally is
+              their risk. Nothing here is a result to trade on; the only clean test left is new days
+              in sandbox mode.
             </p>
           </CardContent>
         </Card>
