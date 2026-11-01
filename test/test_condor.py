@@ -90,3 +90,15 @@ def test_filters_and_period_leave_the_week_out_and_say_why():
     assert not high.trades and high.skipped["vix ceiling"] == 1
     outside = run(condor.S2, allowed={pd.Timestamp("2025-11-10")})
     assert not outside.trades  # the entry session is the 7th, which is not in the period
+
+
+def test_a_narrower_wing_moves_only_the_long_strike():
+    bars = OptionBars(
+        {
+            (EXPIRY, "CE", 25000.0): five_minute(20.0, 2.0),
+            (EXPIRY, "CE", 25100.0): five_minute(5.0, 1.0),
+        }
+    )
+    r = condor.simulate_weekly(condor.S3, bars, index_1m(), vix(), set(SESSIONS), width=100)
+    assert [(g["sold"], g["long"]) for g in r.trades[0]["legs"]] == [(25000.0, 25100.0)]
+    assert r.trades[0]["credit"] == 15.0

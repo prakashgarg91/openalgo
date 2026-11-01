@@ -26,21 +26,27 @@ from services.algos.costs import realistic_cost  # noqa: E402
 
 N_STRUCTURES = 4
 BOOT_LEVEL = fs.BOOTSTRAP_LEVEL / N_STRUCTURES
+NARROW_WIDTH = 100  # structures-narrow-registration.md: 2 x width x 75 <= 20,000
+NARROW_BOOT_LEVEL = fs.BOOTSTRAP_LEVEL / 6  # six structures tried on this data in all
 MIN_SELECT_TRADES = 40
 MIN_HELD_TRADES = 20
 S1_RULES = fs.replace_rules(width=250, stop_pts=None, reverse=False)
 
 
 def run_structure(name, bars, index, vix, period_days):
+    """S1 to S4 as registered; a trailing "n" (S1n, S3n) is the same structure with a 100-point wing."""
     allowed = set(period_days)
-    if name == "S1":
-        gated = fs.simulate_rule  # the registered machine, side C (always sell calls)
+    narrow = name.endswith("n")
+    base = name.removesuffix("n")
+    width = NARROW_WIDTH if narrow else condor.WIDTH
+    if base == "S1":
         from services.algos import regime_gate as rg
 
-        return gated(
-            "C", rg.GatedBars(bars, allowed), index, vix, rules=S1_RULES, last_bar=condor.LAST_BAR
+        rules = fs.replace_rules(width=width, stop_pts=None, reverse=False)
+        return fs.simulate_rule(
+            "C", rg.GatedBars(bars, allowed), index, vix, rules=rules, last_bar=condor.LAST_BAR
         )
-    return condor.simulate_weekly(condor.SPECS[name], bars, index, vix, allowed)
+    return condor.simulate_weekly(condor.SPECS[base], bars, index, vix, allowed, width=width)
 
 
 def legs_of(trade: dict) -> list[dict]:
@@ -76,9 +82,15 @@ def falling_flags(index: pd.DataFrame) -> pd.Series:
     return trailing < 0
 
 
-def metrics(result: fs.ShadowResult, all_days: list, period: list, falling: pd.Series) -> dict:
+def metrics(
+    result: fs.ShadowResult,
+    all_days: list,
+    period: list,
+    falling: pd.Series,
+    boot_level: float = BOOT_LEVEL,
+) -> dict:
     trades = result.trades
-    episodes = fs.episodes_closed(result) if result.rule == "S1" else len(trades)
+    episodes = fs.episodes_closed(result) if result.rule == "C" else len(trades)
     real = copy.copy(result)
     real.trades, costs = [], []
     for t in trades:
@@ -105,7 +117,7 @@ def metrics(result: fs.ShadowResult, all_days: list, period: list, falling: pd.S
         "drawdown": round(fs.max_drawdown(paths)),
         "worst_day": round(fs.worst_day(paths)),
         "realistic_net_by_market": {k: round(v) for k, v in split.items()},
-        "boot_lower": float(fs.block_bootstrap_lower(daily.to_numpy(), BOOT_LEVEL)),
+        "boot_lower": float(fs.block_bootstrap_lower(daily.to_numpy(), boot_level)),
         "skipped": dict(result.skipped),
         "still_open": len(result.open_positions),
     }
@@ -113,7 +125,9 @@ def metrics(result: fs.ShadowResult, all_days: list, period: list, falling: pd.S
 
 def main() -> int:
     repo = Path(sys.argv[1])
-    out = repo / "research" / "structures"
+    narrow = "--narrow" in sys.argv
+    boot = NARROW_BOOT_LEVEL if narrow else BOOT_LEVEL
+    out = repo / "research" / ("structures_narrow" if narrow else "structures")
     out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as scratch:
         bars, _ = rs.load_bars(repo, Path(scratch))
@@ -123,9 +137,9 @@ def main() -> int:
         sel_days = [d for d in days if d <= cut]
         held_days = [d for d in days if d > cut]
         falling = falling_flags(index)
-        names = ["S1", "S2", "S3", "S4"]
+        names = ["S1n", "S3n"] if narrow else ["S1", "S2", "S3", "S4"]
         selection = {
-            n: metrics(run_structure(n, bars, index, vix, sel_days), days, sel_days, falling)
+            n: metrics(run_structure(n, bars, index, vix, sel_days), days, sel_days, falling, boot)
             for n in names
         }
         candidates = [
@@ -144,7 +158,9 @@ def main() -> int:
             )
         print("Selection written; the held-out third is replayed only now.")
         held = {
-            n: metrics(run_structure(n, bars, index, vix, held_days), days, held_days, falling)
+            n: metrics(
+                run_structure(n, bars, index, vix, held_days), days, held_days, falling, boot
+            )
             for n in names
         }
     report = {"held_out": held, "candidates": candidates, "passed": []}

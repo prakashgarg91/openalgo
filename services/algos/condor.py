@@ -50,6 +50,7 @@ def simulate_weekly(
     vix_daily: pd.Series,
     allowed_days: set[pd.Timestamp],
     model: lab.Model | None = None,
+    width: int = WIDTH,
 ) -> fs.ShadowResult:
     """Replay one weekly structure over every stored expiry whose entry session is in ``allowed_days``."""
     model = model or lab.CONSERVATIVE
@@ -87,7 +88,7 @@ def simulate_weekly(
             continue
         opened = []
         for kind, offset in legs_for(spec):
-            one = intraday._open_spread(bars, expiry, kind, ts, p + offset, WIDTH)
+            one = intraday._open_spread(bars, expiry, kind, ts, p + offset, width)
             if one is None:
                 break
             opened.append((kind, *one))
