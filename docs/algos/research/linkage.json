@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-31",
+ "generated": "2026-11-01",
  "meta": {
   "days": 4573,
   "pairs_tried": 292,
@@ -4315,6 +4315,55 @@
     "beta_second": -0.047,
     "t_second": -2.94,
     "verified": false
+   }
+  ]
+ },
+ "cost": {
+  "rows": [
+   {
+    "rule": "Continuation",
+    "sel_pre_cost": -4534,
+    "sel_conservative": -92386,
+    "sel_realistic": -56509,
+    "sel_realistic_2x": -108484,
+    "sel_drawdown": 75245,
+    "held_pre_cost": -26818,
+    "held_conservative": -65782,
+    "held_realistic": -48171,
+    "held_realistic_2x": -69524,
+    "held_drawdown": 81465,
+    "cost_per_trade_realistic": 156,
+    "cost_per_trade_conservative": 263
+   },
+   {
+    "rule": "Opening-move fade",
+    "sel_pre_cost": 4699,
+    "sel_conservative": -83242,
+    "sel_realistic": -45947,
+    "sel_realistic_2x": -96592,
+    "sel_drawdown": 122887,
+    "held_pre_cost": -18409,
+    "held_conservative": -59811,
+    "held_realistic": -39970,
+    "held_realistic_2x": -61532,
+    "held_drawdown": 55228,
+    "cost_per_trade_realistic": 157,
+    "cost_per_trade_conservative": 272
+   },
+   {
+    "rule": "Always sell calls",
+    "sel_pre_cost": 68086,
+    "sel_conservative": -21582,
+    "sel_realistic": 16970,
+    "sel_realistic_2x": -34147,
+    "sel_drawdown": 57148,
+    "held_pre_cost": 27982,
+    "held_conservative": -9858,
+    "held_realistic": 7611,
+    "held_realistic_2x": -12760,
+    "held_drawdown": 36175,
+    "cost_per_trade_realistic": 157,
+    "cost_per_trade_conservative": 275
    }
   ]
  }

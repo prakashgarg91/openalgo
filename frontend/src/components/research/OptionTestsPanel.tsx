@@ -1,4 +1,4 @@
-import type { MomentumData, SpreadData } from '@/api/research'
+import type { CostData, MomentumData, SpreadData } from '@/api/research'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -17,9 +17,11 @@ const tone = (v: number) => (v < 0 ? 'text-rose-500' : 'text-emerald-500')
 export function OptionTestsPanel({
   spread,
   momentum,
+  cost,
 }: {
   spread?: SpreadData
   momentum?: MomentumData
+  cost?: CostData
 }) {
   return (
     <div className="space-y-4">
@@ -76,6 +78,88 @@ export function OptionTestsPanel({
               positive; the costs, roughly Rs 270 a trade, took it back. Whether that cost model is
               too harsh has not been tested. This is one falling-market period and candle prices
               with no bid and ask.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+      {cost ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Does a realistic cost model change it? Only for one rule, and only thinly
+            </CardTitle>
+            <CardDescription>
+              The same trades, with each trade's cost recomputed: Rs 20 an order, the current
+              securities tax (0.10 percent, 0.15 percent from April 2026), GST, stamp duty, the lot
+              size by date and 0.15 points of slippage a fill. That is about Rs{' '}
+              {cost.rows[0]?.cost_per_trade_realistic} a trade, against about Rs{' '}
+              {cost.rows[0]?.cost_per_trade_conservative} in the earlier model. The slippage figure
+              is an assumption until the bid and ask snapshots measure it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Side rule</TableHead>
+                  <TableHead>Period</TableHead>
+                  <TableHead className="text-right">Before costs</TableHead>
+                  <TableHead className="text-right">Earlier cost model</TableHead>
+                  <TableHead className="text-right">Realistic costs</TableHead>
+                  <TableHead className="text-right">At twice the costs</TableHead>
+                  <TableHead className="text-right">Worst drawdown</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cost.rows
+                  .flatMap((r) => [
+                    {
+                      key: `${r.rule}-sel`,
+                      rule: r.rule,
+                      period: 'First two thirds',
+                      pre: r.sel_pre_cost,
+                      cons: r.sel_conservative,
+                      real: r.sel_realistic,
+                      real2: r.sel_realistic_2x,
+                      dd: r.sel_drawdown,
+                    },
+                    {
+                      key: `${r.rule}-held`,
+                      rule: r.rule,
+                      period: 'Last third',
+                      pre: r.held_pre_cost,
+                      cons: r.held_conservative,
+                      real: r.held_realistic,
+                      real2: r.held_realistic_2x,
+                      dd: r.held_drawdown,
+                    },
+                  ])
+                  .map((x) => (
+                    <TableRow key={x.key}>
+                      <TableCell className="font-medium">{x.rule}</TableCell>
+                      <TableCell className="text-muted-foreground">{x.period}</TableCell>
+                      <TableCell className={cn('text-right tabular-nums', tone(x.pre))}>
+                        {rupees(x.pre)}
+                      </TableCell>
+                      <TableCell className={cn('text-right tabular-nums', tone(x.cons))}>
+                        {rupees(x.cons)}
+                      </TableCell>
+                      <TableCell className={cn('text-right tabular-nums', tone(x.real))}>
+                        {rupees(x.real)}
+                      </TableCell>
+                      <TableCell className={cn('text-right tabular-nums', tone(x.real2))}>
+                        {rupees(x.real2)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{rupees(-x.dd)}</TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Rules A and B lose even before costs, so costs are not what sinks them. Always selling
+              calls turns positive under realistic costs but goes negative again at twice those
+              costs, and its drawdown is far beyond a Rs 20,000 loss limit. It is also a bet on a
+              falling market. Nothing here can pass: the last third has been seen before.
             </p>
           </CardContent>
         </Card>

@@ -116,6 +116,28 @@ def spread_block(folder: Path) -> dict:
     return {"rows": rows, "qualified": 0, "cells": 12, "cells_lost_held": held["cells_lost_money"]}
 
 
+def cost_block(folder: Path) -> dict:
+    d = json.loads((folder / "recost.json").read_text(encoding="utf-8"))
+    rows = []
+    for side in ("A", "B", "C"):
+        key = f"{side}_none"
+        s, h = d["selection"][key], d["held_out"][key]
+        rows.append(
+            {
+                "rule": SIDE_LABELS[side],
+                "sel_pre_cost": s["pre_cost_net"], "sel_conservative": s["conservative_net"],
+                "sel_realistic": s["realistic_net"], "sel_realistic_2x": s["realistic_net_2x"],
+                "sel_drawdown": s["realistic_drawdown"],
+                "held_pre_cost": h["pre_cost_net"], "held_conservative": h["conservative_net"],
+                "held_realistic": h["realistic_net"], "held_realistic_2x": h["realistic_net_2x"],
+                "held_drawdown": h["realistic_drawdown"],
+                "cost_per_trade_realistic": round(s["realistic_cost"] / max(s["trades"], 1)),
+                "cost_per_trade_conservative": round(s["conservative_cost"] / max(s["trades"], 1)),
+            }
+        )  # fmt: skip
+    return {"rows": rows}
+
+
 def momentum_block(folder: Path) -> dict:
     v = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
     return {
@@ -323,8 +345,11 @@ def main() -> int:
         ("horizon", repo / "research" / "horizon", horizon_block),
         ("spread", repo / "research" / "regime_spread", spread_block),
         ("momentum", repo / "research" / "intraday_momentum", momentum_block),
+        ("cost", repo / "research" / "regime_spread", cost_block),
     ):
-        if (folder / ("held_out.json" if key == "spread" else "summary.json")).exists():
+        if (
+            folder / {"spread": "held_out.json", "cost": "recost.json"}.get(key, "summary.json")
+        ).exists():
             payload[key] = fn(folder)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=1), encoding="utf-8")

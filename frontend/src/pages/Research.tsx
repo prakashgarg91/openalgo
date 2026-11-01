@@ -667,7 +667,11 @@ export default function Research() {
               {query.data.vrp ? <PremiumPanel data={query.data.vrp} /> : null}
             </TabsContent>
             <TabsContent value="options" className="mt-4">
-              <OptionTestsPanel spread={query.data.spread} momentum={query.data.momentum} />
+              <OptionTestsPanel
+                spread={query.data.spread}
+                momentum={query.data.momentum}
+                cost={query.data.cost}
+              />
             </TabsContent>
             <TabsContent value="models" className="mt-4">
               <ModelsTab data={query.data} />

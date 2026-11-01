@@ -132,6 +132,26 @@ export interface SpreadData {
   cells_lost_held: number
 }
 
+export interface CostRow {
+  rule: string
+  sel_pre_cost: number
+  sel_conservative: number
+  sel_realistic: number
+  sel_realistic_2x: number
+  sel_drawdown: number
+  held_pre_cost: number
+  held_conservative: number
+  held_realistic: number
+  held_realistic_2x: number
+  held_drawdown: number
+  cost_per_trade_realistic: number
+  cost_per_trade_conservative: number
+}
+
+export interface CostData {
+  rows: CostRow[]
+}
+
 export interface MomentumData {
   sessions: number
   joint_r2: number
@@ -168,6 +188,7 @@ export interface LinkageData {
   horizon?: HorizonData
   spread?: SpreadData
   momentum?: MomentumData
+  cost?: CostData
   range_model: {
     models: RangeModelRow[]
     calibration: RangeCalibration[]
