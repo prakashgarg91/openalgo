@@ -165,6 +165,7 @@ class ShadowResult:
     trades: list[dict[str, Any]] = field(default_factory=list)
     skipped: Counter = field(default_factory=Counter)
     open_positions: list[dict[str, Any]] = field(default_factory=list)
+    weeks_skipped: list[dict[str, Any]] = field(default_factory=list)
 
 
 def simulate_rule(

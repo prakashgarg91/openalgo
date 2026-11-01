@@ -54,4 +54,11 @@ Candle fills with no bid and ask; about 26 trades is a small sample, so even a p
 
 ## Build status
 
-The ledger runner for one-minute data is not built yet. It must be built, tested on stored days and committed before the first counted entry on 6 November 2026; the weekly replay in `services/algos/condor.py` is the base, with the last-candle time passed in.
+Built and tested on 1 November 2026, before any counted entry. `services/algos/forward_weekly.py` holds the two ledgers, the report and the stop and pass rule; `scripts/algo_backtest/run_forward_s3n.py` runs them from the stored one-minute candles after each nightly capture (it is in `capture_option_candles.cmd` after the older forward test) and writes `db/forward_s3n/report.json` and `trades_L1.csv`, `trades_L2.csv`. The weekly replay in `services/algos/condor.py` gained three arguments with defaults that leave every earlier result unchanged (re-running the 100-point study reproduces the stored numbers exactly): the last-candle time (15:29), a refusal when either leg has no candle at the entry minute, and the first counted expiry.
+
+How the code treats the cases above:
+
+- A week entered whose expiry session is not stored yet is shown as open and marked to the last stored candle. It becomes a completed trade, or a recorded not-counted week, once the expiry session is stored.
+- The entry session of an open week is taken as two weekdays before its expiry; once the expiry is stored it is taken as two stored sessions before it. A holiday or a missing capture day can therefore move a stored week's entry by one session: every trade in the report carries the calendar days between entry and expiry (4 for a Friday entry and a Tuesday expiry), so a shifted week is visible, and a repair that changes a decision restarts the count under a new version.
+- The bootstrap runs over completed trades (block of 3, 10,000 draws, seed 20261101, one-sided 97.5 percent), not over days as in the earlier studies. The stopping rule looks at the lowest marked-to-market equity as well as the realised total.
+- The pass decision is made on the retail-realistic cost scenario (Rs 20 per order, STT, GST, stamp duty, 0.15-point slippage); the earlier cost model is reported beside it.
