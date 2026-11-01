@@ -15,6 +15,7 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Alternative structures replayed (docs/algos/structures-results.md, `services/algos/condor.py`, `scripts/algo_backtest/structures_study.py`): none of the four registered structures passed. Selling call spreads without a stop made money under realistic and doubled costs in both periods, but its drawdown breaches the Rs 20,000 limit and its statistical bound is below zero; the weekly condors lose.
 - Research page, Option tests tab: the realistic-cost result (the same trades under the earlier and the realistic cost model, both periods, with the Rs 20,000 loss limit in view), and the registration of four alternative structures (docs/algos/structures-registration.md, not yet replayed).
 - The bid and ask snapshot tool no longer saves on a Saturday or Sunday, when the exchange is shut and Upstox returns the last close as if it were a live quote (a test run on a Sunday did exactly that); use `--force` to test the tool on a weekend. The three Windows tasks for it are installed on the trader's computer (10:15, 14:30 and 15:00, Monday to Friday).
 - Bid and ask snapshots (docs/algos/bid-ask-snapshots.md): `scripts/algo_backtest/snapshot_bidask.py` saves the best bid and ask of the active weekly Nifty options three times a day, `summarize_bidask.py` reads them back, and `windows/install_bidask_tasks.cmd` creates the three Windows tasks. Read only; places no order. It needs the trader's Windows computer, the read-only token and the data repository.
