@@ -7,7 +7,7 @@ Why: [structures-narrow-results.md](structures-narrow-results.md) found one stru
 - **L1, S3n (the one under test).** One weekly Nifty call spread: sell the call at the money, buy the call 100 points above it. Entry at 10:15 on the second trading session before the weekly expiry session, at the open of the 10:15 one-minute candle. Held to the last one-minute candle of the expiry session (15:29), taking its close. No stop, no target, no reversal. One lot, using the lot size in force on the entry date.
 - **L2, S3 at 250 points (reference only).** The same entry, with the long call 250 points above. It cannot be promoted. It is there to show whether the width matters on new days.
 
-The previous forward test ([forward-test-registration.md](forward-test-registration.md), side rules A, B and C on a daily entry) is unchanged and independent. This registration does not retire it; the trader may stop its A and B ledgers, which earned nothing before costs in the earlier tests.
+The previous forward test ([forward-test-registration.md](forward-test-registration.md), side rules A, B and C on a daily entry) is unchanged and independent. This registration does not retire it; the trader stopped it on 1 November 2026 (its A and B ledgers earned nothing before costs in the earlier tests), so the nightly job no longer runs it; its stored ledger and code stay for reference.
 
 ## Data and start date
 

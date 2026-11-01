@@ -15,7 +15,7 @@ set SSLKEYLOGFILE=
 uv run python scripts\algo_backtest\capture_option_candles.py >> log\capture.log 2>&1
 set CAPTURE_RESULT=%errorlevel%
 rem Then read what is stored and update the forward shadow test (read only; places no order).
-uv run python scripts\algo_backtest\run_forward_shadow.py >> log\capture.log 2>&1
+rem The older A, B and C forward test was stopped on 2026-11-01 at the trader's request (it earned nothing before costs).
 uv run python scripts\algo_backtest\run_forward_s3n.py >> log\capture.log 2>&1
 uv run python scripts\algo_backtest\run_etf_ledgers.py >> log\capture.log 2>&1
 rem Last, a read-only copy of the finished day for other tools (db\snapshots), so they never wait on a lock.
