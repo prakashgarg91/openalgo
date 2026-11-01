@@ -151,3 +151,8 @@ docs/audit/qa_audit/**/~$*
 db/algo_builder/
 db/algo_chooser/
 db/algo_events.json
+
+# Local research ledgers and the sandbox bot state (rebuilt from stored candles)
+db/forward_s3n/
+db/forward_shadow/
+db/sandbox_bot/

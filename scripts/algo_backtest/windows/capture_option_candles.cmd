@@ -17,6 +17,8 @@ set CAPTURE_RESULT=%errorlevel%
 rem Then read what is stored and update the forward shadow test (read only; places no order).
 rem The older A, B and C forward test was stopped on 2026-11-01 at the trader's request (it earned nothing before costs).
 uv run python scripts\algo_backtest\run_forward_s3n.py >> log\capture.log 2>&1
+rem Telegram alerts for a failed capture, a missed day or a week that did not count (needs the OpenAlgo Telegram bot on).
+uv run python scripts\algo_backtest\alert_forward.py %CAPTURE_RESULT% >> log\capture.log 2>&1
 uv run python scripts\algo_backtest\run_etf_ledgers.py >> log\capture.log 2>&1
 rem Last, a read-only copy of the finished day for other tools (db\snapshots), so they never wait on a lock.
 uv run python scripts\algo_backtest\snapshot_historify.py >> log\capture.log 2>&1
