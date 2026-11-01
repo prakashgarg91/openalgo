@@ -314,6 +314,23 @@ class _FakeClient:
         return {"status": "success", "results": []}
 
 
+@pytest.fixture
+def the_calendar_stands_at_august_2026(monkeypatch):
+    """These tests list expiries of August to October 2026, so "next month" has to be worked out
+    from a date in that window, not from whatever day the suite happens to run on."""
+    from datetime import datetime as real_datetime
+
+    import services.flow_node_contracts as contracts
+
+    class _Frozen(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 8, 24)
+
+    monkeypatch.setattr(contracts, "datetime", _Frozen)
+
+
+@pytest.mark.usefixtures("the_calendar_stands_at_august_2026")
 class TestALegReachesTheBrokerAsBuilt:
     """The end of the chain: what the editor builds is what gets placed.
 
@@ -568,6 +585,7 @@ def leg_contracts_client(monkeypatch):
     return client
 
 
+@pytest.mark.usefixtures("the_calendar_stands_at_august_2026")
 class TestTheLegBuilderOffersListedContracts:
     def _get(self, client, query):
         response = client.get(f"/flow/api/option-strikes?{query}")

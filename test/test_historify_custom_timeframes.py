@@ -71,3 +71,20 @@ def test_intraday_aggregation_resets_at_each_session(stored, interval, seconds):
     frame = historify_db.get_ohlcv("TEST", "NSE", interval)
     assert frame.timestamp.tolist() == [opening, opening + seconds, opening + 86400]
     assert frame.iloc[0].volume == 20
+
+
+def test_bucket_starts_are_the_same_on_an_india_time_computer():
+    """Weekly and monthly candles start at the IST date expressed as UTC, whatever clock the machine
+    keeps. The two bucket tests above are re-run under an India-time clock in a fresh process."""
+    import os
+    import subprocess
+    import sys
+
+    run = subprocess.run(
+        [sys.executable, "-m", "pytest", "-o", "addopts=", "-q", __file__, "-k", "anchor or seven_month"],
+        env={**os.environ, "TZ": "Asia/Kolkata"},
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    assert run.returncode == 0, run.stdout[-1500:]

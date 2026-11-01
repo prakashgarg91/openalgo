@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -171,6 +171,20 @@ class Bot:
     def quote(self, symbol: str, exchange: str = EXCHANGE) -> dict:
         return self.client.post("/api/v1/quotes", symbol=symbol, exchange=exchange).get("data", {})
 
+    def previous_close(self, symbol: str, exchange: str, today: date) -> float:
+        """Close of the last daily bar before ``today``. The index quote's own previous close is
+        returned as 0 by the broker feed, so the daily history is the source."""
+        reply = self.client.post(
+            "/api/v1/history", symbol=symbol, exchange=exchange, interval="D",
+            start_date=f"{today - timedelta(days=12):%Y-%m-%d}", end_date=f"{today:%Y-%m-%d}",
+        )  # fmt: skip
+        earlier = [
+            (datetime.fromtimestamp(row["timestamp"], UTC).date(), float(row["close"]))
+            for row in reply.get("data") or []
+            if datetime.fromtimestamp(row["timestamp"], UTC).date() < today
+        ]
+        return max(earlier)[1] if earlier else 0.0
+
     # actions --------------------------------------------------------------------------------
     def enter(
         self, expiry: date, now: datetime, holidays: set[date], dry_run: bool = False
@@ -185,9 +199,9 @@ class Bot:
                 )
         if today != entry_day(expiry, holidays):
             raise Refused(f"Today is not the entry session for the {expiry:%d %b %Y} expiry.")
-        index = self.quote(UNDERLYING, "NSE_INDEX")
-        spot, prev = float(index.get("ltp") or 0), float(index.get("prev_close") or 0)
-        vix_prev = float(self.quote("INDIAVIX", "NSE_INDEX").get("prev_close") or 0)
+        spot = float(self.quote(UNDERLYING, "NSE_INDEX").get("ltp") or 0)
+        prev = self.previous_close(UNDERLYING, "NSE_INDEX", today)
+        vix_prev = self.previous_close("INDIAVIX", "NSE_INDEX", today)
         if not (spot and prev and vix_prev):
             raise Refused("The Nifty or India VIX quote is missing, so no order was placed.")
         ok, why = should_enter(spot, prev, vix_prev)

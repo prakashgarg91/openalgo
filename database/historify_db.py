@@ -1185,7 +1185,9 @@ def _get_daily_aggregated_ohlcv(
 
         # Use continuous civil-day and absolute-month anchors. Restarting a
         # multiple at January splits one candle across two calendar years.
-        instant = f"to_timestamp(timestamp + {ist_offset})"
+        # AT TIME ZONE 'UTC' makes this a plain timestamp, so the day, week and month cut-offs and
+        # the epoch that comes back do not move with the timezone of the computer running the query.
+        instant = f"(to_timestamp(timestamp + {ist_offset}) AT TIME ZONE 'UTC')"
         if interval_type in ("daily", "weekly"):
             days = interval_value * (7 if interval_type == "weekly" else 1)
             anchor = 4 if interval_type == "weekly" else 0  # Monday 1970-01-05

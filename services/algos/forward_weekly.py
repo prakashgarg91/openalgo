@@ -23,7 +23,9 @@ from services.algos.intraday import OptionBars
 
 VERSION = "2026-11-01-v1"
 LEDGERS = {"L1": 100, "L2": 250}  # ledger -> width of the wing in points
-FIRST_EXPIRY = pd.Timestamp("2026-11-10")
+# The registered first week was named as the Tuesday 10 November expiry; the exchange closed on that day
+# (Diwali Balipratipada) and the expiry moved to Monday 9 November. Same week, holiday-shifted date.
+FIRST_EXPIRY = pd.Timestamp("2026-11-09")
 LAST_CANDLE = dtime(15, 29)  # the last one-minute candle of a full session
 END_TRADES = 26
 END_DATE = pd.Timestamp("2027-05-31")

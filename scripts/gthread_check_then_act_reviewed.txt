@@ -33,3 +33,4 @@ utils/logging.py::SensitiveDataFilter.filter::record.stack_info  # benign: each 
 upgrade/migrate_smtp_simple.py::setup_unicode_output::sys.stdout  # benign: a one-shot command line migration, single threaded
 
 # --- Real races, fixes owned elsewhere --------------------------------------
+services/algos/etf_ledger.py::trade::book.cash  # benign: the book is a local object built and traded inside one nightly offline run (scripts/algo_backtest/run_etf_ledgers.py); no request path or second thread touches it

@@ -169,3 +169,11 @@ def test_the_report_is_written_for_both_ledgers_with_the_week_listed():
     assert out["ledgers"]["L2"]["width"] == 250
     assert one["status"]["state"] == "running"
     assert one["realistic_net"] == round(one["trades"][0]["net"])
+
+
+def test_the_first_counted_week_is_the_holiday_shifted_one():
+    """10 November 2026 is a market holiday, so the registered first week expires on Monday the 9th."""
+    assert fw.FIRST_EXPIRY == pd.Timestamp("2026-11-09")
+    assert (
+        pd.Timestamp("2026-11-03") < fw.FIRST_EXPIRY
+    )  # the week entered before registration stays out

@@ -1,6 +1,6 @@
 """The sandbox-mode executor on a fake API: guards, order sequence, failures and the comparison."""
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -25,11 +25,17 @@ class FakeApi:
             return {"status": "success", "data": {"analyze_mode": self.analyze}}
         if path == "/api/v1/quotes":
             if p["symbol"] == "NIFTY":
-                return {"data": {"ltp": self.spot, "prev_close": 25000.0}}
+                return {"data": {"ltp": self.spot, "prev_close": 0}}  # the real feed returns 0 here
             if p["symbol"] == "INDIAVIX":
-                return {"data": {"prev_close": self.vix}}
+                return {"data": {"ltp": 15.0, "prev_close": 0}}
             ask, bid = (6.0, 5.5) if p["symbol"].endswith("25100CE") else (20.5, 20.0)
             return {"data": {"bid": bid, "ask": ask}}
+        if path == "/api/v1/history":
+            close = 25000.0 if p["symbol"] == "NIFTY" else self.vix
+            day = lambda d: int(datetime(2026, 11, d, tzinfo=UTC).timestamp())  # noqa: E731
+            return {
+                "data": [{"timestamp": day(5), "close": close}, {"timestamp": day(6), "close": 1.0}]
+            }
         if path == "/api/v1/placeorder":
             oid = f"id{len(self.orders) + 1}"
             self.orders[oid] = p
