@@ -46,6 +46,10 @@ DOUBLE_COSTS = replace(
 )
 
 IDEAS = ("idea1", "idea2", "idea3")
+CALENDAR = ("c1_calendar",)
+C1_SPEND = 18_900.0  # Rs 19,000 limit less a reserve for the charges of the entry
+C1_ENTRY_BEFORE_LAST = 3  # sessions before the month's last session
+C1_EXIT_SESSION = 3  # the third session of the next month
 BENCHMARKS = ("hold_5050", "hold_4040_cash")
 MOMENTUM_DAYS = 252
 TREND_DAYS = 100
@@ -59,7 +63,7 @@ def all_rules() -> tuple[str, ...]:
     """Every rule that has a ledger: ideas 1 to 3 and the twelve candidates."""
     from services.algos import etf_candidates
 
-    return (*IDEAS, *etf_candidates.NAMES)
+    return (*IDEAS, *CALENDAR, *etf_candidates.NAMES)
 
 
 class Blocked(Exception):
@@ -112,6 +116,33 @@ def _hold_or(amount: float, symbol: str, book: Book, price: float, month_end: bo
     return None
 
 
+def _c1_targets(closes: pd.DataFrame, i: int, book: Book) -> dict[str, float | None] | None:
+    """The month-end window of docs/algos/c1-registration.md. Calendar only, no price is read.
+
+    ``i`` is the signal session, so the trade is at session ``i + 1``. The month's last session is read
+    from the stored sessions, so an entry is only decided once the next month's first session is stored.
+    """
+    j = i + 1
+    if j >= len(closes):
+        return None
+    month = (closes.index[j].year, closes.index[j].month)
+    in_month = [k for k, d in enumerate(closes.index) if (d.year, d.month) == month]
+    position = in_month.index(j) + 1  # 1 for the month's first session
+    holding = book.shares[NIFTY] > 0
+    last = in_month[-1]
+    month_known = last + 1 < len(closes)  # the next month's first session is stored
+    if holding:
+        in_entry_month = month_known and j > last - C1_ENTRY_BEFORE_LAST
+        if not in_entry_month and position >= C1_EXIT_SESSION:
+            return {NIFTY: 0.0, GOLD: 0.0}
+        return None
+    if not month_known:  # the month's last session is unknown, so the entry day is too
+        return None
+    if j == last - C1_ENTRY_BEFORE_LAST:
+        return {NIFTY: C1_SPEND, GOLD: 0.0}
+    return None
+
+
 def targets(
     idea: str, closes: pd.DataFrame, i: int, book: Book, last: bool
 ) -> dict[str, float] | None:
@@ -121,6 +152,8 @@ def targets(
     """
     from services.algos import etf_candidates
 
+    if idea == "c1_calendar":
+        return _c1_targets(closes, i, book)
     if idea in etf_candidates.RULES:
         return etf_candidates.RULES[idea](closes, i, book, is_month_end(closes, i))
     held = {s: book.shares[s] * float(closes[s].iloc[i]) for s in (NIFTY, GOLD)}
@@ -294,7 +327,7 @@ def run_all(
     for variant, costs in (("base", COSTS_V1), ("double", DOUBLE_COSTS)):
         from services.algos import etf_candidates
 
-        for name in (*IDEAS, *BENCHMARKS, *etf_candidates.NAMES):
+        for name in (*IDEAS, *CALENDAR, *BENCHMARKS, *etf_candidates.NAMES):
             out[f"{name}:{variant}"] = run_ledger(name, closes, start, costs, variant)
         for idea, weights in (matched or {}).items():
             out[f"hold_matched_{idea}:{variant}"] = run_ledger(

@@ -186,6 +186,16 @@ def check_day(day: date, catalog_rows: list[dict], counts: dict) -> list[tuple[s
     return findings
 
 
+def problem_message(day: date, findings: list[tuple[str, str]]) -> str | None:
+    """One short alert for the evening Telegram message, or None when every check passed."""
+    problems = [message for level, message in findings if level == PROBLEM]
+    if not problems:
+        return None
+    shown = " ".join(problems[:3])
+    more = f" ({len(problems) - 3} more in log\\capture.log)" if len(problems) > 3 else ""
+    return f"Nightly data check for {day.isoformat()} found a problem. {shown}{more}"
+
+
 def ist_day_bounds(day: date) -> tuple[int, int]:
     """Unix seconds (UTC) covering one India calendar day, the way get_ohlcv takes them."""
     start = int(datetime.combine(day, dt_time(0, 0), tzinfo=IST).timestamp())
@@ -276,6 +286,11 @@ def main() -> int:
     for level, message in findings:
         print(f"  {level}: {message}")
     if any(level == PROBLEM for level, _ in findings):
+        alert = problem_message(day, findings)
+        if alert and "--no-alert" not in sys.argv:
+            from services.algos import forward_alerts as fa
+
+            fa.notify(alert)
         print("Fix the lines marked PROBLEM - until then this day's numbers cannot be trusted.")
         return 2
     print("Everything the forward tests need from this day is in place.")

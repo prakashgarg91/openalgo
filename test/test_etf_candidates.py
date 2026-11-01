@@ -34,7 +34,7 @@ def random_closes(days=900, seed=3):
 
 def test_there_are_twelve_candidates_with_distinct_names():
     assert len(ec.NAMES) == 12 and len(set(ec.NAMES)) == 12
-    assert el.all_rules() == (*el.IDEAS, *ec.NAMES)
+    assert el.all_rules() == (*el.IDEAS, *el.CALENDAR, *ec.NAMES)
 
 
 def test_trend200_wants_the_etf_only_above_its_average_and_matches_the_tested_trend_rule():

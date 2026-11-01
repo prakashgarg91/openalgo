@@ -20,6 +20,8 @@ uv run python scripts\algo_backtest\run_forward_s3n.py >> log\capture.log 2>&1
 rem Telegram alerts for a failed capture, a missed day or a week that did not count (needs the OpenAlgo Telegram bot on).
 uv run python scripts\algo_backtest\alert_forward.py %CAPTURE_RESULT% >> log\capture.log 2>&1
 uv run python scripts\algo_backtest\run_etf_ledgers.py >> log\capture.log 2>&1
+rem Then check that the day's candles, VIX, ETF closes and report files really arrived (Telegram alert if not).
+uv run python scripts\algo_backtest\check_nightly.py >> log\capture.log 2>&1
 rem Last, a read-only copy of the finished day for other tools (db\snapshots), so they never wait on a lock.
 uv run python scripts\algo_backtest\snapshot_historify.py >> log\capture.log 2>&1
 exit /b %CAPTURE_RESULT%

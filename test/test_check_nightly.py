@@ -230,3 +230,17 @@ def test_only_nifty_options_count_toward_the_sixty():
     saved = dict.fromkeys(symbols, 375)
     found = cn.check_day(THURSDAY, catalog(symbols), good_counts(option_candles=saved))
     assert len(problems(found)) == 1  # a Bank Nifty option does not fill the Nifty quota
+
+
+def test_a_problem_becomes_one_short_alert_and_a_clean_day_makes_none():
+    from datetime import date
+
+    from scripts.algo_backtest import check_nightly as cn
+
+    ok = [(cn.OK, "fine")]
+    assert cn.problem_message(date(2026, 11, 6), ok) is None
+    bad = ok + [(cn.PROBLEM, "No index candles."), (cn.PROBLEM, "No VIX close.")]
+    text = cn.problem_message(date(2026, 11, 6), bad)
+    assert "2026-11-06" in text and "No index candles." in text and "No VIX close." in text
+    many = [(cn.PROBLEM, f"p{n}.") for n in range(5)]
+    assert "2 more" in cn.problem_message(date(2026, 11, 6), many)
