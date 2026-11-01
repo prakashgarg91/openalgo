@@ -69,3 +69,19 @@ def test_the_summary_groups_by_moment_kind_and_distance():
     )
     far = s[(s["bucket"] == "300 to 500")].iloc[0]
     assert far["two_sided_share"] == 0.0
+
+
+def test_a_weekend_is_not_a_snapshot_day():
+    import importlib.util
+    from datetime import datetime
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "snapshot_bidask",
+        Path(__file__).resolve().parents[1] / "scripts/algo_backtest/snapshot_bidask.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.is_weekend(datetime(2026, 11, 1))  # Sunday
+    assert module.is_weekend(datetime(2026, 10, 31))  # Saturday
+    assert not module.is_weekend(datetime(2026, 11, 2))  # Monday

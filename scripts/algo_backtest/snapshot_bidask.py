@@ -22,6 +22,11 @@ from services import bidask_snapshot as bs  # noqa: E402
 from services import option_capture as oc  # noqa: E402
 
 
+def is_weekend(moment: datetime) -> bool:
+    """Saturday or Sunday: the exchange is shut and the quotes returned are the last close, not live."""
+    return moment.weekday() >= 5
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if len(args) < 2:
@@ -33,6 +38,9 @@ def main() -> int:
         print("Set UPSTOX_ANALYTICS_TOKEN to your Upstox read-only token first.")
         return 1
     now = datetime.now()
+    if is_weekend(now) and "--force" not in sys.argv:
+        print("Weekend: the exchange is shut, so nothing was saved. Use --force to test the tool.")
+        return 0
     expiry = oc.nearest_expiry(get_distinct_expiries(oc.EXCHANGE, oc.UNDERLYING, "options"), now)
     if expiry is None:
         print(
