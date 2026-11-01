@@ -30,3 +30,14 @@ This registration adds no trial: it is data, not a strategy. The running count s
 ## Checks before anything is analysed
 
 Row counts per year against the number of sessions; every expiry has a settlement row on its last session; no negative or zero settle on a listed contract; strike steps are regular; the number of Nifty weekly expiries per year matches the exchange's known cycle. A failed check is reported, not patched.
+
+## Result of the download and the checks (1 November 2026)
+
+Downloaded to `openalgo-data/nse_fo_eod/` (81 MB, 12 yearly tables): 3,087 weekdays asked for, 2,919 sessions fetched, 168 with no file (holidays), 0 failed. Passed: the sessions in each year's table equal the manifest's, strike steps are regular, weekly expiries appear from 2019 (about 50 a year; monthly only before). Reported, not patched:
+
+- **No usable option settlement price before February 2020.** On the expiry date of every one of the 100 expiries from January 2015 to January 2020 the option settle column is zero while the close is positive. From February 2020 on, settle is positive on every expiry-day session (452 expiries stored through their own date in all). The rule above ("settlement price is used for expiry") therefore holds only from February 2020; for 2015 to January 2020 a strategy's own registration has to say what expiry value it uses (the expiry-day close is the only candidate in the file) and report results with and without that period.
+- **8 of 460 past expiries have no rows on their own date** (contracts re-dated by the exchange, for example the 25 September 2025 Thursday contract replaced by a Tuesday date, and holiday-shifted expiries). A strategy must take the expiry from the data, not the calendar.
+- **3.5 percent of option rows (218,273 of 6,205,641) have settle 0**, mostly 2015 to 2019 and mostly strikes that did not trade; a strategy must not use a zero as a price.
+
+No trial was added. No strategy has been tested on this data; the earliest next registration is December 2026.
+
