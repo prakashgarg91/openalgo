@@ -43,3 +43,15 @@ Stop rule: cumulative baseline net at or below minus Rs 5,000 ends C1 permanentl
 ## Limits
 
 About 24 monthly observations can show an effect of a few percent a year only if it is very regular. The result will probably be inconclusive. If both this and the S3n forward test (registered separately) end without a pass, the owner's default is a simple equity-plus-gold holding with at most Rs 20,000 invested, which caps exposure but is not a guaranteed daily stop.
+
+## Screening on the 15-year ETF history (run 1 November 2026, information only, not a trial)
+
+Run once with `scripts/algo_backtest/screen_etf_ideas.py` on NIFTYBEES and GOLDBEES closes from 18 January 2013 to 30 October 2026 (13.8 years, about 165 month-end windows, Rs 1,00,000 start, the same itemised cost schedule). This history is development data and confers no pass.
+
+| | Ending value | A year | Deepest fall | Worst day | Costs paid |
+| --- | --- | --- | --- | --- | --- |
+| C1, base costs | Rs 1,03,470 | 0.2% | Rs 5,571 | -Rs 1,033 | Rs 14,649 |
+| C1, doubled costs | Rs 88,821 | negative | | | |
+| Passive NIFTYBEES hold, same average rupees invested | Rs 1,17,479 | 1.2% | Rs 4,147 | -Rs 822 | Rs 27 |
+
+What it shows: the month-end window earned a small gross gain, and the two trades a month (about Rs 14,600 of charges over the period) consumed nearly all of it, so C1 trailed the matched passive hold by about Rs 14,000 at base costs and by about Rs 28,600 at doubled costs. The registered gate "positive excess over an exposure-matched passive hold under both variants" is therefore very unlikely to be met in the forward test. Nothing is changed: the rule, costs and gates stay as registered, the ledger keeps running, and this screening adds no trial. If the forward months agree, C1 ends as a fail, which costs nothing because it is a shadow ledger.
