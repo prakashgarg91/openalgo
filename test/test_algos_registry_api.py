@@ -92,3 +92,28 @@ def test_there_is_no_endpoint_to_run_edit_or_promote_a_registration(client):
 
 def test_a_non_object_body_is_a_400(client):
     assert client.post("/algos/api/registry", json=[1, 2]).status_code == 400
+
+
+def test_the_forward_list_reads_the_nightly_reports_and_is_empty_without_them(
+    client, tmp_path, monkeypatch
+):
+    import json
+
+    reports = tmp_path / "reports"  # not the register folder: that one only holds registrations
+    reports.mkdir()
+    monkeypatch.setenv("ALGO_FORWARD_S3N_REPORT", str(reports / "none.json"))
+    monkeypatch.setenv("ALGO_FORWARD_EOD_DIR", str(reports / "eod"))
+    assert client.get("/algos/api/forward").get_json()["data"] == []
+    (reports / "s3n.json").write_text(
+        json.dumps({"ledgers": {"L1": {"completed": 3, "realistic_net": 1200,
+                                       "status": {"state": "running", "verdict": None, "trades_to_go": 23}}}}),
+        encoding="utf-8",
+    )  # fmt: skip
+    monkeypatch.setenv("ALGO_FORWARD_S3N_REPORT", str(reports / "s3n.json"))
+    row = client.get("/algos/api/forward").get_json()["data"][0]
+    assert (
+        row["state"] == "running"
+        and row["completed"] == 3
+        and row["trades_to_go"] == 23
+        and row["net"] == 1200
+    )

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ClipboardCheck, Loader2 } from 'lucide-react'
 import { useState } from 'react'
-import { algoQueryKeys, fetchRegistry, registerIdea } from '@/api/algos'
+import { algoQueryKeys, fetchForwardTests, fetchRegistry, registerIdea } from '@/api/algos'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -31,6 +31,10 @@ export function RegistryPanel() {
   const { data, isLoading } = useQuery({
     queryKey: algoQueryKeys.registry(),
     queryFn: fetchRegistry,
+  })
+  const { data: forward } = useQuery({
+    queryKey: algoQueryKeys.forward(),
+    queryFn: fetchForwardTests,
   })
   const [values, setValues] = useState<Record<string, string>>({})
   const [gates, setGates] = useState('')
@@ -122,6 +126,40 @@ export function RegistryPanel() {
                   ))}
                 </tbody>
               </table>
+            )}
+
+            {forward && forward.length > 0 && (
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium">Forward tests in Sandbox mode</h3>
+                <table className="w-full text-left text-sm">
+                  <thead className="text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-3 font-normal">Idea</th>
+                      <th className="pr-3 font-normal">State</th>
+                      <th className="pr-3 font-normal">Trades done</th>
+                      <th className="pr-3 font-normal">To go</th>
+                      <th className="font-normal">Net after costs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forward.map((f) => (
+                      <tr key={f.name} className="border-t">
+                        <td className="py-1 pr-3">{f.name}</td>
+                        <td className="pr-3">{f.verdict ? `${f.state}, ${f.verdict}` : f.state}</td>
+                        <td className="pr-3">{f.completed}</td>
+                        <td className="pr-3">{f.trades_to_go ?? '-'}</td>
+                        <td>
+                          {f.net == null ? '-' : `Rs ${Math.round(f.net).toLocaleString('en-IN')}`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="text-xs text-muted-foreground">
+                  Shadow tests on stored prices. No order is placed and nothing here is a result
+                  until a test has ended.
+                </p>
+              </div>
             )}
 
             <div className="space-y-3">

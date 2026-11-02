@@ -161,6 +161,7 @@ export const algoQueryKeys = {
   coverage: () => [...algoQueryKeys.all, 'coverage'] as const,
   readiness: () => [...algoQueryKeys.all, 'readiness'] as const,
   registry: () => [...algoQueryKeys.all, 'registry'] as const,
+  forward: () => [...algoQueryKeys.all, 'forward'] as const,
 }
 
 export async function fetchCatalogue(): Promise<AlgoItem[]> {
@@ -496,5 +497,19 @@ export async function fetchRegistry(): Promise<RegistryView> {
 
 export async function registerIdea(draft: RegistrationDraft): Promise<RegistrationRow> {
   const response = await webClient.post<{ data: RegistrationRow }>(`${BASE}/registry`, draft)
+  return response.data.data
+}
+
+export interface ForwardRow {
+  name: string
+  state: string
+  verdict: string | null
+  completed: number
+  trades_to_go: number | null
+  net: number | null
+}
+
+export async function fetchForwardTests(): Promise<ForwardRow[]> {
+  const response = await webClient.get<{ data: ForwardRow[] }>(`${BASE}/forward`)
   return response.data.data
 }

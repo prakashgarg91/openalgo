@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RegistryView } from '@/api/algos'
 import { RegistryPanel } from './RegistryPanel'
 
-const api = vi.hoisted(() => ({ fetchRegistry: vi.fn(), registerIdea: vi.fn() }))
+const api = vi.hoisted(() => ({
+  fetchRegistry: vi.fn(),
+  registerIdea: vi.fn(),
+  fetchForwardTests: vi.fn(),
+}))
 
 vi.mock('@/api/algos', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/algos')>()),
@@ -34,6 +38,8 @@ describe('RegistryPanel', () => {
   beforeEach(() => {
     api.fetchRegistry.mockReset()
     api.registerIdea.mockReset()
+    api.fetchForwardTests.mockReset()
+    api.fetchForwardTests.mockResolvedValue([])
   })
 
   it('shows the count, the bar to clear and the next free month in plain words', async () => {
@@ -88,5 +94,23 @@ describe('RegistryPanel', () => {
       params: { wing: 100, label: 'calm' },
     })
     expect(await screen.findByRole('alert')).toHaveTextContent('already used by C1')
+  })
+
+  it('lists the forward tests with their state and says nothing is a result until one has ended', async () => {
+    api.fetchRegistry.mockResolvedValue(view())
+    api.fetchForwardTests.mockResolvedValue([
+      {
+        name: 'Weekly call spread, 100 points wide (S3n)',
+        state: 'running',
+        verdict: null,
+        completed: 3,
+        trades_to_go: 23,
+        net: 1200,
+      },
+    ])
+    mount()
+    expect(await screen.findByText(/Weekly call spread, 100 points wide/)).toBeInTheDocument()
+    expect(screen.getByText('23')).toBeInTheDocument()
+    expect(screen.getByText(/until a test has ended/)).toBeInTheDocument()
   })
 })
