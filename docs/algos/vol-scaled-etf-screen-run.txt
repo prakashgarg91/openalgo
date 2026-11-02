@@ -1,0 +1,2 @@
+Volatility-scaled equity and gold screen (trial 320) was run on 2026-11-02.
+Verdict: rejected. Do not run it again; a second look is a new trial.
