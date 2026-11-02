@@ -185,3 +185,8 @@ def test_exit_buys_back_the_call_first_then_sells_the_hedge_and_compares_with_th
     assert "exit_shortfall" in row
     with pytest.raises(sb.Refused):
         b.exit()  # nothing left open? status closed is not open
+
+
+def test_the_entry_session_for_the_holiday_shifted_9_november_expiry_is_thursday_the_5th():
+    """10 November 2026 is a market holiday; Sunday 8 November is a special evening session only."""
+    assert sb.entry_day(date(2026, 11, 9), {date(2026, 11, 10)}) == date(2026, 11, 5)

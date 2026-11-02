@@ -41,3 +41,4 @@ Downloaded to `openalgo-data/nse_fo_eod/` (81 MB, 12 yearly tables): 3,087 weekd
 
 No trial was added. No strategy has been tested on this data; the earliest next registration is December 2026.
 
+Update, 2 November 2026: the earliest-next-registration statement above is superseded by the owner's direction to register the eight-structure screen in November and run it once on or after 1 December ([eight-structure-screen-registration.md](eight-structure-screen-registration.md)). Its trials (312 to 319) are counted at the run, in December's idea slot.
