@@ -9,7 +9,7 @@ Optimized for backtesting and analytical queries.
 import os
 import threading
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -22,6 +22,9 @@ from utils.logging import get_logger
 
 # Initialize logger
 logger = get_logger(__name__)
+
+#: Exchange time. Exported dates and times are always shown in it, whatever timezone the computer keeps.
+_IST = timezone(timedelta(hours=5, minutes=30))
 
 # Load environment variables
 load_dotenv()
@@ -1516,8 +1519,8 @@ def export_to_csv(
         query = f"""
             SELECT
                 symbol, exchange, interval,
-                strftime(to_timestamp(timestamp), '%Y-%m-%d') as date,
-                strftime(to_timestamp(timestamp), '%H:%M:%S') as time,
+                strftime((to_timestamp(timestamp + 19800) AT TIME ZONE 'UTC'), '%Y-%m-%d') as date,
+                strftime((to_timestamp(timestamp + 19800) AT TIME ZONE 'UTC'), '%H:%M:%S') as time,
                 open, high, low, close, volume, oi
             FROM market_data
             WHERE {where_clause}
@@ -2708,8 +2711,8 @@ def export_to_txt(
         query = f"""
             SELECT
                 symbol, exchange, interval,
-                strftime(to_timestamp(timestamp), '%Y-%m-%d') as date,
-                strftime(to_timestamp(timestamp), '%H:%M:%S') as time,
+                strftime((to_timestamp(timestamp + 19800) AT TIME ZONE 'UTC'), '%Y-%m-%d') as date,
+                strftime((to_timestamp(timestamp + 19800) AT TIME ZONE 'UTC'), '%H:%M:%S') as time,
                 open, high, low, close, volume, oi
             FROM market_data
             WHERE {where_clause}
@@ -2962,8 +2965,8 @@ def export_to_zip(
                             # Direct query for stored intervals (1m, D)
                             query = """
                                 SELECT
-                                    strftime(to_timestamp(timestamp), '%Y-%m-%d') as date,
-                                    strftime(to_timestamp(timestamp), '%H:%M:%S') as time,
+                                    strftime((to_timestamp(timestamp + 19800) AT TIME ZONE 'UTC'), '%Y-%m-%d') as date,
+                                    strftime((to_timestamp(timestamp + 19800) AT TIME ZONE 'UTC'), '%H:%M:%S') as time,
                                     open, high, low, close, volume, oi
                                 FROM market_data
                                 WHERE symbol = ? AND exchange = ? AND interval = ?
@@ -3075,8 +3078,8 @@ def export_bulk_csv(
         query = f"""
             SELECT
                 symbol, exchange, interval,
-                strftime(to_timestamp(timestamp), '%Y-%m-%d') as date,
-                strftime(to_timestamp(timestamp), '%H:%M:%S') as time,
+                strftime((to_timestamp(timestamp + 19800) AT TIME ZONE 'UTC'), '%Y-%m-%d') as date,
+                strftime((to_timestamp(timestamp + 19800) AT TIME ZONE 'UTC'), '%H:%M:%S') as time,
                 open, high, low, close, volume, oi
             FROM market_data
             WHERE {where_clause}
@@ -3179,10 +3182,10 @@ def get_export_preview(
                 "symbol_count": result[1],
                 "exchange_count": result[2],
                 "interval_count": result[3],
-                "first_date": datetime.fromtimestamp(result[4]).strftime("%Y-%m-%d")
+                "first_date": datetime.fromtimestamp(result[4], _IST).strftime("%Y-%m-%d")
                 if result[4]
                 else None,
-                "last_date": datetime.fromtimestamp(result[5]).strftime("%Y-%m-%d")
+                "last_date": datetime.fromtimestamp(result[5], _IST).strftime("%Y-%m-%d")
                 if result[5]
                 else None,
                 "estimated_size_csv_mb": round(csv_size, 2),

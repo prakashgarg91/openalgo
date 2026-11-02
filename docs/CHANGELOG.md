@@ -10,6 +10,7 @@ fix, live in [docs/releases](releases/).
 
 ### Fixed
 
+- Historify exports (CSV, TXT, ZIP, parquet text columns) now always show dates and times in exchange (India) time, whatever timezone the computer keeps. THIS CHANGES EXPORTS FROM UTC SERVERS: the market open that used to read 03:45 now reads 09:15, as it already did on an India-time computer and in the exports that were built from dataframes. Anything that reads old exports and expects 03:45 must be adjusted. The catalogue's first and last dates are also in India time. Chosen by the owner on 2 November 2026; a test checks the same output under three timezones.
 - Sandbox bot (`services/algos/sandbox_bot.py`): analyzer mode is now checked before every order, not once at the start, so switching to Live between the hedge and the call can no longer send the call Live; the hedge is recorded before the call is placed; an exit that bought the call back is remembered, so a retry never buys it twice; an order that fills between the last look and the cancel is recorded; the position check understands every state.
 - Algo entries (`services/algos/runner.py`): algos that fire at the same moment could each pass the daily loss limit, because the check ran before the position was recorded. One entry at a time per trader now.
 - S3n forward ledger: a missed capture on the entry day silently moved the entry to an earlier day. With the exchange calendar the week is now not counted (as the registration says), and the report names the reason.

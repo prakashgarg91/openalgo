@@ -81,10 +81,60 @@ def test_bucket_starts_are_the_same_on_an_india_time_computer():
     import sys
 
     run = subprocess.run(
-        [sys.executable, "-m", "pytest", "-o", "addopts=", "-q", __file__, "-k", "anchor or seven_month"],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-o",
+            "addopts=",
+            "-q",
+            __file__,
+            "-k",
+            "anchor or seven_month or exported_times",
+        ],
         env={**os.environ, "TZ": "Asia/Kolkata"},
         capture_output=True,
         text=True,
         timeout=180,
     )
     assert run.returncode == 0, run.stdout[-1500:]
+
+
+def test_exported_times_are_exchange_time_on_any_computer(stored, tmp_path):
+    """The market opens at 09:15 India time. A stored 03:45 UTC candle must be exported as 09:15:00,
+    not as the clock of whichever computer ran the export."""
+    stored("1m", [epoch("2026-10-01T03:45:00"), epoch("2026-10-01T03:46:00")])
+    out = tmp_path / "export.csv"
+    ok, _message = historify_db.export_to_csv(
+        str(out), symbol="TEST", exchange="NSE", interval="1m"
+    )
+    assert ok
+    rows = out.read_text(encoding="utf-8").splitlines()
+    header, first = rows[0].split(","), rows[1].split(",")
+    assert first[header.index("date")] == "2026-10-01" and first[header.index("time")] == "09:15:00"
+
+
+def test_exported_times_do_not_move_with_the_computers_timezone():
+    import os
+    import subprocess
+    import sys
+
+    for zone in ("America/New_York", "Asia/Kolkata"):
+        run = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-o",
+                "addopts=",
+                "-q",
+                __file__,
+                "-k",
+                "exchange_time_on_any",
+            ],
+            env={**os.environ, "TZ": zone},
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        assert run.returncode == 0, f"{zone}: {run.stdout[-1200:]}"
