@@ -162,6 +162,7 @@ export const algoQueryKeys = {
   readiness: () => [...algoQueryKeys.all, 'readiness'] as const,
   registry: () => [...algoQueryKeys.all, 'registry'] as const,
   forward: () => [...algoQueryKeys.all, 'forward'] as const,
+  reconciliation: () => [...algoQueryKeys.all, 'reconciliation'] as const,
 }
 
 export async function fetchCatalogue(): Promise<AlgoItem[]> {
@@ -477,6 +478,7 @@ export interface RegistrationRow {
   pass_bar: number
   status: string
   intact: boolean
+  needs_post_mortem?: boolean
 }
 
 export interface RegistryView {
@@ -511,5 +513,30 @@ export interface ForwardRow {
 
 export async function fetchForwardTests(): Promise<ForwardRow[]> {
   const response = await webClient.get<{ data: ForwardRow[] }>(`${BASE}/forward`)
+  return response.data.data
+}
+
+export async function savePostMortem(id: string, text: string): Promise<void> {
+  await webClient.post(`${BASE}/registry/${id}/post-mortem`, { text })
+}
+
+export interface ReconciliationRow {
+  expiry: string
+  ledger_credit: number
+  bot_credit: number
+  entry_shortfall: number
+  exit_shortfall: number | null
+  flagged: boolean
+}
+
+export interface Reconciliation {
+  rows: ReconciliationRow[]
+  weeks: number
+  mean_entry_shortfall: number | null
+  flag_points: number
+}
+
+export async function fetchReconciliation(): Promise<Reconciliation> {
+  const response = await webClient.get<{ data: Reconciliation }>(`${BASE}/reconciliation`)
   return response.data.data
 }

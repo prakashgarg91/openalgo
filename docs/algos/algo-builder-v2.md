@@ -30,12 +30,14 @@ The "Register an idea" tab now also lists the forward tests in Sandbox mode (`/a
 - **A reworded idea is the same idea**: registering refuses a draft whose name, idea and entry share 60 percent of their words with a registered one.
 - **Post-mortem before a pass counts**: `record_forward` stores the verdict; the Live rule also needs the owner's written post-mortem (`POST /algos/api/registry/<id>/post-mortem`, at least 60 characters) before a forward pass is recognised.
 - **Trial count guard**: a test fails if the count in the code differs from the register document.
+- **Sandbox reconciliation in the app** (`/algos/api/reconciliation`, a table on the Register an idea tab): the sandbox bot's credit and exit value against the ledger's candle prices, week by week, from the file the bot's `compare` command appends to; a week a point or more off is marked, with the average entry shortfall. A steady shortfall is the measured slippage the cost scenarios assume at 0.15 points a leg.
+- **Post-mortem box** on the same tab for a finished forward test that still owes one.
 - **C1 on the forward list**; the screen's bootstrap gate follows the register's rule 3 (see the registration).
 
 ## Next slices (not built)
 
 1. **Generalise the rejection screen** so a registration for a new idea (not only the eight structures) can be run once through `record_run`. Until then only the December screen exists, and nobody can mark a registration run, which is intended.
-2. A text box for the post-mortem on the Register an idea tab (the endpoint exists).
+2. (none left from the product review except the general screen, below)
 3. **Sandbox and Live gates.** Done: see the forward-pass rule above. The builder page never goes Live.
 4. Replace the old family checkboxes in `BuilderPanel.tsx` with the four steps (Write, Register, Screen, Forward) once the screen is general; the old search keeps working and is now counted.
 

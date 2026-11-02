@@ -8,6 +8,8 @@ const api = vi.hoisted(() => ({
   fetchRegistry: vi.fn(),
   registerIdea: vi.fn(),
   fetchForwardTests: vi.fn(),
+  fetchReconciliation: vi.fn(),
+  savePostMortem: vi.fn(),
 }))
 
 vi.mock('@/api/algos', async (importOriginal) => ({
@@ -40,6 +42,14 @@ describe('RegistryPanel', () => {
     api.registerIdea.mockReset()
     api.fetchForwardTests.mockReset()
     api.fetchForwardTests.mockResolvedValue([])
+    api.fetchReconciliation.mockReset()
+    api.fetchReconciliation.mockResolvedValue({
+      rows: [],
+      weeks: 0,
+      mean_entry_shortfall: null,
+      flag_points: 1,
+    })
+    api.savePostMortem.mockReset()
   })
 
   it('shows the count, the bar to clear and the next free month in plain words', async () => {
@@ -112,5 +122,69 @@ describe('RegistryPanel', () => {
     expect(await screen.findByText(/Weekly call spread, 100 points wide/)).toBeInTheDocument()
     expect(screen.getByText('23')).toBeInTheDocument()
     expect(screen.getByText(/until a test has ended/)).toBeInTheDocument()
+  })
+
+  it('shows sandbox fills against the ledger and points out a week that is a point or more off', async () => {
+    api.fetchRegistry.mockResolvedValue(view())
+    api.fetchReconciliation.mockResolvedValue({
+      rows: [
+        {
+          expiry: '2026-11-09',
+          ledger_credit: 44.8,
+          bot_credit: 44.3,
+          entry_shortfall: 0.5,
+          exit_shortfall: null,
+          flagged: false,
+        },
+        {
+          expiry: '2026-11-17',
+          ledger_credit: 40,
+          bot_credit: 38,
+          entry_shortfall: 2,
+          exit_shortfall: 0.2,
+          flagged: true,
+        },
+      ],
+      weeks: 2,
+      mean_entry_shortfall: 1.25,
+      flag_points: 1,
+    })
+    mount()
+    expect(await screen.findByText('Sandbox fills against the ledger')).toBeInTheDocument()
+    expect(screen.getByText(/look at this week/)).toBeInTheDocument()
+    expect(screen.getByText(/Average entry shortfall: 1.25 points/)).toBeInTheDocument()
+  })
+
+  it('asks for the post-mortem of a finished test and sends it', async () => {
+    api.fetchRegistry.mockResolvedValue(
+      view({
+        registrations: [
+          {
+            id: 'a-1',
+            name: 'Vol scaled equity gold',
+            created_at: '2027-01-04T10:00:00',
+            slot: '2027-01',
+            trial_numbers: [320, 320],
+            pass_bar: 0.025 / 320,
+            status: 'forward pass',
+            intact: true,
+            needs_post_mortem: true,
+          },
+        ],
+      })
+    )
+    api.savePostMortem.mockResolvedValue(undefined)
+    mount()
+    const box = await screen.findByLabelText(/Post-mortem for Vol scaled equity gold/)
+    fireEvent.change(box, {
+      target: { value: 'It held on 26 trades; fills were kinder in sandbox mode.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Save post-mortem/ }))
+    await waitFor(() =>
+      expect(api.savePostMortem).toHaveBeenCalledWith(
+        'a-1',
+        'It held on 26 trades; fills were kinder in sandbox mode.'
+      )
+    )
   })
 })

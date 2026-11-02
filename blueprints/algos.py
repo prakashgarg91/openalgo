@@ -589,7 +589,11 @@ def registry_list():
                             "run",
                         )
                     }
-                    | {"name": r["content"]["name"], "intact": registry.intact(r)}
+                    | {
+                        "name": r["content"]["name"],
+                        "intact": registry.intact(r),
+                        "needs_post_mortem": registry.needs_post_mortem(r),
+                    }
                     for r in records
                 ],
             }
@@ -603,6 +607,14 @@ def registry_list():
 def forward_tests():
     """Where each forward shadow test stands, read from the reports the nightly job writes."""
     return _ok({"data": agent_view.forward_status()})
+
+
+@algos_bp.route("/api/reconciliation", methods=["GET"])
+@check_session_validity
+@_api_limit
+def reconciliation():
+    """Sandbox fills against the ledger's candle prices, one row per finished week."""
+    return _ok({"data": agent_view.reconciliation()})
 
 
 @algos_bp.route("/api/registry", methods=["POST"])

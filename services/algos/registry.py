@@ -390,6 +390,12 @@ def record_forward(
 MIN_POST_MORTEM_CHARS = 60
 
 
+def needs_post_mortem(record: dict[str, Any]) -> bool:
+    """True for a finished forward test whose written post-mortem is still owed."""
+    forward = record.get("forward")
+    return bool(forward) and not forward.get("post_mortem")
+
+
 def add_post_mortem(folder: Path, record_id: str, text: str, now: datetime) -> dict[str, Any]:
     """The owner's written account of what a forward test showed and what it did not. A forward pass
     counts toward Live only once it has one, so the result is read before it is relied on."""

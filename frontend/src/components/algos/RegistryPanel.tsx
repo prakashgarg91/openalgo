@@ -1,7 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ClipboardCheck, Loader2 } from 'lucide-react'
 import { useState } from 'react'
-import { algoQueryKeys, fetchForwardTests, fetchRegistry, registerIdea } from '@/api/algos'
+import {
+  algoQueryKeys,
+  fetchForwardTests,
+  fetchReconciliation,
+  fetchRegistry,
+  registerIdea,
+  savePostMortem,
+} from '@/api/algos'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -36,6 +43,11 @@ export function RegistryPanel() {
     queryKey: algoQueryKeys.forward(),
     queryFn: fetchForwardTests,
   })
+  const { data: reconciliation } = useQuery({
+    queryKey: algoQueryKeys.reconciliation(),
+    queryFn: fetchReconciliation,
+  })
+  const [postMortem, setPostMortem] = useState<Record<string, string>>({})
   const [values, setValues] = useState<Record<string, string>>({})
   const [gates, setGates] = useState('')
   const [settings, setSettings] = useState('')
@@ -43,6 +55,18 @@ export function RegistryPanel() {
   const [problem, setProblem] = useState<string | null>(null)
 
   const set = (key: string, value: string) => setValues((old) => ({ ...old, [key]: value }))
+
+  async function savePost(id: string) {
+    setProblem(null)
+    try {
+      await savePostMortem(id, postMortem[id] ?? '')
+      showToast.success('Post-mortem saved.', 'algos')
+      setPostMortem((old) => ({ ...old, [id]: '' }))
+      await queryClient.invalidateQueries({ queryKey: algoQueryKeys.registry() })
+    } catch (error) {
+      setProblem(errorText(error))
+    }
+  }
 
   async function submit() {
     setBusy(true)
@@ -126,6 +150,67 @@ export function RegistryPanel() {
                   ))}
                 </tbody>
               </table>
+            )}
+
+            {data.registrations
+              .filter((r) => r.needs_post_mortem)
+              .map((r) => (
+                <div key={`pm-${r.id}`} className="space-y-1 rounded-md border p-3">
+                  <Label htmlFor={`pm-${r.id}`}>
+                    Post-mortem for {r.name}: what the test showed, what it cannot show, and what
+                    you would do differently
+                  </Label>
+                  <Textarea
+                    id={`pm-${r.id}`}
+                    rows={3}
+                    value={postMortem[r.id] ?? ''}
+                    onChange={(e) => setPostMortem((old) => ({ ...old, [r.id]: e.target.value }))}
+                  />
+                  <Button size="sm" onClick={() => savePost(r.id)}>
+                    Save post-mortem
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    A passed forward test counts toward Live only after this is written.
+                  </p>
+                </div>
+              ))}
+
+            {reconciliation && reconciliation.rows.length > 0 && (
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium">Sandbox fills against the ledger</h3>
+                <table className="w-full text-left text-sm">
+                  <thead className="text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-3 font-normal">Week ending</th>
+                      <th className="pr-3 font-normal">Ledger credit</th>
+                      <th className="pr-3 font-normal">Sandbox credit</th>
+                      <th className="pr-3 font-normal">Entry shortfall</th>
+                      <th className="font-normal">Exit shortfall</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reconciliation.rows.map((r) => (
+                      <tr
+                        key={r.expiry}
+                        className={r.flagged ? 'border-t font-medium' : 'border-t'}
+                      >
+                        <td className="py-1 pr-3">{r.expiry}</td>
+                        <td className="pr-3">{r.ledger_credit.toFixed(2)}</td>
+                        <td className="pr-3">{r.bot_credit.toFixed(2)}</td>
+                        <td className="pr-3">
+                          {r.entry_shortfall.toFixed(2)}
+                          {r.flagged ? ' (look at this week)' : ''}
+                        </td>
+                        <td>{r.exit_shortfall == null ? '-' : r.exit_shortfall.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="text-xs text-muted-foreground">
+                  Points per spread; positive means the sandbox did worse than the ledger assumed.
+                  Average entry shortfall: {reconciliation.mean_entry_shortfall?.toFixed(2)} points.
+                </p>
+              </div>
             )}
 
             {forward && forward.length > 0 && (

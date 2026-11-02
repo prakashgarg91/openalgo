@@ -151,3 +151,23 @@ def test_a_post_mortem_is_recorded_through_the_endpoint_and_a_bad_one_is_a_400(c
     text = "It failed on 26 trades; the edge was the filter and not the structure; I would test the filter alone."
     ok = client.post(f"/algos/api/registry/{record_id}/post-mortem", json={"text": text})
     assert ok.status_code == 200 and ok.get_json()["data"]["status"] == "forward fail"
+
+
+def test_the_reconciliation_endpoint_reads_the_comparison_file(client, tmp_path, monkeypatch):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    monkeypatch.setenv("ALGO_BOT_COMPARE_CSV", str(reports / "none.csv"))
+    assert client.get("/algos/api/reconciliation").get_json()["data"]["rows"] == []
+    (reports / "c.csv").write_text(
+        "expiry,ledger_credit,bot_credit,entry_shortfall,exit_shortfall\n2026-11-09,44.8,43.0,1.8,\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ALGO_BOT_COMPARE_CSV", str(reports / "c.csv"))
+    row = client.get("/algos/api/reconciliation").get_json()["data"]["rows"][0]
+    assert row["flagged"] is True and row["exit_shortfall"] is None
+
+
+def test_the_registry_list_says_which_finished_tests_owe_a_post_mortem(client):
+    client.post("/algos/api/registry", json=draft())
+    row = client.get("/algos/api/registry").get_json()["data"]["registrations"][0]
+    assert row["needs_post_mortem"] is False

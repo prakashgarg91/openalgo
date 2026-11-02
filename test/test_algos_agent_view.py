@@ -100,3 +100,33 @@ def test_the_forward_view_lists_s3n_c1_and_registered_structures(tmp_path, monke
 )
 def test_every_public_view_exists(name):
     assert callable(getattr(av, name))
+
+
+def test_the_reconciliation_flags_a_fill_a_point_or_more_worse_than_the_ledger(tmp_path):
+    assert av.reconciliation(tmp_path / "none.csv")["rows"] == []
+    (tmp_path / "compare.csv").write_text(
+        "expiry,ledger_credit,bot_credit,entry_shortfall,ledger_exit_value,bot_exit_value,exit_shortfall\n"
+        "2026-11-09,44.8,44.3,0.5,1.0,1.2,0.2\n"
+        "2026-11-17,40.0,38.5,1.5,0.5,0.5,0.0\n",
+        encoding="utf-8",
+    )
+    out = av.reconciliation(tmp_path / "compare.csv")
+    assert out["weeks"] == 2 and out["mean_entry_shortfall"] == 1.0
+    assert [r["flagged"] for r in out["rows"]] == [False, True]
+    assert out["rows"][0]["exit_shortfall"] == 0.2
+
+
+def test_a_finished_forward_test_without_a_post_mortem_is_marked_as_owing_one(tmp_path):
+    record = reg.register(draft(), tmp_path, JAN)
+    assert reg.needs_post_mortem(record) is False
+    run = reg.record_run(tmp_path, record["id"], dict.fromkeys(record["content"]["gates"], True),
+                         datetime(2027, 2, 1), reg.engine_seal(record["sha256"], dict.fromkeys(record["content"]["gates"], True)))  # fmt: skip
+    ended = reg.record_forward(tmp_path, run["id"], "fail", {}, datetime(2027, 8, 1))
+    assert reg.needs_post_mortem(ended) is True
+    done = reg.add_post_mortem(
+        tmp_path,
+        ended["id"],
+        "It failed on 26 trades because the filter did the work; test the filter alone next.",
+        datetime(2027, 8, 2),
+    )
+    assert reg.needs_post_mortem(done) is False

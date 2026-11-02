@@ -169,3 +169,48 @@ def tried_before(query: str, docs_root: Path, limit: int = 8) -> list[dict[str, 
                 if len(out) >= limit:
                     return out
     return out
+
+
+FLAG_POINTS = 1.0  # a sandbox fill this many points worse than the ledger's price is worth a look
+
+
+def reconciliation(path: Path | None = None) -> dict[str, Any]:
+    """How the sandbox bot's fills compare with the ledger's candle prices, week by week.
+
+    A positive shortfall means the bot did worse than the ledger assumed. A steady shortfall is the
+    measured slippage the cost scenarios assume at 0.15 points a leg. Reads the file the bot's
+    ``compare`` command appends to; nothing here places or changes anything.
+    """
+    path = path or Path(os.getenv("ALGO_BOT_COMPARE_CSV", "db/sandbox_bot/compare.csv"))
+    if not path.exists():
+        return {"rows": [], "weeks": 0, "mean_entry_shortfall": None, "flag_points": FLAG_POINTS}
+    try:
+        import pandas as pd
+
+        frame = pd.read_csv(path)
+    except (ValueError, OSError):
+        logger.exception("Could not read the sandbox comparison file")
+        return {"rows": [], "weeks": 0, "mean_entry_shortfall": None, "flag_points": FLAG_POINTS}
+    rows = []
+    for r in frame.to_dict("records"):
+        entry = float(r.get("entry_shortfall", 0) or 0)
+        exit_ = r.get("exit_shortfall")
+        exit_ = None if exit_ is None or pd.isna(exit_) else float(exit_)
+        rows.append(
+            {
+                "expiry": str(r.get("expiry", "")),
+                "ledger_credit": round(float(r.get("ledger_credit", 0) or 0), 2),
+                "bot_credit": round(float(r.get("bot_credit", 0) or 0), 2),
+                "entry_shortfall": round(entry, 2),
+                "exit_shortfall": None if exit_ is None else round(exit_, 2),
+                "flagged": abs(entry) >= FLAG_POINTS
+                or (exit_ is not None and abs(exit_) >= FLAG_POINTS),
+            }
+        )
+    mean = round(sum(r["entry_shortfall"] for r in rows) / len(rows), 2) if rows else None
+    return {
+        "rows": rows,
+        "weeks": len(rows),
+        "mean_entry_shortfall": mean,
+        "flag_points": FLAG_POINTS,
+    }
