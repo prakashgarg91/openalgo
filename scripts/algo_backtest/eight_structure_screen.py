@@ -2,7 +2,7 @@
 
 Registered on 2 November 2026 to be run ONCE (first for 1 December 2026, brought forward to 2 November 2026 by the owner), on the NSE end-of-day data in
 the private data repository. ``--check`` only counts what data and documented lot sizes are there and
-evaluates no price, so it is safe to run at any time. A full run refuses to start before 1 December 2026
+evaluates no price, so it is safe to run at any time. A full run refuses to start before 2 November 2026
 and refuses a second run. Read only; places no order.
 
 Usage:
@@ -50,7 +50,7 @@ def refusal(today: date, report_exists: bool) -> str | None:
     """Why the screen must not run now, in words for the trader, or None if it may."""
     if today < RUN_NOT_BEFORE:
         return (
-            "This screen is registered to run once, on or after 1 December 2026. Nothing was run."
+            "This screen is registered to run once, on or after 2 November 2026. Nothing was run."
         )
     if report_exists:
         return "This screen has already been run. A second look is a new idea and a new trial. Nothing was run."
@@ -85,7 +85,7 @@ def check(chain: es.Chain, nifty: pd.Series, vix: pd.Series) -> None:
     print(f"  expiries before the first documented lot (excluded): {len(undocumented)}")
     print(f"  Nifty close {nifty.index.min():%Y-%m-%d} to {nifty.index.max():%Y-%m-%d}; "
           f"India VIX {vix.index.min():%Y-%m-%d} to {vix.index.max():%Y-%m-%d}")  # fmt: skip
-    print("No price was evaluated. The screen itself runs once, on or after 1 December 2026.")
+    print("No price was evaluated. The screen itself runs once, on or after 2 November 2026.")
 
 
 def coverage(chain: es.Chain, nifty: pd.Series, vix: pd.Series) -> None:
