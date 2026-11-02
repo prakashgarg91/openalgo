@@ -534,6 +534,18 @@ TOOLKITS: list[ToolkitSpec] = [
         description="Write a generated Python strategy to strategies/scripts/. Never starts it.",
     ),
     ToolkitSpec(
+        key="algos_read",
+        module="services.agent.tools.algos_read",
+        attr="AlgosReadToolkit",
+        # Chat only: it answers a person who asked, inside a turn they started. Never voice or chart.
+        surfaces=frozenset({SURFACE_CHAT}),
+        order=57,
+        description=(
+            "Read the idea register, the forward tests and what was tried before; check a draft "
+            "idea without saving it. Cannot register, run, record or deploy anything."
+        ),
+    ),
+    ToolkitSpec(
         key="skills",
         module="services.agent.tools.skills",
         attr="SkillsToolkit",

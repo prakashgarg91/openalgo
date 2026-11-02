@@ -303,8 +303,23 @@ def test_the_optional_forward_pass_rule_only_adds_a_requirement(monkeypatch, tmp
         "kill_rule": "minus 20000", "gates": ["g1"], "params": {"algo_id": "custom_1"},
     }  # fmt: skip
     rec = reg.register(draft, tmp_path, datetime(2027, 1, 4))
-    reg.record_run(tmp_path, rec["id"], {"g1": True}, datetime(2027, 2, 1))
+    reg.record_run(
+        tmp_path,
+        rec["id"],
+        {"g1": True},
+        datetime(2027, 2, 1),
+        reg.engine_seal(rec["sha256"], {"g1": True}),
+    )
     assert runner.live_gate(1, "custom_1")["allowed"] is False  # eligible is not a forward pass
     reg.record_forward(tmp_path, rec["id"], "pass", {}, datetime(2027, 8, 1))
+    assert (
+        runner.live_gate(1, "custom_1")["allowed"] is False
+    )  # a pass without a post-mortem does not count
+    reg.add_post_mortem(
+        tmp_path,
+        rec["id"],
+        "It held on 26 trades; sandbox fills were idealised; next time measure the spread.",
+        datetime(2027, 8, 2),
+    )
     assert runner.live_gate(1, "custom_1")["allowed"] is True
     assert runner.live_gate(1, "custom_2")["allowed"] is False

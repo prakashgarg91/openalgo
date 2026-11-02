@@ -40,7 +40,7 @@ Weekly structures enter at the close two sessions before the weekly expiry (the 
 3. Worst drawdown marked to market at each day's close, and worst single day, each no more than Rs 20,000 for one lot.
 4. Net profit still above zero after the single best trade is removed.
 5. Net profit above zero in each half of the primary period (split at the median trade date).
-6. A one-sided 97.5 percent lower bound above zero for the mean net result per trade, by a moving-block bootstrap over trades (block 3, 10,000 draws, seed 20261201).
+6. A lower bound above zero for the mean net result per trade, by a moving-block bootstrap over trades (block 3, seed 20261201), taken at the level 0.025 divided by 319, the running trial count after this screen (rule 3 of [TRIAL_REGISTER.md](TRIAL_REGISTER.md)), with 200,000 draws so that level is resolvable. Amended on 2 November 2026, before any run: the first version of this gate used the 97.5 percent bound (level 0.025) with 10,000 draws; the stricter bar is the register's own rule.
 
 If more than two pass, the two with the smallest worst drawdown go forward (ties by larger net). A survivor still needs its own registration, costs and gates before it is run forward, and the one-new-idea-a-month rule applies to those registrations.
 
@@ -60,5 +60,5 @@ The engine is built and tested on made-up prices (`services/algos/eod_screen.py`
 
 - The screen can only be run once per repository, not per copy of the data: running it writes `docs/algos/eight-structure-screen-run.txt`, which must be committed, and the script refuses while that file exists.
 - Exchange charges: `costs.py` uses a flat 0.0345 percent; the actual rate was about 0.05 percent over 2021 to September 2024. STT is overstated by more (0.10 against 0.0625 percent), so costs stay conservative overall, but the screen's report must say so.
-- The survival gate uses a bootstrap at the 0.025 level, while `TRIAL_REGISTER.md` rule 3 describes a bar of 0.025 divided by the running count. The registered text above is what the code does; the owner should settle before 1 December whether the stricter bar applies to the screen.
+- The bootstrap gate now uses the register's rule 3 (0.025 divided by 319); see gate 6 above. A forward ledger of a survivor uses the same engine and so the same bar. The earlier S3n and C1 registrations keep the levels they were registered with.
 

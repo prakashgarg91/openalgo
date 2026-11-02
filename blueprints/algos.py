@@ -21,6 +21,7 @@ from database import algo_db
 from database import strategy_module_db as sm_store
 from limiter import limiter
 from services.algos import (
+    agent_view,
     builder,
     builder_jobs,
     chooser,
@@ -601,44 +602,7 @@ def registry_list():
 @_api_limit
 def forward_tests():
     """Where each forward shadow test stands, read from the reports the nightly job writes."""
-    import json as _json
-
-    rows: list[dict[str, Any]] = []
-    s3n = Path(os.getenv("ALGO_FORWARD_S3N_REPORT", "db/forward_s3n/report.json"))
-    if s3n.exists():
-        try:
-            one = _json.loads(s3n.read_text(encoding="utf-8"))["ledgers"]["L1"]
-            status = one.get("status", {})
-            rows.append(
-                {
-                    "name": "Weekly call spread, 100 points wide (S3n)",
-                    "state": status.get("state", "running"),
-                    "verdict": status.get("verdict"),
-                    "completed": one.get("completed", 0),
-                    "trades_to_go": status.get("trades_to_go"),
-                    "net": one.get("realistic_net"),
-                }
-            )
-        except (ValueError, KeyError, OSError):
-            logger.exception("Could not read the S3n forward report")
-    root = Path(os.getenv("ALGO_FORWARD_EOD_DIR", "db/forward_eod"))
-    names = {r["id"]: r["content"]["name"] for r in registry._store(REGISTRY_DIR)}
-    for path in sorted(root.glob("*/report.json")) if root.exists() else []:
-        try:
-            one = _json.loads(path.read_text(encoding="utf-8"))
-            rows.append(
-                {
-                    "name": names.get(path.parent.name, path.parent.name),
-                    "state": one["state"],
-                    "verdict": one["verdict"],
-                    "completed": one["completed"],
-                    "trades_to_go": one["trades_to_go"],
-                    "net": round(one["stats"]["net"]),
-                }
-            )
-        except (ValueError, KeyError, OSError):
-            logger.exception("Could not read a forward report")
-    return _ok({"data": rows})
+    return _ok({"data": agent_view.forward_status()})
 
 
 @algos_bp.route("/api/registry", methods=["POST"])
@@ -656,6 +620,25 @@ def registry_create():
     except registry.Refused as why:
         return _error(str(why), 400)
     return _ok({"data": record}, 201)
+
+
+@algos_bp.route("/api/registry/<record_id>/post-mortem", methods=["POST"])
+@check_session_validity
+@_api_limit
+def registry_post_mortem(record_id):
+    """The owner's written account of a finished forward test. It records text and changes no result."""
+    if (request.content_length or 0) > REGISTRY_MAX_BODY:
+        return _error("That text is too large. Shorten it and try again.", 413)
+    data, error = _body()
+    if error:
+        return error
+    try:
+        record = registry.add_post_mortem(
+            REGISTRY_DIR, record_id, data.get("text", ""), datetime.now()
+        )
+    except registry.Refused as why:
+        return _error(str(why), 400)
+    return _ok({"data": {"id": record["id"], "status": record["status"]}})
 
 
 @algos_bp.route("/api/builder/search", methods=["POST"])

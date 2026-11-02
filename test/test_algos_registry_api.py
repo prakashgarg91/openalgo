@@ -79,7 +79,14 @@ def test_an_incomplete_idea_is_a_400_with_words_a_trader_can_act_on(client):
 
 def test_a_second_idea_in_the_same_month_is_a_400(client):
     client.post("/algos/api/registry", json=draft())
-    again = client.post("/algos/api/registry", json=draft(name="Another idea"))
+    again = client.post(
+        "/algos/api/registry",
+        json=draft(
+            name="Another idea",
+            idea="Sell weekly index call spreads on calm days",
+            entry="Enter at the close two sessions before the weekly expiry",
+        ),
+    )
     assert again.status_code == 400 and "2027-02" in again.get_json()["message"]
 
 
@@ -117,3 +124,30 @@ def test_the_forward_list_reads_the_nightly_reports_and_is_empty_without_them(
         and row["trades_to_go"] == 23
         and row["net"] == 1200
     )
+
+
+def test_a_post_mortem_is_recorded_through_the_endpoint_and_a_bad_one_is_a_400(client, tmp_path):
+    from datetime import datetime as real_datetime
+
+    first = client.post("/algos/api/registry", json=draft()).get_json()["data"]
+    record_id = first["id"]
+    assert (
+        client.post(
+            f"/algos/api/registry/{record_id}/post-mortem", json={"text": "x" * 80}
+        ).status_code
+        == 400
+    )
+    sealed = reg.engine_seal(first["sha256"], dict.fromkeys(first["content"]["gates"], True))
+    reg.record_run(
+        tmp_path,
+        record_id,
+        dict.fromkeys(first["content"]["gates"], True),
+        real_datetime(2027, 2, 1),
+        sealed,
+    )
+    reg.record_forward(tmp_path, record_id, "fail", {}, real_datetime(2027, 8, 1))
+    short = client.post(f"/algos/api/registry/{record_id}/post-mortem", json={"text": "too short"})
+    assert short.status_code == 400 and "at least 60" in short.get_json()["message"]
+    text = "It failed on 26 trades; the edge was the filter and not the structure; I would test the filter alone."
+    ok = client.post(f"/algos/api/registry/{record_id}/post-mortem", json={"text": text})
+    assert ok.status_code == 200 and ok.get_json()["data"]["status"] == "forward fail"

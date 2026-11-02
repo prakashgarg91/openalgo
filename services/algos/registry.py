@@ -70,6 +70,44 @@ def _hash(content: dict[str, Any]) -> str:
     return hashlib.sha256(_canonical(content).encode("utf-8")).hexdigest()
 
 
+NEAR_DUPLICATE = 0.6  # share of words two ideas must have in common to count as the same idea
+_WORDS = re.compile(r"[a-z0-9]+")
+_STOP = {
+    "the",
+    "a",
+    "an",
+    "of",
+    "to",
+    "and",
+    "or",
+    "in",
+    "on",
+    "at",
+    "is",
+    "it",
+    "for",
+    "with",
+    "by",
+}
+
+
+def _words(text: str) -> set[str]:
+    return {w for w in _WORDS.findall(text.lower()) if w not in _STOP and len(w) > 1}
+
+
+def near_duplicate(draft: dict[str, Any], folder: Path) -> str | None:
+    """The name of a registered idea this draft restates, or None. A reworded idea is the same idea."""
+    mine = _words(f"{draft.get('name', '')} {draft.get('idea', '')} {draft.get('entry', '')}")
+    if not mine:
+        return None
+    for record in _store(folder):
+        c = record["content"]
+        theirs = _words(f"{c['name']} {c['idea']} {c['entry']}")
+        if theirs and len(mine & theirs) / len(mine | theirs) >= NEAR_DUPLICATE:
+            return str(c["name"])
+    return None
+
+
 def problems(draft: dict[str, Any]) -> list[str]:
     """What is missing or wrong in a draft, in words a trader can act on."""
     out = []
@@ -186,6 +224,11 @@ def _register(
     draft: dict[str, Any], folder: Path, now: datetime, known_algo_ids: set[str] | None
 ) -> dict[str, Any]:
     issues = problems(draft)
+    twin = near_duplicate(draft, folder)
+    if twin:
+        issues.append(
+            f"This restates an idea already registered ({twin}). A reworded idea is the same idea."
+        )
     named = (draft.get("params") or {}).get("algo_id")
     if named is not None and known_algo_ids is not None and named not in known_algo_ids:
         issues.append(
@@ -267,8 +310,19 @@ def intact(record: dict[str, Any]) -> bool:
     return _hash(record["content"]) == record["sha256"]
 
 
+def engine_seal(
+    registration_sha256: str, results: dict[str, bool], source: str = "eod_screen"
+) -> str:
+    """The seal a rejection-screen engine attaches to the gate results it computed for one frozen
+    registration. ``record_run`` refuses results without it, so a hand-typed pass is not accepted
+    by mistake. It guards against slips and against an agent or page writing results; it does not
+    stop someone with the server's files from forging one, and is not meant to."""
+    text = _canonical({"sha": registration_sha256, "results": results, "source": source, "v": 1})
+    return hashlib.sha256(("engine-seal:" + text).encode("utf-8")).hexdigest()
+
+
 def record_run(
-    folder: Path, record_id: str, results: dict[str, bool], now: datetime
+    folder: Path, record_id: str, results: dict[str, bool], now: datetime, seal: str | None = None
 ) -> dict[str, Any]:
     """Store the one run of a registration. A second run is refused. The only verdicts are
     'rejected' and 'eligible for a forward test'."""
@@ -277,6 +331,10 @@ def record_run(
         raise Refused("No such registration.")
     if not intact(record):
         raise Refused("This registration was changed after it was frozen, so it cannot be run.")
+    if seal != engine_seal(record["sha256"], results):
+        raise Refused(
+            "These gate results did not come from the screen engine, so they were not recorded."
+        )
     if record["run"] is not None:
         raise Refused(
             "This registration has already been run. A second look is a new idea and a new trial."
@@ -329,11 +387,38 @@ def record_forward(
     return record
 
 
+MIN_POST_MORTEM_CHARS = 60
+
+
+def add_post_mortem(folder: Path, record_id: str, text: str, now: datetime) -> dict[str, Any]:
+    """The owner's written account of what a forward test showed and what it did not. A forward pass
+    counts toward Live only once it has one, so the result is read before it is relied on."""
+    record = get(folder, record_id)
+    if record is None:
+        raise Refused("No such registration.")
+    if record.get("forward") is None:
+        raise Refused("A post-mortem is written after the forward test has ended.")
+    if record["forward"].get("post_mortem"):
+        raise Refused("A post-mortem is already recorded for this registration.")
+    if not isinstance(text, str) or len(text.strip()) < MIN_POST_MORTEM_CHARS:
+        raise Refused(
+            f"Write at least {MIN_POST_MORTEM_CHARS} characters: what it showed, what it cannot "
+            "show, and what you would do differently."
+        )
+    record["forward"]["post_mortem"] = {
+        "at": now.isoformat(timespec="seconds"),
+        "text": text.strip(),
+    }
+    _write(folder / f"{record_id}.json", json.dumps(record, indent=2))
+    return record
+
+
 def forward_passed(folder: Path, algo_id: str) -> bool:
     """True if a registration naming this algo (its ``algo_id`` setting) has a recorded forward pass."""
     return any(
         r["content"]["params"].get("algo_id") == algo_id
         and (r.get("forward") or {}).get("verdict") == "pass"
+        and bool((r.get("forward") or {}).get("post_mortem"))
         and intact(r)
         for r in _store(folder)
     )

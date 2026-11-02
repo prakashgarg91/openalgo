@@ -25,9 +25,11 @@ SESSIONS_BEFORE = {"weekly": 2, "monthly": 5}
 MIN_TRADES = {"weekly": 100, "monthly": 30}
 LOSS_LIMIT = 20_000.0
 BOOT_BLOCK = 3
-BOOT_DRAWS = 10_000
+BOOT_DRAWS = 200_000  # the bar below is about one draw in 12,800, so it needs many draws
 BOOT_SEED = 20261201
-BOOT_LEVEL = 0.025
+RUNNING_COUNT = 319  # after the screen's own 8 trials (docs/algos/TRIAL_REGISTER.md)
+BOOT_LEVEL = 0.025 / RUNNING_COUNT  # rule 3 of the register: the bar is 0.025 divided by the count
+BOOT_CHUNK = 10_000
 MAX_SURVIVORS = 2
 
 
@@ -315,15 +317,23 @@ def worst_day(eq: pd.Series) -> float:
 
 
 def bootstrap_lower(values: np.ndarray, level: float = BOOT_LEVEL) -> float:
-    """Lower bound of the mean from a moving-block bootstrap over trades (fixed block and seed)."""
+    """Lower bound of the mean from a moving-block bootstrap over trades (fixed block and seed).
+
+    Drawn in chunks so 200,000 draws never hold more than one chunk of resampled series in memory.
+    """
     n = len(values)
     if n == 0:
         return float("nan")
     block = min(BOOT_BLOCK, n)
     rng = np.random.default_rng(BOOT_SEED)
-    starts = rng.integers(0, n - block + 1, size=(BOOT_DRAWS, -(-n // block)))
-    picked = values[(starts[:, :, None] + np.arange(block)).reshape(BOOT_DRAWS, -1)[:, :n]]
-    return float(np.quantile(picked.mean(axis=1), level))
+    means = np.empty(BOOT_DRAWS)
+    offsets = np.arange(block)
+    for start in range(0, BOOT_DRAWS, BOOT_CHUNK):
+        size = min(BOOT_CHUNK, BOOT_DRAWS - start)
+        starts = rng.integers(0, n - block + 1, size=(size, -(-n // block)))
+        picked = values[(starts[:, :, None] + offsets).reshape(size, -1)[:, :n]]
+        means[start : start + size] = picked.mean(axis=1)
+    return float(np.quantile(means, level))
 
 
 def evaluate(

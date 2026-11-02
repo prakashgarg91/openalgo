@@ -23,10 +23,19 @@ The Algos page already has a "Build your own" tab (`services/algos/builder.py`):
 
 The "Register an idea" tab now also lists the forward tests in Sandbox mode (`/algos/api/forward`): state, trades done, trades to go and net after costs, with a note that nothing is a result until a test has ended.
 
+## Built in the fourth slice (2 November 2026, night; from the Opus 5.5 product review)
+
+- **Read-only agent toolkit** (`services/agent/tools/algos_read.py`, chat surface only, over the pure `services/algos/agent_view.py`): four tools that only read. The idea register (trial count, the bar, the next free month), the forward tests (S3n, C1 and registered structures), a check of a draft idea that saves nothing, and a search of what was tried before. A test pins the four names and checks the file reaches no function that registers, runs, records, deploys or toggles anything, so the agent cannot become an unattended idea generator through these tools.
+- **Gate results only from the engine**: `registry.record_run` refuses results without the engine's seal (`registry.engine_seal`), so a hand-typed pass is not recorded. This guards against slips and against an agent or page writing results; it does not stop someone with the server's files from forging one.
+- **A reworded idea is the same idea**: registering refuses a draft whose name, idea and entry share 60 percent of their words with a registered one.
+- **Post-mortem before a pass counts**: `record_forward` stores the verdict; the Live rule also needs the owner's written post-mortem (`POST /algos/api/registry/<id>/post-mortem`, at least 60 characters) before a forward pass is recognised.
+- **Trial count guard**: a test fails if the count in the code differs from the register document.
+- **C1 on the forward list**; the screen's bootstrap gate follows the register's rule 3 (see the registration).
+
 ## Next slices (not built)
 
 1. **Generalise the rejection screen** so a registration for a new idea (not only the eight structures) can be run once through `record_run`. Until then only the December screen exists, and nobody can mark a registration run, which is intended.
-2. Add the C1 ETF ledger to the forward list (the list now shows the S3n report and every `db/forward_eod/<id>/report.json`).
+2. A text box for the post-mortem on the Register an idea tab (the endpoint exists).
 3. **Sandbox and Live gates.** Done: see the forward-pass rule above. The builder page never goes Live.
 4. Replace the old family checkboxes in `BuilderPanel.tsx` with the four steps (Write, Register, Screen, Forward) once the screen is general; the old search keeps working and is now counted.
 

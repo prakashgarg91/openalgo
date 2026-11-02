@@ -66,8 +66,24 @@ def test_the_months_already_used_are_refused_and_the_next_free_one_is_named(tmp_
 def test_one_new_idea_a_month(tmp_path):
     reg.register(draft(), tmp_path, JAN)
     with pytest.raises(reg.Refused, match="already registered.*2027-02"):
-        reg.register(draft(name="Another idea"), tmp_path, datetime(2027, 1, 20))
-    second = reg.register(draft(name="Another idea"), tmp_path, FEB)
+        reg.register(
+            draft(
+                name="Another idea",
+                idea="Sell weekly index call spreads on calm days",
+                entry="Enter at the close two sessions before the weekly expiry",
+            ),
+            tmp_path,
+            datetime(2027, 1, 20),
+        )
+    second = reg.register(
+        draft(
+            name="Another idea",
+            idea="Sell weekly index call spreads on calm days",
+            entry="Enter at the close two sessions before the weekly expiry",
+        ),
+        tmp_path,
+        FEB,
+    )
     assert second["trial_numbers"] == [321, 321]
 
 
@@ -93,25 +109,25 @@ def test_editing_a_frozen_file_is_detected_and_blocks_the_run(tmp_path):
     path.write_text(tampered, encoding="utf-8")
     assert not reg.intact(reg.get(tmp_path, record["id"]))
     with pytest.raises(reg.Refused, match="changed after it was frozen"):
-        reg.record_run(tmp_path, record["id"], dict.fromkeys(record["content"]["gates"], True), JAN)
+        sealed(tmp_path, record, dict.fromkeys(record["content"]["gates"], True), JAN)
 
 
 def test_one_run_only_and_the_verdict_is_reject_or_eligible_never_an_edge(tmp_path):
     record = reg.register(draft(), tmp_path, JAN)
     gates = record["content"]["gates"]
     with pytest.raises(reg.Refused, match="every registered gate"):
-        reg.record_run(tmp_path, record["id"], {gates[0]: True}, FEB)
-    done = reg.record_run(tmp_path, record["id"], dict.fromkeys(gates, True), FEB)
+        sealed(tmp_path, record, {gates[0]: True}, FEB)
+    done = sealed(tmp_path, record, dict.fromkeys(gates, True), FEB)
     assert done["run"]["verdict"] == "eligible for a forward test"
     assert "edge" not in done["status"]
     with pytest.raises(reg.Refused, match="already been run"):
-        reg.record_run(tmp_path, record["id"], dict.fromkeys(gates, True), FEB)
+        sealed(tmp_path, record, dict.fromkeys(gates, True), FEB)
 
 
 def test_a_failed_gate_rejects(tmp_path):
     record = reg.register(draft(), tmp_path, JAN)
     gates = record["content"]["gates"]
-    done = reg.record_run(tmp_path, record["id"], {gates[0]: True, gates[1]: False}, FEB)
+    done = sealed(tmp_path, record, {gates[0]: True, gates[1]: False}, FEB)
     assert done["status"] == "rejected" and done["run"]["failed"] == [gates[1]]
 
 
@@ -129,11 +145,16 @@ def test_builder_searches_add_every_configuration_to_the_trial_count(tmp_path):
     assert record["trial_numbers"] == [420, 420]
 
 
+def sealed(folder, record, results, now):
+    """Record a run the way the screen engine does: with its seal."""
+    return reg.record_run(
+        folder, record["id"], results, now, reg.engine_seal(record["sha256"], results)
+    )
+
+
 def eligible_record(tmp_path, algo_id="custom_1"):
     record = reg.register(draft(params={"algo_id": algo_id, "width": 100}), tmp_path, JAN)
-    return reg.record_run(
-        tmp_path, record["id"], dict.fromkeys(record["content"]["gates"], True), FEB
-    )
+    return sealed(tmp_path, record, dict.fromkeys(record["content"]["gates"], True), FEB)
 
 
 def test_a_forward_result_needs_an_eligible_registration_and_is_recorded_once(tmp_path):
@@ -153,6 +174,13 @@ def test_only_a_recorded_forward_pass_for_that_algo_counts(tmp_path):
     done = eligible_record(tmp_path, "custom_7")
     assert reg.forward_passed(tmp_path, "custom_7") is False
     reg.record_forward(tmp_path, done["id"], "pass", {}, FEB)
+    assert reg.forward_passed(tmp_path, "custom_7") is False  # no post-mortem yet
+    reg.add_post_mortem(
+        tmp_path,
+        done["id"],
+        "It held up on 26 trades; fills were idealised in sandbox mode; measure spreads next time.",
+        FEB,
+    )
     assert reg.forward_passed(tmp_path, "custom_7") is True
     assert reg.forward_passed(tmp_path, "custom_8") is False
 
@@ -194,4 +222,72 @@ def test_an_algo_that_is_not_in_the_app_cannot_be_named(tmp_path):
     assert (
         reg.register(draft(params={"algo_id": "zen"}), tmp_path, JAN, {"zen"})["status"]
         == "registered"
+    )
+
+
+def test_a_reworded_idea_is_the_same_idea_and_is_refused_even_in_a_free_month(tmp_path):
+    reg.register(draft(), tmp_path, JAN)
+    reworded = draft(
+        name="Volatility scaled equity and gold",
+        idea="Hold less equity when the forecast volatility is high and more when it is low.",
+    )
+    with pytest.raises(reg.Refused, match="restates an idea already registered"):
+        reg.register(reworded, tmp_path, FEB)
+    different = draft(
+        name="Weekly put spread",
+        idea="Sell a weekly index put spread on calm days.",
+        entry="Enter at the close two sessions before the expiry.",
+    )
+    assert reg.register(different, tmp_path, FEB)["trial_numbers"] == [321, 321]
+
+
+def test_results_that_did_not_come_from_the_engine_are_refused(tmp_path):
+    record = reg.register(draft(), tmp_path, JAN)
+    hand_typed = dict.fromkeys(record["content"]["gates"], True)
+    for seal in (None, "", "0" * 64, reg.engine_seal("another registration", hand_typed)):
+        with pytest.raises(reg.Refused, match="did not come from the screen engine"):
+            reg.record_run(tmp_path, record["id"], hand_typed, FEB, seal)
+    assert reg.get(tmp_path, record["id"])["run"] is None
+    # the seal is bound to the results: changing a gate after sealing is refused too
+    good_seal = reg.engine_seal(record["sha256"], hand_typed)
+    flipped = {**hand_typed, record["content"]["gates"][0]: False}
+    with pytest.raises(reg.Refused, match="did not come from the screen engine"):
+        reg.record_run(tmp_path, record["id"], flipped, FEB, good_seal)
+
+
+def test_a_post_mortem_is_needed_after_the_forward_result_and_must_say_something(tmp_path):
+    done = eligible_record(tmp_path)
+    with pytest.raises(reg.Refused, match="after the forward test has ended"):
+        reg.add_post_mortem(tmp_path, done["id"], "x" * 80, FEB)
+    reg.record_forward(tmp_path, done["id"], "pass", {}, FEB)
+    with pytest.raises(reg.Refused, match="at least 60 characters"):
+        reg.add_post_mortem(tmp_path, done["id"], "good", FEB)
+    ended = reg.add_post_mortem(
+        tmp_path,
+        done["id"],
+        "It passed on 26 trades; sandbox fills were kinder than real ones; next time use measured spreads.",
+        FEB,
+    )
+    assert ended["forward"]["post_mortem"]["text"].startswith("It passed")
+    with pytest.raises(reg.Refused, match="already recorded"):
+        reg.add_post_mortem(tmp_path, done["id"], "y" * 80, FEB)
+
+
+def test_the_trial_count_in_the_code_matches_the_markdown_register():
+    """SEED_TRIALS is a constant in the code and the register is a document kept by hand: they must agree."""
+    import re
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[1] / "docs" / "algos" / "TRIAL_REGISTER.md").read_text(
+        encoding="utf-8"
+    )
+    entries = text.split("## Entries since then", 1)[1].split("## Rules", 1)[0]
+    numbers = [
+        int(n)
+        for row in entries.splitlines()
+        if row.startswith("|")
+        for n in re.findall(r"\b(3\d\d)\b", row.split("|")[1])
+    ]
+    assert numbers and max(numbers) == reg.SEED_TRIALS, (
+        f"TRIAL_REGISTER.md goes up to {max(numbers) if numbers else None} but SEED_TRIALS is {reg.SEED_TRIALS}"
     )
