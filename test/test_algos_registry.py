@@ -127,3 +127,31 @@ def test_builder_searches_add_every_configuration_to_the_trial_count(tmp_path):
     assert reg.builder_trials(tmp_path) == 100 and reg.running_count(tmp_path) == 419
     record = reg.register(draft(), tmp_path, JAN)
     assert record["trial_numbers"] == [420, 420]
+
+
+def eligible_record(tmp_path, algo_id="custom_1"):
+    record = reg.register(draft(params={"algo_id": algo_id, "width": 100}), tmp_path, JAN)
+    return reg.record_run(
+        tmp_path, record["id"], dict.fromkeys(record["content"]["gates"], True), FEB
+    )
+
+
+def test_a_forward_result_needs_an_eligible_registration_and_is_recorded_once(tmp_path):
+    registered = reg.register(draft(), tmp_path, JAN)
+    with pytest.raises(reg.Refused, match="eligible for a forward test"):
+        reg.record_forward(tmp_path, registered["id"], "pass", {}, FEB)
+    done = eligible_record(tmp_path / "two", "custom_2")
+    with pytest.raises(reg.Refused, match="pass, fail or inconclusive"):
+        reg.record_forward(tmp_path / "two", done["id"], "edge shown", {}, FEB)
+    ended = reg.record_forward(tmp_path / "two", done["id"], "pass", {"trades": 26}, FEB)
+    assert ended["status"] == "forward pass"
+    with pytest.raises(reg.Refused, match="already recorded"):
+        reg.record_forward(tmp_path / "two", done["id"], "pass", {}, FEB)
+
+
+def test_only_a_recorded_forward_pass_for_that_algo_counts(tmp_path):
+    done = eligible_record(tmp_path, "custom_7")
+    assert reg.forward_passed(tmp_path, "custom_7") is False
+    reg.record_forward(tmp_path, done["id"], "pass", {}, FEB)
+    assert reg.forward_passed(tmp_path, "custom_7") is True
+    assert reg.forward_passed(tmp_path, "custom_8") is False

@@ -311,7 +311,9 @@ def bootstrap_lower(values: np.ndarray, level: float = BOOT_LEVEL) -> float:
     return float(np.quantile(picked.mean(axis=1), level))
 
 
-def evaluate(result: Result, cadence: str, sessions: list) -> dict[str, Any]:
+def evaluate(
+    result: Result, cadence: str, sessions: list, min_trades: int | None = None
+) -> dict[str, Any]:
     """The six survival gates and the numbers behind them. Verdicts are only eligible or rejected."""
     trades = sorted(result.trades, key=lambda t: t["entry"])
     nets = np.array([t["net"] for t in trades], dtype=float)
@@ -332,7 +334,7 @@ def evaluate(result: Result, cadence: str, sessions: list) -> dict[str, Any]:
         "boot_lower_mean": bootstrap_lower(nets),
     }
     gates = {
-        "enough_trades": stats["trades"] >= MIN_TRADES[cadence],
+        "enough_trades": stats["trades"] >= (min_trades or MIN_TRADES[cadence]),
         "net_positive_at_both_costs": stats["net"] > 0 and stats["net_2x"] > 0,
         "drawdown_and_worst_day_within_limit": stats["drawdown"] <= LOSS_LIMIT
         and stats["worst_day"] >= -LOSS_LIMIT,

@@ -274,3 +274,36 @@ def test_catalogue_tells_the_page_when_each_algo_checks(client):
     assert items["zen"]["entry_time"] == "15:05"
     assert items["morning_gap"]["entry_time"] == "09:25"
     assert items["morning_gap"]["overnight"] is False
+
+
+def test_the_optional_forward_pass_rule_only_adds_a_requirement(monkeypatch, tmp_path):
+    from services.algos import registry as reg
+
+    monkeypatch.setenv("ALGO_REGISTRY_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        runner,
+        "track_record",
+        lambda sid: {
+            "runs": 50,
+            "wins": 40,
+            "net_pnl": 9000.0,
+            "worst_run": -10.0,
+            "available": True,
+        },
+    )
+    assert runner.live_gate(1, "custom_1")["allowed"] is True  # rule off: unchanged
+    monkeypatch.setenv("ALGO_LIVE_REQUIRES_FORWARD_PASS", "1")
+    blocked = runner.live_gate(1, "custom_1")
+    assert blocked["allowed"] is False and "forward test" in blocked["reason"]
+    draft = {
+        "name": "x idea", "idea": "an idea", "instrument": "nifty", "entry": "at close", "exit": "at expiry",
+        "size": "1 lot", "costs": "schedule", "benchmark": "cash", "why_it_might_work": "reason",
+        "how_it_fails": "costs", "data_seen": "all", "data_unseen": "forward", "end_rule": "26 trades",
+        "kill_rule": "minus 20000", "gates": ["g1"], "params": {"algo_id": "custom_1"},
+    }  # fmt: skip
+    rec = reg.register(draft, tmp_path, datetime(2027, 1, 4))
+    reg.record_run(tmp_path, rec["id"], {"g1": True}, datetime(2027, 2, 1))
+    assert runner.live_gate(1, "custom_1")["allowed"] is False  # eligible is not a forward pass
+    reg.record_forward(tmp_path, rec["id"], "pass", {}, datetime(2027, 8, 1))
+    assert runner.live_gate(1, "custom_1")["allowed"] is True
+    assert runner.live_gate(1, "custom_2")["allowed"] is False

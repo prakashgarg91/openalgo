@@ -121,7 +121,7 @@ def _deployment_view(dep: dict, *, decisions: int = 5) -> dict[str, Any]:
     view["position_open"] = bool(row and row.status == "running")
     view["max_loss_ceiling_inr"] = runner.max_loss_ceiling(dep["algo_id"], dep["capital"])
     view["recent_decisions"] = algo_db.list_decisions(dep["id"], decisions)
-    view["live_gate"] = runner.live_gate(dep["strategy_id"])
+    view["live_gate"] = runner.live_gate(dep["strategy_id"], dep["algo_id"])
     return view
 
 
@@ -457,7 +457,7 @@ def set_live(deployment_id):
         return _error("Wait for the open position to close before changing the mode.", 409)
 
     if enabled:
-        gate = runner.live_gate(dep["strategy_id"])
+        gate = runner.live_gate(dep["strategy_id"], dep["algo_id"])
         if not gate["allowed"]:
             return _error(gate["reason"], 403, {"live_gate": gate})
         ceiling = runner.max_loss_ceiling(dep["algo_id"], dep["capital"])

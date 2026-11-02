@@ -250,3 +250,42 @@ def record_run(
     record["status"] = "rejected" if failed else "eligible for a forward test"
     _write(folder / f"{record_id}.json", json.dumps(record, indent=2))
     return record
+
+
+FORWARD_VERDICTS = ("pass", "fail", "inconclusive")
+
+
+def record_forward(
+    folder: Path, record_id: str, verdict: str, evidence: dict[str, Any], now: datetime
+) -> dict[str, Any]:
+    """Store the end of a forward test. Only a registration that was run and found eligible can have
+    one, and it can be recorded once. A pass here is what the optional Live requirement looks for."""
+    record = get(folder, record_id)
+    if record is None:
+        raise Refused("No such registration.")
+    if verdict not in FORWARD_VERDICTS:
+        raise Refused("The forward verdict must be pass, fail or inconclusive.")
+    if record.get("forward") is not None:
+        raise Refused("The forward result of this registration is already recorded.")
+    if record["status"] != "eligible for a forward test":
+        raise Refused(
+            "Only a registration found eligible for a forward test can have a forward result."
+        )
+    record["forward"] = {
+        "at": now.isoformat(timespec="seconds"),
+        "verdict": verdict,
+        "evidence": evidence,
+    }
+    record["status"] = f"forward {verdict}"
+    _write(folder / f"{record_id}.json", json.dumps(record, indent=2))
+    return record
+
+
+def forward_passed(folder: Path, algo_id: str) -> bool:
+    """True if a registration naming this algo (its ``algo_id`` setting) has a recorded forward pass."""
+    return any(
+        r["content"]["params"].get("algo_id") == algo_id
+        and (r.get("forward") or {}).get("verdict") == "pass"
+        and intact(r)
+        for r in _store(folder)
+    )

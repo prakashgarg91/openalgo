@@ -149,6 +149,21 @@ def _min_sandbox_runs() -> int:
         return 10
 
 
+def _forward_pass_required() -> bool:
+    """Optional stricter rule: Live only for an algo whose registered idea passed its forward test.
+    Off unless the owner sets ALGO_LIVE_REQUIRES_FORWARD_PASS=1; it never makes Live easier."""
+    return os.getenv("ALGO_LIVE_REQUIRES_FORWARD_PASS", "0").strip() == "1"
+
+
+def _forward_pass_found(algo_id: str | None) -> bool:
+    from pathlib import Path
+
+    from services.algos import registry
+
+    folder = Path(os.getenv("ALGO_REGISTRY_DIR", "db/algo_registry"))
+    return bool(algo_id) and registry.forward_passed(folder, str(algo_id))
+
+
 def track_record(strategy_id: int) -> dict[str, Any]:
     """What this strategy has actually done in Sandbox, from its closed runs."""
     try:
@@ -174,12 +189,24 @@ def track_record(strategy_id: int) -> dict[str, Any]:
     }
 
 
-def live_gate(strategy_id: int) -> dict[str, Any]:
+def live_gate(strategy_id: int, algo_id: str | None = None) -> dict[str, Any]:
     """Whether this algo has earned Live, with the reason in plain words.
 
     Needs enough closed Sandbox runs and a positive net result. Sandbox fills
-    are idealised, so this is a floor and never a promise of Live profit.
+    are idealised, so this is a floor and never a promise of Live profit. When the owner has
+    switched on the forward-pass rule it also needs a registered idea for this algo whose
+    forward test passed (docs/algos/algo-builder-v2.md); that rule only ever adds a requirement.
     """
+    if _forward_pass_required() and not _forward_pass_found(algo_id):
+        return {
+            "allowed": False,
+            "needed_runs": _min_sandbox_runs(),
+            "reason": (
+                "Going Live needs a registered idea for this algo whose forward test in Sandbox "
+                "mode has passed. None is recorded yet."
+            ),
+            "record": track_record(strategy_id),
+        }
     record = track_record(strategy_id)
     needed = _min_sandbox_runs()
     if needed == 0:
