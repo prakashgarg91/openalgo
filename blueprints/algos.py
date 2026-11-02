@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import os
 import threading
-from datetime import date
+from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, jsonify, request, session
@@ -32,6 +33,7 @@ from services.algos import (
     mandate,
     netinfo,
     readiness,
+    registry,
     runner,
 )
 from services.algos.templates import ALGOS, algo_width_pts
@@ -548,6 +550,64 @@ def _builder_request(data: dict) -> tuple[dict | None, str | None]:
     except builder.SpecError as exc:
         return None, str(exc)
     return {"families": families, "label_sets": labels, "model": model}, None
+
+
+REGISTRY_DIR = Path(os.getenv("ALGO_REGISTRY_DIR", "db/algo_registry"))
+
+
+@algos_bp.route("/api/registry", methods=["GET"])
+@check_session_validity
+@_api_limit
+def registry_list():
+    """The trial count, the next free idea month, and every registration with its status."""
+    now = datetime.now()
+    records = registry._store(REGISTRY_DIR)
+    return _ok(
+        {
+            "data": {
+                "trial_count": registry.running_count(REGISTRY_DIR),
+                "pass_bar": registry.pass_bar(registry.running_count(REGISTRY_DIR)),
+                "next_free_month": registry.next_free_slot(REGISTRY_DIR, now),
+                "months_used": {
+                    **registry.SLOTS_USED,
+                    **{r["slot"]: r["content"]["name"] for r in records},
+                },
+                "fields": registry.FIELDS,
+                "registrations": [
+                    {
+                        k: r[k]
+                        for k in (
+                            "id",
+                            "created_at",
+                            "slot",
+                            "sha256",
+                            "trial_numbers",
+                            "pass_bar",
+                            "status",
+                            "run",
+                        )
+                    }
+                    | {"name": r["content"]["name"], "intact": registry.intact(r)}
+                    for r in records
+                ],
+            }
+        }
+    )
+
+
+@algos_bp.route("/api/registry", methods=["POST"])
+@check_session_validity
+@_api_limit
+def registry_create():
+    """Freeze an idea before anything runs. It cannot run, edit or promote anything."""
+    data, error = _body()
+    if error:
+        return error
+    try:
+        record = registry.register(data, REGISTRY_DIR, datetime.now())
+    except registry.Refused as why:
+        return _error(str(why), 400)
+    return _ok({"data": record}, 201)
 
 
 @algos_bp.route("/api/builder/search", methods=["POST"])

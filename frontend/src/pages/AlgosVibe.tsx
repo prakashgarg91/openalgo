@@ -27,6 +27,7 @@ import { DebuggerPanel, ExplainRecent } from '@/components/algos/DebuggerPanel'
 import { EventDaysPanel } from '@/components/algos/EventDaysPanel'
 import { LabPanel } from '@/components/algos/LabPanel'
 import { ReadinessPanel, StartHere } from '@/components/algos/ReadinessPanel'
+import { RegistryPanel } from '@/components/algos/RegistryPanel'
 import { UniversePanel } from '@/components/algos/UniversePanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -236,6 +237,7 @@ export default function AlgosVibe() {
             My algos{mine.length > 0 ? ` (${mine.length})` : ''}
           </TabsTrigger>
           <TabsTrigger value="build">Build your own</TabsTrigger>
+          <TabsTrigger value="register">Register an idea</TabsTrigger>
           <TabsTrigger value="lab">Test on history</TabsTrigger>
           <TabsTrigger value="debug">Why did it do that?</TabsTrigger>
         </TabsList>
@@ -311,6 +313,10 @@ export default function AlgosVibe() {
         <TabsContent value="build" className="space-y-4 pt-3">
           <UniversePanel />
           <BuilderPanel />
+        </TabsContent>
+
+        <TabsContent value="register" className="pt-3">
+          <RegistryPanel />
         </TabsContent>
 
         <TabsContent value="lab" className="pt-3">

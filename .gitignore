@@ -156,3 +156,4 @@ db/algo_events.json
 db/forward_s3n/
 db/forward_shadow/
 db/sandbox_bot/
+db/algo_registry/

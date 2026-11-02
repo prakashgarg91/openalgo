@@ -160,6 +160,7 @@ export const algoQueryKeys = {
   regime: () => [...algoQueryKeys.all, 'regime'] as const,
   coverage: () => [...algoQueryKeys.all, 'coverage'] as const,
   readiness: () => [...algoQueryKeys.all, 'readiness'] as const,
+  registry: () => [...algoQueryKeys.all, 'registry'] as const,
 }
 
 export async function fetchCatalogue(): Promise<AlgoItem[]> {
@@ -464,4 +465,36 @@ export async function startUniverseSearch(account: {
 }): Promise<string> {
   const response = await webClient.post<{ job_id: string }>(`${BASE}/universe/search`, { account })
   return response.data.job_id
+}
+
+export interface RegistrationRow {
+  id: string
+  name: string
+  created_at: string
+  slot: string
+  trial_numbers: [number, number]
+  pass_bar: number
+  status: string
+  intact: boolean
+}
+
+export interface RegistryView {
+  trial_count: number
+  pass_bar: number
+  next_free_month: string
+  months_used: Record<string, string>
+  fields: Record<string, string>
+  registrations: RegistrationRow[]
+}
+
+export type RegistrationDraft = Record<string, unknown>
+
+export async function fetchRegistry(): Promise<RegistryView> {
+  const response = await webClient.get<{ data: RegistryView }>(`${BASE}/registry`)
+  return response.data.data
+}
+
+export async function registerIdea(draft: RegistrationDraft): Promise<RegistrationRow> {
+  const response = await webClient.post<{ data: RegistrationRow }>(`${BASE}/registry`, draft)
+  return response.data.data
 }
