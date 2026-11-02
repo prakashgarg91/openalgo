@@ -25,6 +25,8 @@ FAR_FUTURE = pd.Timestamp("2100-01-01")
 def spec_for(registration: dict[str, Any]) -> es.Spec | None:
     """The structure a registration describes: one of the eight by name, or its own legs."""
     params = registration["content"]["params"]
+    if "structure" in params and "legs" in params:
+        return None  # the screen and the forward ledger must test the same structure: name one
     if params.get("structure") in es.SPECS:
         return es.SPECS[params["structure"]]
     if "legs" in params:
@@ -56,13 +58,34 @@ def parse(registration: dict[str, Any]) -> dict[str, Any] | None:
         "end_trades": int(params.get("end_trades", DEFAULT_END_TRADES)),
         "end_date": pd.Timestamp(params["end_date"]) if params.get("end_date") else None,
         "kill_net": float(params.get("kill_net", DEFAULT_KILL_NET)),
+        "run_date": pd.Timestamp(str(ran)[:10]),
+        "boot_level": registration.get("pass_bar"),
     }
 
 
-def run(settings: dict[str, Any], chain, nifty: pd.Series, vix: pd.Series, lot_for) -> es.Result:
-    return es.simulate(
-        settings["spec"], chain, nifty, vix, lot_for, settings["first_expiry"], FAR_FUTURE
+def run(
+    settings: dict[str, Any], chain, nifty: pd.Series, vix: pd.Series, lot_for, is_session=None
+) -> es.Result:
+    result = es.simulate(
+        settings["spec"],
+        chain,
+        nifty,
+        vix,
+        lot_for,
+        settings["first_expiry"],
+        FAR_FUTURE,
+        is_session,
     )
+    # Only trades entered AFTER the screen was run are forward trades, whatever the expiry date says.
+    run_date = settings.get("run_date")
+    if run_date is not None:
+        early = [t for t in result.trades if t["entry"] <= run_date]
+        result.trades = [t for t in result.trades if t["entry"] > run_date]
+        result.skipped += [
+            {"expiry": t["expiry"], "reason": "entered on or before the day the screen was run"}
+            for t in early
+        ]
+    return result
 
 
 def report(
@@ -76,7 +99,11 @@ def report(
     ]  # fmt: skip
     counted = es.Result(result.spec, result.trades, [s for s in result.skipped if s not in pending])
     evaluated = es.evaluate(
-        counted, settings["spec"].cadence, sessions, min_trades=settings["end_trades"]
+        counted,
+        settings["spec"].cadence,
+        sessions,
+        min_trades=settings["end_trades"],
+        boot_level=settings.get("boot_level"),
     )
     trades = sorted(counted.trades, key=lambda t: t["entry"])
     cumulative, lowest = 0.0, 0.0

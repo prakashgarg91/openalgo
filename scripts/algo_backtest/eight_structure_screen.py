@@ -30,6 +30,20 @@ OVERLAP = (pd.Timestamp("2024-10-03"), pd.Timestamp("2026-10-27"))
 RUNNING_COUNT_AFTER = 319
 
 
+def marker_in_history() -> bool:
+    """True if the run marker was ever committed in this repository (best effort, any branch)."""
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "log", "--all", "--oneline", "--", str(RUN_MARKER)],
+            capture_output=True, text=True, timeout=30, cwd=RUN_MARKER.parents[2],
+        )  # fmt: skip
+        return bool(out.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def refusal(today: date, report_exists: bool) -> str | None:
     """Why the screen must not run now, in words for the trader, or None if it may."""
     if today < RUN_NOT_BEFORE:
@@ -77,7 +91,10 @@ def main() -> int:
     repo = Path(args[0])
     out_dir = repo / "research" / "eight_structure_screen"
     if "--check" not in sys.argv:
-        why = refusal(date.today(), (out_dir / "report.json").exists() or RUN_MARKER.exists())
+        why = refusal(
+            date.today(),
+            (out_dir / "report.json").exists() or RUN_MARKER.exists() or marker_in_history(),
+        )
         if why:
             print(why)
             return 2
@@ -97,10 +114,16 @@ def main() -> int:
     for name, spec in es.SPECS.items():
         for label, (a, b) in (("primary", PRIMARY), ("overlap", OVERLAP)):
             result = es.simulate(spec, chain, nifty, vix, nse_lots.nifty_lot, a, b)
-            report[label][name] = es.evaluate(result, spec.cadence, sessions)
-    survivors = es.choose_survivors(report["primary"])
-    report["survivors"] = survivors
+            one = es.evaluate(result, spec.cadence, sessions)
+            # Keep everything: the screen runs once, so what is not saved now cannot be read later.
+            one["rows"] = es.trade_rows(result)
+            one["net_by_trailing_market"] = es.net_by_trailing_market(result.trades, nifty)
+            report[label][name] = one
     report["control_suspect"] = es.control_is_suspect(report["primary"])
+    # If the control passed, the data or the costs are suspect: name no survivors.
+    report["survivors"] = (
+        [] if report["control_suspect"] else es.choose_survivors(report["primary"])
+    )
     report["lost_money_in_primary"] = sorted(
         n for n, r in report["primary"].items() if r["stats"]["net"] < 0
     )
@@ -113,6 +136,11 @@ def main() -> int:
     (out_dir / "report.json").write_text(
         json.dumps(report, indent=2, default=str), encoding="utf-8"
     )
+    if report["control_suspect"]:
+        print(
+            "The control (long straddle) passed. Stop: check the data and the cost code before reading "
+            "anything else. No survivors were named."
+        )
     print(
         json.dumps(
             {k: report[k] for k in ("survivors", "control_suspect", "lost_money_in_primary")},
@@ -123,10 +151,6 @@ def main() -> int:
         s = r["stats"]
         print(f"  {name}: {s['trades']} trades, net {s['net']:,.0f}, at twice costs {s['net_2x']:,.0f}, "
               f"drawdown {s['drawdown']:,.0f}, verdict {r['verdict']}")  # fmt: skip
-    if report["control_suspect"]:
-        print(
-            "The control (long straddle) passed. Stop: check the data and the cost code before reading anything else."
-        )
     return 0
 
 

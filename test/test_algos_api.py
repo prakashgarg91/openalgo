@@ -323,3 +323,21 @@ def test_the_optional_forward_pass_rule_only_adds_a_requirement(monkeypatch, tmp
     )
     assert runner.live_gate(1, "custom_1")["allowed"] is True
     assert runner.live_gate(1, "custom_2")["allowed"] is False
+
+
+def test_with_the_rule_on_a_stray_file_in_the_register_does_not_break_the_gate_and_the_reason_uses_real_numbers(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("ALGO_REGISTRY_DIR", str(tmp_path))
+    monkeypatch.delenv("ALGO_LIVE_REQUIRES_FORWARD_PASS")  # the default: on
+    (tmp_path / "stray.json").write_text('{"half": true}', encoding="utf-8")
+    (tmp_path / "broken.json").write_text("{nope", encoding="utf-8")
+    monkeypatch.setattr(
+        runner,
+        "track_record",
+        lambda sid: {"runs": 0, "wins": 0, "net_pnl": 0.0, "worst_run": 0.0, "available": True},
+    )
+    gate = runner.live_gate(1, "zen")
+    assert gate["allowed"] is False
+    assert "0 registered ideas, 0 passed forward tests and 0 post-mortems" in gate["reason"]
+    assert "2027" not in gate["reason"]  # it describes the register, not a guess about the future

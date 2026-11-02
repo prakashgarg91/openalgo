@@ -42,13 +42,32 @@ def main() -> int:
         print("This registration was changed after it was frozen, so it cannot be run.")
         return 2
     try:
-        es.spec_from_params(record["content"]["name"], record["content"]["params"])
+        spec = es.spec_from_params(record["content"]["name"], record["content"]["params"])
+        twin = next(
+            (
+                n
+                for n, e in es.SPECS.items()
+                if (e.cadence, e.legs, e.move_filter) == (spec.cadence, spec.legs, spec.move_filter)
+            ),
+            None,
+        )
+        if twin and not (base.RUN_MARKER.exists() or base.marker_in_history()):
+            raise ValueError(
+                f"This is the registered structure {twin}, which the eight-structure screen runs once on "
+                "1 December 2026. It cannot be looked at early through another registration."
+            )
         if list(record["content"]["gates"]) != list(es.GATE_TEXT):
             raise ValueError(
                 "The registered gates must be exactly: " + ", ".join(es.GATE_TEXT) + "."
             )
     except ValueError as why:
         print(f"Nothing was run: {why}")
+        return 2
+    lock = folder / f"{record_id}.running"
+    try:
+        os.close(os.open(lock, os.O_CREAT | os.O_EXCL))  # one run at a time, even across processes
+    except FileExistsError:
+        print("This registration is already being screened (or was interrupted). Nothing was run.")
         return 2
     chain = es.Chain(base.load_options(repo))
     nifty = base.load_daily(repo / "context" / "daily" / "_NSEI.csv")

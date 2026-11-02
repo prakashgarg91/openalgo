@@ -67,8 +67,26 @@ def update_prices(start: date, end: date) -> pd.DataFrame:
         have = pd.concat([have, *frames], ignore_index=True).drop_duplicates(
             ["date", "instrument", "expiry", "strike", "kind"]
         )
-        have.to_csv(FILE, index=False)
+        tmp = FILE.with_suffix(".tmp")
+        have.to_csv(tmp, index=False)
+        os.replace(tmp, FILE)
     return have
+
+
+def _calendar():
+    """The exchange calendar (a weekday that is not an NFO holiday), so a missing day removes a week
+    instead of moving its entry. None if the app's calendar cannot be read."""
+    try:
+        from database.market_calendar_db import is_market_holiday
+
+        return lambda d: (
+            pd.Timestamp(d).weekday() < 5 and not is_market_holiday(pd.Timestamp(d).date(), "NFO")
+        )
+    except Exception:
+        print(
+            "The exchange calendar could not be read; the Nifty's own trading days are used instead."
+        )
+        return None
 
 
 def main() -> int:
@@ -92,7 +110,7 @@ def main() -> int:
         return 1
     chain = es.Chain(prices)
     for record, settings in waiting:
-        result = fe.run(settings, chain, nifty, vix, nse_lots.nifty_lot)
+        result = fe.run(settings, chain, nifty, vix, nse_lots.nifty_lot, _calendar())
         out = fe.report(settings, result, chain.sessions, pd.Timestamp.now().normalize())
         target = OUT / record["id"]
         target.mkdir(parents=True, exist_ok=True)

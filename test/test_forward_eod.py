@@ -138,3 +138,24 @@ def test_the_report_has_no_verdict_before_the_end_even_when_every_week_won():
     assert out["state"] == "running" and out["verdict"] is None
     with pytest.raises(KeyError):
         out["edge"]
+
+
+def test_a_trade_entered_on_or_before_the_day_the_screen_ran_is_not_a_forward_trade():
+    chain = es.Chain(options())
+    s = settings(run_date=pd.Timestamp("2021-05-11"))  # the screen ran on the entry day itself
+    out = fe.run(s, chain, series(24000.0), series(14.0), nse_lots.nifty_lot)
+    assert not out.trades
+    assert out.skipped[-1]["reason"] == "entered on or before the day the screen was run"
+    later = fe.run(
+        settings(run_date=pd.Timestamp("2021-05-10")),
+        chain,
+        series(24000.0),
+        series(14.0),
+        nse_lots.nifty_lot,
+    )
+    assert len(later.trades) == 1
+
+
+def test_a_registration_that_names_a_structure_and_also_describes_legs_is_refused():
+    both = registration(legs="CE0S:CE100B", cadence="weekly")  # structure WC is already in the base
+    assert fe.parse(both) is None

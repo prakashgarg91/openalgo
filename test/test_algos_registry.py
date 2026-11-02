@@ -291,3 +291,60 @@ def test_the_trial_count_in_the_code_matches_the_markdown_register():
     assert numbers and max(numbers) == reg.SEED_TRIALS, (
         f"TRIAL_REGISTER.md goes up to {max(numbers) if numbers else None} but SEED_TRIALS is {reg.SEED_TRIALS}"
     )
+
+
+def test_a_json_file_that_is_not_a_registration_is_skipped_and_never_breaks_the_live_rule(tmp_path):
+    reg.register(draft(params={"algo_id": "zen"}), tmp_path, JAN)
+    (tmp_path / "stray.json").write_text('{"hello": 1}', encoding="utf-8")
+    (tmp_path / "half.json").write_text('{"id": "x", "content": {}}', encoding="utf-8")
+    assert len(reg._store(tmp_path)) == 1 and reg.running_count(tmp_path) == 320
+    assert reg.forward_passed(tmp_path, "zen") is False  # no raise
+    assert reg.forward_summary(tmp_path)["registered"] == 1
+
+
+def test_a_put_mirror_of_a_registered_call_spread_is_a_different_idea(tmp_path):
+    call = draft(
+        name="Weekly call spread", idea="Sell a weekly index call spread on calm days.",
+        entry="At the close two sessions before the expiry.",
+    )  # fmt: skip
+    reg.register(call, tmp_path, JAN)
+    put = {
+        **call,
+        "name": "Weekly put spread",
+        "idea": "Sell a weekly index put spread on calm days.",
+    }
+    assert reg.register(put, tmp_path, FEB)["trial_numbers"] == [321, 321]
+
+
+def test_settings_sent_as_a_list_are_refused_in_words_not_with_a_crash(tmp_path):
+    with pytest.raises(reg.Refused, match="Fix every setting"):
+        reg.register(draft(params=["a", "b"]), tmp_path, JAN)
+    with pytest.raises(reg.Refused):
+        reg.register(draft(params="x"), tmp_path, JAN)
+
+
+def test_two_post_mortems_written_at_the_same_moment_record_only_one(tmp_path):
+    import threading
+
+    done = eligible_record(tmp_path)
+    reg.record_forward(tmp_path, done["id"], "pass", {}, FEB)
+    results = []
+
+    def write(n):
+        try:
+            reg.add_post_mortem(
+                tmp_path,
+                done["id"],
+                f"Post-mortem {n}: it held on 26 trades; fills were kinder than real ones.",
+                FEB,
+            )
+            results.append("ok")
+        except reg.Refused:
+            results.append("refused")
+
+    threads = [threading.Thread(target=write, args=(i,)) for i in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20)
+    assert sorted(results) == ["ok"] + ["refused"] * 5

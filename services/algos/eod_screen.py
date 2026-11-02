@@ -101,6 +101,18 @@ def leg_cost(
     return sale + brokerage + exchange + sebi + gst + stamp + slippage
 
 
+def calendar_session_before(
+    day: pd.Timestamp, steps: int, is_session: Callable[[pd.Timestamp], bool]
+) -> pd.Timestamp:
+    """The trading day ``steps`` sessions before ``day`` by the exchange calendar."""
+    out, left = pd.Timestamp(day).normalize(), steps
+    while left:
+        out -= pd.Timedelta(days=1)
+        if is_session(out):
+            left -= 1
+    return out
+
+
 class Chain:
     """Close, settle and trading flag per (date, expiry, kind, strike) for fast lookups."""
 
@@ -123,7 +135,16 @@ class Chain:
             values = {round(float(v), 4) for v in rows["settle"] if float(v) > 0}
             self.final[pd.Timestamp(expiry)] = values.pop() if len(values) == 1 else None
         self.sessions = [pd.Timestamp(d) for d in sorted(frame["date"].unique())]
-        self.expiries = [pd.Timestamp(e) for e in sorted(frame["expiry"].unique())]
+        # An expiry the exchange re-dated (a holiday moved it) has no rows on its own date: its contracts
+        # carry the new date from then on. Keep only expiries that really settled on their own date.
+        settled = {pd.Timestamp(e) for e in on_expiry["expiry"].unique()}
+        last_day = frame["date"].max() if len(frame) else pd.Timestamp.min
+        self.expiries = [
+            pd.Timestamp(e)
+            for e in sorted(frame["expiry"].unique())
+            if pd.Timestamp(e) in settled
+            or pd.Timestamp(e) > last_day  # a future expiry is not re-dated
+        ]
 
     def close(self, day, expiry, kind, strike) -> float | None:
         row = self.rows.get((pd.Timestamp(day), pd.Timestamp(expiry), kind, float(strike)))
@@ -171,9 +192,15 @@ def simulate(
     lot_for: Callable[[pd.Timestamp], int | None],
     first_expiry: pd.Timestamp,
     last_expiry: pd.Timestamp,
+    is_session: Callable[[pd.Timestamp], bool] | None = None,
 ) -> Result:
     """Replay one structure over every expiry in the period. A week that cannot be priced is
-    recorded with its reason and never filled in."""
+    recorded with its reason and never filled in.
+
+    The entry session is two sessions before a weekly expiry and five before a monthly one, counted on
+    the trading calendar: ``is_session`` if given, otherwise the days the Nifty has a close. It is NOT
+    counted on the stored days, so a session missing from the data removes the week instead of moving
+    its entry earlier."""
     out = Result(spec.name)
     sessions = list(chain.sessions)
     position = {d: i for i, d in enumerate(sessions)}
@@ -181,6 +208,8 @@ def simulate(
     nifty.index = pd.DatetimeIndex(nifty.index).normalize()
     vix = vix_close.copy()
     vix.index = pd.DatetimeIndex(vix.index).normalize()
+    calendar = sorted(pd.Timestamp(d) for d in nifty.index)
+    cal_position = {d: i for i, d in enumerate(calendar)}
     monthly = cadence_expiries(chain, "monthly")
     skip = out.skipped
     for expiry in cadence_expiries(chain, spec.cadence):
@@ -194,11 +223,22 @@ def simulate(
         if expiry not in position:
             why("expiry session not stored")
             continue
-        at = position[expiry] - SESSIONS_BEFORE[spec.cadence]
-        if at < 1:
-            why("entry session not stored")
+        steps = SESSIONS_BEFORE[spec.cadence]
+        if is_session is not None:
+            day = calendar_session_before(expiry, steps, is_session)
+            prev = calendar_session_before(day, 1, is_session)
+        elif expiry in cal_position and cal_position[expiry] - steps - 1 >= 0:
+            day = calendar[cal_position[expiry] - steps]
+            prev = calendar[cal_position[expiry] - steps - 1]
+        else:
+            why("expiry is not in the trading calendar")
             continue
-        day, prev = sessions[at], sessions[at - 1]
+        if day not in position:
+            why("entry session was not stored")
+            continue
+        if prev not in position:
+            why("session before the entry was not stored")
+            continue
         level = vix.get(day)
         if level is None or pd.isna(level):
             why("no vix")
@@ -248,10 +288,15 @@ def simulate(
                 px = chain.expiry_value(expiry, g["kind"], g["strike"])
             if px is None:
                 priced = False
+                reason = (
+                    "the far leg has no trade on the near expiry date"
+                    if g["far"]
+                    else "no index settlement price on the expiry date"
+                )
                 break
             g["exit"] = px
         if not priced:
-            why("no index settlement price on the expiry date")
+            why(reason)
             continue
         if len({lot_for(g["expiry"]) for g in legs}) > 1:
             why("the legs' expiries have different lot sizes")
@@ -338,7 +383,11 @@ def bootstrap_lower(values: np.ndarray, level: float = BOOT_LEVEL) -> float:
 
 
 def evaluate(
-    result: Result, cadence: str, sessions: list, min_trades: int | None = None
+    result: Result,
+    cadence: str,
+    sessions: list,
+    min_trades: int | None = None,
+    boot_level: float | None = None,
 ) -> dict[str, Any]:
     """The six survival gates and the numbers behind them. Verdicts are only eligible or rejected."""
     trades = sorted(result.trades, key=lambda t: t["entry"])
@@ -357,7 +406,7 @@ def evaluate(
         "net_without_best": float(nets.sum() - nets.max()) if len(nets) else 0.0,
         "net_first_half": float(first.sum()) if len(first) else 0.0,
         "net_second_half": float(second.sum()) if len(second) else 0.0,
-        "boot_lower_mean": bootstrap_lower(nets),
+        "boot_lower_mean": bootstrap_lower(nets, boot_level if boot_level else BOOT_LEVEL),
     }
     gates = {
         "enough_trades": stats["trades"] >= (min_trades or MIN_TRADES[cadence]),
@@ -370,6 +419,38 @@ def evaluate(
     }
     verdict = "eligible for a forward test" if all(gates.values()) else "rejected"
     return {"stats": stats, "gates": gates, "verdict": verdict}
+
+
+def net_by_trailing_market(trades: list[dict], nifty_close: pd.Series) -> dict[str, float]:
+    """Net result split by whether the Nifty had fallen over the 20 sessions before each entry: a short
+    call does best when it has not rallied, and a test run in one kind of market proves little about
+    the other."""
+    close = nifty_close.copy()
+    close.index = pd.DatetimeIndex(close.index).normalize()
+    falling = (close.shift(1) / close.shift(21) - 1) < 0
+    out = {"falling": 0.0, "not_falling": 0.0}
+    for t in trades:
+        out[
+            "falling"
+            if bool(falling.get(pd.Timestamp(t["entry"]).normalize(), False))
+            else "not_falling"
+        ] += float(t["net"])
+    return out
+
+
+def trade_rows(result: Result) -> dict[str, Any]:
+    """Every counted trade and every week that was not counted, with its reason, for the saved report."""
+    return {
+        "trades": [
+            {
+                "entry": f"{t['entry']:%Y-%m-%d}", "expiry": f"{t['expiry']:%Y-%m-%d}", "lot": t["lot"],
+                "pts": round(t["pts"], 2), "cost": round(t["cost"], 2), "net": round(t["net"], 2),
+                "legs": [{k: (f"{v:%Y-%m-%d}" if isinstance(v, pd.Timestamp) else v) for k, v in g.items()} for g in t["legs"]],
+            }
+            for t in sorted(result.trades, key=lambda x: x["entry"])
+        ],
+        "not_counted": [{"expiry": f"{x['expiry']:%Y-%m-%d}", "reason": x["reason"]} for x in result.skipped],
+    }  # fmt: skip
 
 
 def choose_survivors(reports: dict[str, dict[str, Any]]) -> list[str]:
@@ -448,6 +529,7 @@ def screen_registration(
     lot_for: Callable[[pd.Timestamp], int | None],
     primary: tuple[pd.Timestamp, pd.Timestamp],
     overlap: tuple[pd.Timestamp, pd.Timestamp],
+    is_session: Callable[[pd.Timestamp], bool] | None = None,
 ) -> dict[str, Any]:
     """Run a registered idea's structure once and return the sealed gate results for the primary period.
 
@@ -457,13 +539,18 @@ def screen_registration(
     from services.algos import registry
 
     content = registration["content"]
+    if "structure" in content["params"] and "legs" in content["params"]:
+        raise ValueError("Name the structure or describe its legs, not both.")
     if list(content["gates"]) != list(GATE_TEXT):
         raise ValueError("The registered gates must be exactly: " + ", ".join(GATE_TEXT) + ".")
     spec = spec_from_params(content["name"], content["params"])
     out: dict[str, Any] = {}
     for label, (first, last) in (("primary", primary), ("overlap", overlap)):
-        result = simulate(spec, chain, nifty_close, vix_close, lot_for, first, last)
-        out[label] = evaluate(result, spec.cadence, chain.sessions)
+        result = simulate(spec, chain, nifty_close, vix_close, lot_for, first, last, is_session)
+        # The bar is the registration's own: 0.025 divided by its last trial number.
+        out[label] = evaluate(
+            result, spec.cadence, chain.sessions, boot_level=registration.get("pass_bar")
+        )
     results = dict(out["primary"]["gates"])
     return {
         "results": results,

@@ -553,7 +553,11 @@ def _builder_request(data: dict) -> tuple[dict | None, str | None]:
     return {"families": families, "label_sets": labels, "model": model}, None
 
 
-REGISTRY_DIR = Path(os.getenv("ALGO_REGISTRY_DIR", "db/algo_registry"))
+def _registry_dir() -> Path:
+    """Read on every call, so a test or an operator changing the setting takes effect at once."""
+    return Path(os.getenv("ALGO_REGISTRY_DIR", "db/algo_registry"))
+
+
 REGISTRY_MAX_BODY = 64 * 1024
 
 
@@ -563,13 +567,13 @@ REGISTRY_MAX_BODY = 64 * 1024
 def registry_list():
     """The trial count, the next free idea month, and every registration with its status."""
     now = datetime.now()
-    records = registry._store(REGISTRY_DIR)
+    records = registry._store(_registry_dir())
     return _ok(
         {
             "data": {
-                "trial_count": registry.running_count(REGISTRY_DIR),
-                "pass_bar": registry.pass_bar(registry.running_count(REGISTRY_DIR)),
-                "next_free_month": registry.next_free_slot(REGISTRY_DIR, now),
+                "trial_count": registry.running_count(_registry_dir()),
+                "pass_bar": registry.pass_bar(registry.running_count(_registry_dir())),
+                "next_free_month": registry.next_free_slot(_registry_dir(), now),
                 "months_used": {
                     **registry.SLOTS_USED,
                     **{r["slot"]: r["content"]["name"] for r in records},
@@ -622,13 +626,16 @@ def reconciliation():
 @_api_limit
 def registry_create():
     """Freeze an idea before anything runs. It cannot run, edit or promote anything."""
+    request.max_content_length = (
+        REGISTRY_MAX_BODY  # also bounds a chunked body with no length header
+    )
     if (request.content_length or 0) > REGISTRY_MAX_BODY:
         return _error("That registration is too large. Shorten the text and try again.", 413)
     data, error = _body()
     if error:
         return error
     try:
-        record = registry.register(data, REGISTRY_DIR, datetime.now(), set(ALGOS))
+        record = registry.register(data, _registry_dir(), datetime.now(), set(ALGOS))
     except registry.Refused as why:
         return _error(str(why), 400)
     return _ok({"data": record}, 201)
@@ -639,6 +646,7 @@ def registry_create():
 @_api_limit
 def registry_post_mortem(record_id):
     """The owner's written account of a finished forward test. It records text and changes no result."""
+    request.max_content_length = REGISTRY_MAX_BODY
     if (request.content_length or 0) > REGISTRY_MAX_BODY:
         return _error("That text is too large. Shorten it and try again.", 413)
     data, error = _body()
@@ -646,7 +654,7 @@ def registry_post_mortem(record_id):
         return error
     try:
         record = registry.add_post_mortem(
-            REGISTRY_DIR, record_id, data.get("text", ""), datetime.now()
+            _registry_dir(), record_id, data.get("text", ""), datetime.now()
         )
     except registry.Refused as why:
         return _error(str(why), 400)

@@ -41,6 +41,11 @@ class Refused(Exception):
     """The bot declines to act; the message is written for the trader."""
 
 
+class Unresolved(Refused):
+    """An order's state cannot be told (still open after the cancel, or only partly filled). Nothing
+    further is placed until the trader has looked."""
+
+
 def contract_symbol(expiry: date, strike: float, kind: str = "CE") -> str:
     return f"{UNDERLYING}{expiry:%d%b%y}".upper() + f"{int(strike)}{kind}"
 
@@ -176,23 +181,40 @@ class Bot:
             self.sleep(5)
             waited += 5
 
-    def _settle(self, orderid: str) -> Fill | None:
+    def _settle(self, orderid: str, quantity: int) -> Fill | None:
         """Wait for a fill. If none comes, cancel and look once more: an order can fill in the moment
-        between the last look and the cancel, and then the position exists and must be recorded."""
+        between the last look and the cancel, and then the position exists and must be recorded.
+
+        Returns the full fill, or None only when the order is certainly not filled (rejected or
+        cancelled). An order still open after the cancel, or filled in part, raises Unresolved: it
+        may hold a position, and treating it as nothing is how a leg is left unwatched."""
         fill = self._filled(orderid)
-        if fill is not None:
-            return fill
-        self._cancel(orderid)
-        data = self.client.post("/api/v1/orderstatus", strategy=STRATEGY, orderid=orderid).get(
-            "data", {}
-        )
-        if str(data.get("order_status", "")).lower() == "complete":
-            return Fill(
-                orderid,
-                float(data.get("average_price") or 0),
-                int(float(data.get("quantity") or 0)),
+        if fill is None:
+            self._cancel(orderid)
+            data = self.client.post("/api/v1/orderstatus", strategy=STRATEGY, orderid=orderid).get(
+                "data", {}
             )
-        return None
+            status = str(data.get("order_status", "")).lower()
+            if status == "complete":
+                fill = Fill(
+                    orderid,
+                    float(data.get("average_price") or 0),
+                    int(float(data.get("quantity") or 0)),
+                )
+            elif status in ("rejected", "cancelled"):
+                return None
+            else:
+                raise Unresolved(
+                    f"Order {orderid} is still {status or 'of unknown state'} after the cancel."
+                )
+        if fill.quantity < quantity:
+            raise Unresolved(f"Order {orderid} filled {fill.quantity} of {quantity}.")
+        return fill
+
+    def _attention(self, state: dict, why: Exception) -> None:
+        """Record that something needs a person, and say so. Nothing new is placed meanwhile."""
+        self.save({**state, "needs_attention": str(why)})
+        self.notify(f"Sandbox bot ALERT: {why} Look at the positions and the order book now.")
 
     def _cancel(self, orderid: str) -> None:
         self.client.post("/api/v1/cancelorder", strategy=STRATEGY, orderid=orderid)
@@ -246,7 +268,11 @@ class Bot:
         if dry_run:
             return {"status": "dry_run", **plan}
         hedge_id = self._place(long_sym, "BUY", qty, "LIMIT", buy_at)
-        hedge = self._settle(hedge_id)
+        try:
+            hedge = self._settle(hedge_id, qty)
+        except Unresolved as why:
+            self._attention({**plan, "status": "orphan_hedge"}, why)
+            raise
         if hedge is None:
             self.notify(
                 f"Sandbox bot: the hedge {long_sym} did not fill, so the call was not sold. Nothing is open."
@@ -263,7 +289,11 @@ class Bot:
                 f"({why}). Only the bought call is held; close it with the exit command."
             )
             raise
-        short = self._settle(short_id)
+        try:
+            short = self._settle(short_id, qty)
+        except Unresolved as why:
+            self._attention(state, why)
+            raise
         if short is None:
             self.notify(
                 f"Sandbox bot: the hedge {long_sym} filled but the call {sold_sym} did not. Only the "
@@ -326,7 +356,11 @@ class Bot:
         qty, closed = state["quantity"], {}
         if state["status"] == "open":
             buy_id = self._place(state["sold"], "BUY", qty, "MARKET")
-            buy = self._settle(buy_id)
+            try:
+                buy = self._settle(buy_id, qty)
+            except Unresolved as why:
+                self._attention(state, why)
+                raise
             if buy is None:
                 self.notify(
                     f"Sandbox bot ALERT: could not buy back {state['sold']}. Close it by hand."
@@ -339,7 +373,11 @@ class Bot:
         elif state["status"] == "short_bought_back":
             closed["buyback_fill"] = state["buyback_fill"]
         sell_id = self._place(state["long"], "SELL", qty, "MARKET")
-        sell = self._settle(sell_id)
+        try:
+            sell = self._settle(sell_id, qty)
+        except Unresolved as why:
+            self._attention(state, why)
+            raise
         if sell is None:
             self.notify(f"Sandbox bot ALERT: could not sell {state['long']}. Close it by hand.")
             return {**state, **closed, "status": "short_bought_back"}

@@ -89,20 +89,39 @@ _STOP = {
     "with",
     "by",
 }
+# A call spread and its put mirror are different ideas: direction words do not make two ideas the same.
+_DIRECTION = {"call", "calls", "put", "puts", "buy", "sell", "long", "short", "bullish", "bearish"}
 
 
 def _words(text: str) -> set[str]:
-    return {w for w in _WORDS.findall(text.lower()) if w not in _STOP and len(w) > 1}
+    return {
+        w
+        for w in _WORDS.findall(text.lower())
+        if w not in _STOP and w not in _DIRECTION and len(w) > 1
+    }
+
+
+def _direction(text: str) -> frozenset[str]:
+    return frozenset(w for w in _WORDS.findall(text.lower()) if w in _DIRECTION)
 
 
 def near_duplicate(draft: dict[str, Any], folder: Path) -> str | None:
-    """The name of a registered idea this draft restates, or None. A reworded idea is the same idea."""
-    mine = _words(f"{draft.get('name', '')} {draft.get('idea', '')} {draft.get('entry', '')}")
+    """The name of a registered idea this draft restates, or None. A reworded idea is the same idea.
+
+    Ideas that differ in direction (a call spread and its put mirror, a buyer and a seller) are
+    different ideas, each with its own trial, so a different set of direction words is never a
+    duplicate; otherwise the shared words decide.
+    """
+    text = f"{draft.get('name', '')} {draft.get('idea', '')} {draft.get('entry', '')}"
+    mine, my_direction = _words(text), _direction(text)
     if not mine:
         return None
     for record in _store(folder):
         c = record["content"]
-        theirs = _words(f"{c['name']} {c['idea']} {c['entry']}")
+        other = f"{c['name']} {c['idea']} {c['entry']}"
+        if _direction(other) != my_direction:
+            continue
+        theirs = _words(other)
         if theirs and len(mine & theirs) / len(mine | theirs) >= NEAR_DUPLICATE:
             return str(c["name"])
     return None
@@ -156,7 +175,15 @@ def _store(folder: Path) -> list[dict[str, Any]]:
             if path.name == BUILDER_TRIALS_FILE:
                 continue
             try:
-                found.append(json.loads(path.read_text(encoding="utf-8")))
+                record = json.loads(path.read_text(encoding="utf-8"))
+                if not (
+                    isinstance(record, dict)
+                    and isinstance(record.get("content"), dict)
+                    and isinstance(record["content"].get("params"), dict)
+                    and "id" in record
+                ):
+                    raise ValueError("not a registration")
+                found.append(record)
             except (ValueError, OSError):
                 logger.exception("Skipping an unreadable registration file: %s", path.name)
     return found
@@ -229,7 +256,8 @@ def _register(
         issues.append(
             f"This restates an idea already registered ({twin}). A reworded idea is the same idea."
         )
-    named = (draft.get("params") or {}).get("algo_id")
+    params = draft.get("params")
+    named = params.get("algo_id") if isinstance(params, dict) else None
     if named is not None and known_algo_ids is not None and named not in known_algo_ids:
         issues.append(
             "The algo named in the settings (algo_id) is not one of the algos in this app."
@@ -326,32 +354,33 @@ def record_run(
 ) -> dict[str, Any]:
     """Store the one run of a registration. A second run is refused. The only verdicts are
     'rejected' and 'eligible for a forward test'."""
-    record = get(folder, record_id)
-    if record is None:
-        raise Refused("No such registration.")
-    if not intact(record):
-        raise Refused("This registration was changed after it was frozen, so it cannot be run.")
-    if seal != engine_seal(record["sha256"], results):
-        raise Refused(
-            "These gate results did not come from the screen engine, so they were not recorded."
-        )
-    if record["run"] is not None:
-        raise Refused(
-            "This registration has already been run. A second look is a new idea and a new trial."
-        )
-    gates = record["content"]["gates"]
-    if set(results) != set(gates) or not all(isinstance(v, bool) for v in results.values()):
-        raise Refused("Report a pass or fail for every registered gate, and no others.")
-    failed = [g for g in gates if not results[g]]
-    record["run"] = {
-        "at": now.isoformat(timespec="seconds"),
-        "results": results,
-        "verdict": "rejected" if failed else "eligible for a forward test",
-        "failed": failed,
-    }
-    record["status"] = "rejected" if failed else "eligible for a forward test"
-    _write(folder / f"{record_id}.json", json.dumps(record, indent=2))
-    return record
+    with _LOCK:
+        record = get(folder, record_id)
+        if record is None:
+            raise Refused("No such registration.")
+        if not intact(record):
+            raise Refused("This registration was changed after it was frozen, so it cannot be run.")
+        if seal != engine_seal(record["sha256"], results):
+            raise Refused(
+                "These gate results did not come from the screen engine, so they were not recorded."
+            )
+        if record["run"] is not None:
+            raise Refused(
+                "This registration has already been run. A second look is a new idea and a new trial."
+            )
+        gates = record["content"]["gates"]
+        if set(results) != set(gates) or not all(isinstance(v, bool) for v in results.values()):
+            raise Refused("Report a pass or fail for every registered gate, and no others.")
+        failed = [g for g in gates if not results[g]]
+        record["run"] = {
+            "at": now.isoformat(timespec="seconds"),
+            "results": results,
+            "verdict": "rejected" if failed else "eligible for a forward test",
+            "failed": failed,
+        }
+        record["status"] = "rejected" if failed else "eligible for a forward test"
+        _write(folder / f"{record_id}.json", json.dumps(record, indent=2))
+        return record
 
 
 FORWARD_VERDICTS = ("pass", "fail", "inconclusive")
@@ -362,29 +391,30 @@ def record_forward(
 ) -> dict[str, Any]:
     """Store the end of a forward test. Only a registration that was run and found eligible can have
     one, and it can be recorded once. A pass here is what the optional Live requirement looks for."""
-    record = get(folder, record_id)
-    if record is None:
-        raise Refused("No such registration.")
-    if verdict not in FORWARD_VERDICTS:
-        raise Refused("The forward verdict must be pass, fail or inconclusive.")
-    if not intact(record):
-        raise Refused(
-            "This registration was changed after it was frozen, so no result can be recorded."
-        )
-    if record.get("forward") is not None:
-        raise Refused("The forward result of this registration is already recorded.")
-    if record["status"] != "eligible for a forward test":
-        raise Refused(
-            "Only a registration found eligible for a forward test can have a forward result."
-        )
-    record["forward"] = {
-        "at": now.isoformat(timespec="seconds"),
-        "verdict": verdict,
-        "evidence": evidence,
-    }
-    record["status"] = f"forward {verdict}"
-    _write(folder / f"{record_id}.json", json.dumps(record, indent=2))
-    return record
+    with _LOCK:
+        record = get(folder, record_id)
+        if record is None:
+            raise Refused("No such registration.")
+        if verdict not in FORWARD_VERDICTS:
+            raise Refused("The forward verdict must be pass, fail or inconclusive.")
+        if not intact(record):
+            raise Refused(
+                "This registration was changed after it was frozen, so no result can be recorded."
+            )
+        if record.get("forward") is not None:
+            raise Refused("The forward result of this registration is already recorded.")
+        if record["status"] != "eligible for a forward test":
+            raise Refused(
+                "Only a registration found eligible for a forward test can have a forward result."
+            )
+        record["forward"] = {
+            "at": now.isoformat(timespec="seconds"),
+            "verdict": verdict,
+            "evidence": evidence,
+        }
+        record["status"] = f"forward {verdict}"
+        _write(folder / f"{record_id}.json", json.dumps(record, indent=2))
+        return record
 
 
 MIN_POST_MORTEM_CHARS = 60
@@ -399,32 +429,55 @@ def needs_post_mortem(record: dict[str, Any]) -> bool:
 def add_post_mortem(folder: Path, record_id: str, text: str, now: datetime) -> dict[str, Any]:
     """The owner's written account of what a forward test showed and what it did not. A forward pass
     counts toward Live only once it has one, so the result is read before it is relied on."""
-    record = get(folder, record_id)
-    if record is None:
-        raise Refused("No such registration.")
-    if record.get("forward") is None:
-        raise Refused("A post-mortem is written after the forward test has ended.")
-    if record["forward"].get("post_mortem"):
-        raise Refused("A post-mortem is already recorded for this registration.")
-    if not isinstance(text, str) or len(text.strip()) < MIN_POST_MORTEM_CHARS:
-        raise Refused(
-            f"Write at least {MIN_POST_MORTEM_CHARS} characters: what it showed, what it cannot "
-            "show, and what you would do differently."
-        )
-    record["forward"]["post_mortem"] = {
-        "at": now.isoformat(timespec="seconds"),
-        "text": text.strip(),
+    with _LOCK:
+        record = get(folder, record_id)
+        if record is None:
+            raise Refused("No such registration.")
+        if record.get("forward") is None:
+            raise Refused("A post-mortem is written after the forward test has ended.")
+        if record["forward"].get("post_mortem"):
+            raise Refused("A post-mortem is already recorded for this registration.")
+        if not isinstance(text, str) or len(text.strip()) < MIN_POST_MORTEM_CHARS:
+            raise Refused(
+                f"Write at least {MIN_POST_MORTEM_CHARS} characters: what it showed, what it cannot "
+                "show, and what you would do differently."
+            )
+        record["forward"]["post_mortem"] = {
+            "at": now.isoformat(timespec="seconds"),
+            "text": text.strip(),
+        }
+        _write(folder / f"{record_id}.json", json.dumps(record, indent=2))
+        return record
+
+
+def forward_summary(folder: Path) -> dict[str, int]:
+    """What the register holds, in numbers, for the Live gate's message: no guessing about the future."""
+    try:
+        records = _store(folder)
+    except OSError:
+        records = []
+    return {
+        "registered": len(records),
+        "forward_tests_passed": sum(
+            (r.get("forward") or {}).get("verdict") == "pass" for r in records
+        ),
+        "post_mortems_written": sum(
+            bool((r.get("forward") or {}).get("post_mortem")) for r in records
+        ),
     }
-    _write(folder / f"{record_id}.json", json.dumps(record, indent=2))
-    return record
 
 
 def forward_passed(folder: Path, algo_id: str) -> bool:
-    """True if a registration naming this algo (its ``algo_id`` setting) has a recorded forward pass."""
-    return any(
-        r["content"]["params"].get("algo_id") == algo_id
-        and (r.get("forward") or {}).get("verdict") == "pass"
-        and bool((r.get("forward") or {}).get("post_mortem"))
-        and intact(r)
-        for r in _store(folder)
-    )
+    """True if a registration naming this algo (its ``algo_id`` setting) has a recorded forward pass
+    and a written post-mortem. A damaged record never raises: it simply does not count."""
+    try:
+        return any(
+            r["content"]["params"].get("algo_id") == algo_id
+            and (r.get("forward") or {}).get("verdict") == "pass"
+            and bool((r.get("forward") or {}).get("post_mortem"))
+            and intact(r)
+            for r in _store(folder)
+        )
+    except (KeyError, TypeError, OSError):
+        logger.exception("Could not read the register for the Live rule")
+        return False

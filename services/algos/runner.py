@@ -160,6 +160,22 @@ def _forward_pass_required() -> bool:
     return os.getenv("ALGO_LIVE_REQUIRES_FORWARD_PASS", "1").strip() != "0"
 
 
+def _forward_pass_reason() -> str:
+    """Why Live is refused, from what the register really holds."""
+    from pathlib import Path
+
+    from services.algos import registry
+
+    held = registry.forward_summary(Path(os.getenv("ALGO_REGISTRY_DIR", "db/algo_registry")))
+    return (
+        "Going Live needs a registered idea for this algo whose forward test in Sandbox mode has "
+        "passed and has a written post-mortem. The register holds "
+        f"{held['registered']} registered ideas, {held['forward_tests_passed']} passed forward tests "
+        f"and {held['post_mortems_written']} post-mortems. An idea opens Live for an algo only if its "
+        "settings name that algo as algo_id."
+    )
+
+
 def _forward_pass_found(algo_id: str | None) -> bool:
     from pathlib import Path
 
@@ -206,11 +222,7 @@ def live_gate(strategy_id: int, algo_id: str | None = None) -> dict[str, Any]:
         return {
             "allowed": False,
             "needed_runs": _min_sandbox_runs(),
-            "reason": (
-                "Going Live needs a registered idea for this algo whose forward test in Sandbox "
-                "mode has passed. No algo has one yet, and the forward tests running now end in "
-                "2027 at the earliest, so Live is not available for any algo today."
-            ),
+            "reason": _forward_pass_reason(),
             "record": track_record(strategy_id),
         }
     record = track_record(strategy_id)
@@ -524,7 +536,8 @@ def run_entry(deployment_id: int, *, today: date | None = None) -> dict[str, Any
             return _record(
                 deployment_id,
                 "error",
-                "Another of your algos was being started at the same moment. It will try again tomorrow.",
+                "Another of your algos was being started at the same moment, so this one was not "
+                "started. Check the market again in a minute, or wait for the next scheduled check.",
                 **regime_fields,
             )
     except Exception:

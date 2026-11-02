@@ -62,3 +62,16 @@ The engine is built and tested on made-up prices (`services/algos/eod_screen.py`
 - Exchange charges: `costs.py` uses a flat 0.0345 percent; the actual rate was about 0.05 percent over 2021 to September 2024. STT is overstated by more (0.10 against 0.0625 percent), so costs stay conservative overall, but the screen's report must say so.
 - The bootstrap gate now uses the register's rule 3 (0.025 divided by 319); see gate 6 above. A forward ledger of a survivor uses the same engine and so the same bar. The earlier S3n and C1 registrations keep the levels they were registered with.
 
+## Amendments made before any run (2 November 2026, after a second Opus 5.5 audit)
+
+None of these used a result; they correct how the engine reads the data and what the single run saves.
+
+- **Expiry list.** An expiry the exchange re-dated (a holiday moved it; the file's contracts carry the new date and no row sits on the old one, for example the labels 2023-03-30, 2023-06-29, 2025-09-25, 2025-12-24 and 2026-03-26) is no longer in the list. The monthly expiry of a month is the last expiry that settled on its own date, so March and June 2023 are no longer lost to the monthly structures. A week whose legs carry the old label before the move is not counted, with the reason "a leg has no trade at the entry close".
+- **Entry session on the trading calendar, not on stored days.** The entry is two sessions before a weekly expiry and five before a monthly one, counted on the days the Nifty has a close (the forward ledger uses the exchange calendar). A session missing from the data (the manifest has 2021-03-30 as a gap although the Nifty traded, and Saturday 20 January 2024 was never fetched) removes the week with the reason "entry session was not stored", instead of moving the entry earlier. Special evening sessions (Muhurat) count as sessions where the file stores them.
+- **The bootstrap bar** of a screened registration is its own: 0.025 divided by its last trial number (the eight structures use 0.025 divided by 319).
+- **A registration may name a structure or describe its legs, not both**, so the screen and the forward ledger cannot test different things. A forward trade must be entered after the day the screen was run, whatever its expiry date.
+- **A registration that restates one of the eight structures cannot be screened early** through its own record: `screen_registration.py` refuses until the eight-structure run marker exists.
+- **What the one run saves:** every counted trade with its legs, every week not counted with its reason, and the net split by whether the Nifty had fallen over the 20 sessions before entry. If the long-straddle control passes, no survivors are named and the warning is printed first.
+- **The run marker** is also looked for in the repository's history (`git log --all`), so a fresh clone cannot run the screen again once the marker has been committed. Commit it straight after the run.
+- **Known and accepted:** the equity curve counts a still-open trade's mark without its costs until it closes, so drawdown is understated by the costs of a trade in flight (a few hundred rupees a trade); the report says so.
+

@@ -32,8 +32,10 @@ def main() -> int:
         gap = fa.missing_day_message(bars.days(), datetime.strptime(day, "%Y-%m-%d").date())
         if gap:
             messages.append(gap)
-    except Exception as err:
-        messages.append(f"Could not read the stored candles to check for missed days: {err}")
+    except Exception:
+        messages.append(
+            "Could not read the stored candles to check for missed days. Check log\\capture.log."
+        )
     report_path, seen_path = OUT / "report.json", OUT / "alerted.json"
     if report_path.exists():
         report = json.loads(report_path.read_text(encoding="utf-8"))

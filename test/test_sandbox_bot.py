@@ -22,10 +22,13 @@ class FakeApi:
         flip_after_orders=None,
         fill_buyback=True,
         fill_after_cancel=False,
+        stuck_open=False,
+        partial_qty=None,
     ):
         self.analyze, self.vix, self.spot = analyze, vix, spot
         self.flip_after_orders, self.fill_buyback = flip_after_orders, fill_buyback
         self.fill_after_cancel = fill_after_cancel
+        self.stuck_open, self.partial_qty = stuck_open, partial_qty
         self.fill = {"hedge": fill_hedge, "short": fill_short}
         self.calls, self.orders, self.cancelled = [], {}, []
         self.positions = positions or {}
@@ -69,13 +72,13 @@ class FakeApi:
             price = order["price"] or (20.2 if order["action"] == "BUY" else 5.4)
             if self.fill_after_cancel and p["orderid"] in self.cancelled:
                 ok = True  # it filled in the moment between the last look and the cancel
-            return {
-                "data": {
-                    "order_status": "complete" if ok else "open",
-                    "average_price": price,
-                    "quantity": order["quantity"],
-                }
-            }
+            if ok:
+                status, qty = "complete", self.partial_qty or order["quantity"]
+            elif p["orderid"] in self.cancelled and not self.stuck_open:
+                status, qty = "cancelled", order["quantity"]  # a real broker reports the cancel
+            else:
+                status, qty = "open", order["quantity"]
+            return {"data": {"order_status": status, "average_price": price, "quantity": qty}}
         if path == "/api/v1/cancelorder":
             self.cancelled.append(p["orderid"])
             return {"status": "success"}
@@ -286,3 +289,35 @@ def test_check_expects_no_sold_call_after_the_exit_started_and_flags_a_naked_one
     assert b.check()["status"] == "ok"  # the call is closed, the hedge is held: as recorded
     api.positions = {"NIFTY10NOV2625000CE": -65}  # a short call with no hedge
     assert b.check()["status"] == "mismatch" and "ALERT" in notes[-1]
+
+
+def test_an_order_still_open_after_the_cancel_is_recorded_as_needing_a_person_and_nothing_more_is_placed(
+    tmp_path,
+):
+    api, notes = FakeApi(fill_hedge=False, stuck_open=True), []
+    b = bot(tmp_path, api, notes)
+    with pytest.raises(sb.Unresolved, match="still open after the cancel"):
+        b.enter(EXPIRY, NOW, set())
+    assert [o["action"] for o in api.orders.values()] == ["BUY"]  # no call was sold
+    assert b.state()["status"] == "orphan_hedge" and "still open" in b.state()["needs_attention"]
+    assert "Look at the positions" in notes[-1]
+    with pytest.raises(sb.Refused, match="already recorded"):
+        b.enter(EXPIRY, NOW, set())  # and next week's entry is refused until someone has looked
+
+
+def test_a_partly_filled_order_is_not_recorded_as_a_full_fill(tmp_path):
+    api = FakeApi(partial_qty=30)
+    b = bot(tmp_path, api)
+    with pytest.raises(sb.Unresolved, match="filled 30 of 65"):
+        b.enter(EXPIRY, NOW, set())
+    assert b.state()["status"] == "orphan_hedge" and "30 of 65" in b.state()["needs_attention"]
+
+
+def test_an_exit_whose_buyback_is_unresolved_keeps_the_state_open_and_flags_it(tmp_path):
+    api = FakeApi()
+    b = bot(tmp_path, api)
+    b.enter(EXPIRY, NOW, set())
+    api.fill_buyback, api.stuck_open = False, True
+    with pytest.raises(sb.Unresolved):
+        b.exit(today=EXPIRY)
+    assert b.state()["status"] == "open" and "needs_attention" in b.state()

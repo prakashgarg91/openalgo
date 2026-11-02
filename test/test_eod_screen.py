@@ -22,12 +22,12 @@ def options(spot_by_day=None, settle_spot=24050.0, drop=None, expiries=(E,)):
     spot_by_day = spot_by_day or dict.fromkeys(DAYS, 24000.0)
     rows = []
     for expiry in expiries:
-        for day in DAYS:
+        for day in (*DAYS, *([expiry] if expiry not in DAYS else [])):
             for strike in range(23000, 25001, 50):
                 for kind in ("CE", "PE"):
                     if drop and (day, expiry, kind, strike) in drop:
                         continue
-                    spot = spot_by_day[day]
+                    spot = spot_by_day.get(day, 24000.0)
                     px = premium(kind, strike, spot)
                     if expiry == day:
                         px = (
@@ -298,3 +298,93 @@ def test_a_calendar_whose_legs_have_different_lot_sizes_is_not_counted():
     assert (
         not out.trades and out.skipped[0]["reason"] == "the legs' expiries have different lot sizes"
     )
+
+
+def test_an_expiry_the_exchange_re_dated_is_not_in_the_expiry_list():
+    """A holiday moved the 2021-05-20 expiry to the 19th: the contracts carry the new date, and no row
+    sits on the old one. The old label must not stay in the list (it would shadow the real expiry)."""
+    opts = options()
+    old = opts.copy()
+    old["expiry"] = pd.Timestamp(
+        "2021-05-20"
+    )  # the label before the move, rows only on earlier dates
+    chain = es.Chain(pd.concat([opts, old], ignore_index=True))
+    # last session stored is 05-13, so 05-20 is still in the future here: it stays, as a future expiry
+    assert pd.Timestamp("2021-05-20") in chain.expiries
+    later = options()
+    later = later.assign(
+        date=later["date"] + pd.Timedelta(days=14), expiry=later["expiry"] + pd.Timedelta(days=14)
+    )
+    chain2 = es.Chain(
+        pd.concat([opts, old, later], ignore_index=True)
+    )  # sessions now run past 05-20
+    assert (
+        pd.Timestamp("2021-05-20") not in chain2.expiries
+    )  # in the past and never settled on its date
+    assert pd.Timestamp("2021-05-13") in chain2.expiries
+
+
+def test_a_session_missing_from_the_data_removes_the_week_instead_of_moving_the_entry_earlier():
+    days = [
+        pd.Timestamp(d)
+        for d in ("2021-05-07", "2021-05-10", "2021-05-11", "2021-05-12", "2021-05-13")
+    ]
+    opts = options()
+    extra = opts[opts["date"] == DAYS[0]].assign(date=days[0])
+    stored = pd.concat([opts, extra], ignore_index=True)
+    stored = stored[stored["date"] != DAYS[1]]  # the 11th, the real entry session, was never stored
+    nifty = pd.Series(24000.0, index=pd.DatetimeIndex(days))
+    vix = pd.Series(14.0, index=pd.DatetimeIndex(days))
+    out = es.simulate(
+        es.SPECS["WK"],
+        es.Chain(stored),
+        nifty,
+        vix,
+        nse_lots.nifty_lot,
+        pd.Timestamp("2021-05-01"),
+        pd.Timestamp("2021-06-30"),
+    )
+    assert not out.trades and out.skipped[0]["reason"] == "entry session was not stored"
+
+
+def test_the_trading_calendar_can_be_given_and_names_the_entry_session():
+    calendar = lambda d: pd.Timestamp(d).weekday() < 5  # noqa: E731
+    out = es.simulate(
+        es.SPECS["WK"],
+        es.Chain(options()),
+        series(24000.0),
+        series(14.0),
+        nse_lots.nifty_lot,
+        pd.Timestamp("2021-05-01"),
+        pd.Timestamp("2021-06-30"),
+        calendar,
+    )
+    assert out.trades[0]["entry"] == ENTRY  # two weekdays before Thursday 13 May
+
+
+def test_the_bootstrap_bar_is_the_one_it_is_given():
+    trades = [{"entry": pd.Timestamp("2021-01-04") + pd.Timedelta(days=7 * i), "exit": pd.Timestamp("2021-01-06") + pd.Timedelta(days=7 * i), "net": 100.0 + 20 * (i % 3), "net_2x": 90.0, "marks": {}} for i in range(40)]  # fmt: skip
+    result = es.Result("WC", trades=trades)
+    sessions = [t[k] for t in trades for k in ("entry", "exit")]
+    strict = es.evaluate(result, "weekly", sessions, min_trades=30)["stats"]["boot_lower_mean"]
+    loose = es.evaluate(result, "weekly", sessions, min_trades=30, boot_level=0.4)["stats"][
+        "boot_lower_mean"
+    ]
+    assert loose >= strict  # a looser level gives a higher lower bound: the argument is honoured
+
+
+def test_the_split_by_the_markets_trailing_move_is_saved_with_every_trade_and_skip():
+    close = pd.Series(
+        range(100, 140), index=pd.date_range("2021-01-01", periods=40, freq="B"), dtype=float
+    )
+    falling = close[::-1].copy()
+    falling.index = close.index
+    t = [{"entry": close.index[30], "net": 100.0}]
+    assert es.net_by_trailing_market(t, close) == {"falling": 0.0, "not_falling": 100.0}
+    assert es.net_by_trailing_market(t, falling) == {"falling": 100.0, "not_falling": 0.0}
+    rows = es.trade_rows(run("WC"))
+    assert (
+        rows["trades"][0]["entry"] == "2021-05-11"
+        and rows["trades"][0]["legs"][0]["strike"] == 24000
+    )
+    assert rows["not_counted"] == []

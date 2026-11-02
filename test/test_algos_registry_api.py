@@ -36,7 +36,7 @@ def draft(**over):
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(limiter, "enabled", False)
-    monkeypatch.setattr(algos, "REGISTRY_DIR", tmp_path)
+    monkeypatch.setenv("ALGO_REGISTRY_DIR", str(tmp_path))
     monkeypatch.setattr(algos, "_custom_loaded", True)  # no database in these tests
     monkeypatch.setattr(
         algos, "datetime", type("D", (), {"now": staticmethod(lambda: datetime(2027, 1, 4, 10, 0))})
@@ -171,3 +171,17 @@ def test_the_registry_list_says_which_finished_tests_owe_a_post_mortem(client):
     client.post("/algos/api/registry", json=draft())
     row = client.get("/algos/api/registry").get_json()["data"]["registrations"][0]
     assert row["needs_post_mortem"] is False
+
+
+def test_the_registry_folder_is_read_on_every_call_so_a_test_never_writes_into_the_real_register(
+    client, tmp_path, monkeypatch
+):
+    other = tmp_path / "second"
+    monkeypatch.setenv("ALGO_REGISTRY_DIR", str(other))
+    assert client.post("/algos/api/registry", json=draft()).status_code == 201
+    assert list(other.glob("*.json")) and not list(tmp_path.glob("*.json"))
+
+
+def test_a_body_with_settings_that_are_not_an_object_is_a_400_not_a_crash(client):
+    response = client.post("/algos/api/registry", json={**draft(), "params": ["a"]})
+    assert response.status_code == 400 and "Fix every setting" in response.get_json()["message"]

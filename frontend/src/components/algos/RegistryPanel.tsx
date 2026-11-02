@@ -35,7 +35,7 @@ function parseSettings(text: string): Record<string, string | number> {
 
 export function RegistryPanel() {
   const queryClient = useQueryClient()
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: algoQueryKeys.registry(),
     queryFn: fetchRegistry,
   })
@@ -106,7 +106,11 @@ export function RegistryPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading || !data ? (
+        {isError ? (
+          <p role="alert" className="text-sm text-destructive">
+            The register could not be loaded. Check that OpenAlgo is running and try again.
+          </p>
+        ) : isLoading || !data ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />
         ) : (
           <>
@@ -227,8 +231,8 @@ export function RegistryPanel() {
                     </tr>
                   </thead>
                   <tbody>
-                    {forward.map((f) => (
-                      <tr key={f.name} className="border-t">
+                    {forward.map((f, i) => (
+                      <tr key={`${f.name}-${i}`} className="border-t">
                         <td className="py-1 pr-3">{f.name}</td>
                         <td className="pr-3">{f.verdict ? `${f.state}, ${f.verdict}` : f.state}</td>
                         <td className="pr-3">{f.completed}</td>
@@ -273,7 +277,10 @@ export function RegistryPanel() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="reg-settings">Settings, one value each (name = value)</Label>
+                <Label htmlFor="reg-settings">
+                  Settings, one value each (name = value). To let this idea open Live for an algo,
+                  add algo_id = the algo’s id
+                </Label>
                 <Textarea
                   id="reg-settings"
                   rows={3}
