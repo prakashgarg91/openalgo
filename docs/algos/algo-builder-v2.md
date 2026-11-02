@@ -34,9 +34,20 @@ The "Register an idea" tab now also lists the forward tests in Sandbox mode (`/a
 - **Post-mortem box** on the same tab for a finished forward test that still owes one.
 - **C1 on the forward list**; the screen's bootstrap gate follows the register's rule 3 (see the registration).
 
+## Built in the fifth slice (2 November 2026, night): a screen for a new idea's own structure
+
+A registration for an end-of-day option idea can describe its structure in its one-value settings and be screened once, by the same engine, costs and gates as the eight structures:
+
+- `legs`: written `CE0S:CE100B`: call or put, the offset in points from the money (a multiple of 50, within 1,000), S for sold or B for bought, and an F on the end for the same strike on the next monthly expiry. One to four legs, at most one on the next month.
+- `cadence`: weekly or monthly. `move_filter`: none, call or put. Anything else is refused, so a search cannot be smuggled in through the grammar.
+- `gates`: the six standard gates written exactly (`eod_screen.GATE_TEXT`), because the engine computes those and no others.
+- `scripts/algo_backtest/screen_registration.py <data_repo> <registration_id>` runs it once over the primary period (expiries 1 April 2021 to 26 September 2024; the overlap period is reported and decides nothing), writes the result into the registration with the engine's seal and a report file (`<id>.screen.txt`), and refuses a second run, a registration changed after it was frozen, and a structure outside the grammar. The verdict is only rejected or eligible for a forward test.
+- An eligible registration that also gives `first_expiry` (after the run) and, optionally, `end_trades`, `end_date` and `kill_net` is picked up by the nightly forward ledger (`forward_eod.py`).
+- It is built but not run on any idea. The one-new-idea-a-month rule still applies at registration, so the earliest new idea is January 2027.
+
 ## Next slices (not built)
 
-1. **Generalise the rejection screen** so a registration for a new idea (not only the eight structures) can be run once through `record_run`. Until then only the December screen exists, and nobody can mark a registration run, which is intended.
+1. Non-option ideas (an ETF rule such as the volatility-scaled equity and gold idea) have no screen yet: they need their own engine over the ETF ledgers.
 2. (none left from the product review except the general screen, below)
 3. **Sandbox and Live gates.** Done: see the forward-pass rule above. The builder page never goes Live.
 4. Replace the old family checkboxes in `BuilderPanel.tsx` with the four steps (Write, Register, Screen, Forward) once the screen is general; the old search keeps working and is now counted.

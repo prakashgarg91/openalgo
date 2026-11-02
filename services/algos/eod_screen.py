@@ -8,6 +8,7 @@ work and has no clock. It can only say a structure is rejected or eligible for a
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -386,3 +387,88 @@ def choose_survivors(reports: dict[str, dict[str, Any]]) -> list[str]:
 def control_is_suspect(reports: dict[str, dict[str, Any]]) -> bool:
     """The long straddle is expected to lose; if it passes every gate, stop and look at the data."""
     return CONTROL in reports and reports[CONTROL]["verdict"] == "eligible for a forward test"
+
+
+# ---------------------------------------------------------------------------------------------
+# A registered idea that names its own structure (docs/algos/algo-builder-v2.md)
+# ---------------------------------------------------------------------------------------------
+
+GATE_TEXT = (
+    "enough_trades",
+    "net_positive_at_both_costs",
+    "drawdown_and_worst_day_within_limit",
+    "positive_without_best_trade",
+    "positive_in_each_half",
+    "bootstrap_bound_above_zero",
+)
+_LEG = re.compile(r"^(CE|PE)(-?\d{1,4})([SB])(F?)$")
+MAX_LEGS = 4
+MAX_OFFSET = 1000
+
+
+def spec_from_params(name: str, params: dict[str, Any]) -> Spec:
+    """The structure a registration describes, from its one-value settings.
+
+    ``legs`` is written ``CE0S:CE100B``: call or put, the offset in points from the money, S for sold
+    or B for bought, and an F at the end for the same strike on the next monthly expiry. ``cadence`` is
+    weekly or monthly; ``move_filter`` is call, put or none. Anything else is refused, so a search
+    cannot be smuggled in through the grammar.
+    """
+    legs = []
+    for token in str(params.get("legs", "")).split(":"):
+        found = _LEG.match(token.strip())
+        if not found:
+            raise ValueError(
+                f"'{token}' is not a leg. Write it like CE0S (call, at the money, sold)."
+            )
+        kind, offset, side, far = found.groups()
+        if abs(int(offset)) > MAX_OFFSET or int(offset) % STEP:
+            raise ValueError(
+                f"The offset {offset} must be a multiple of {STEP} within {MAX_OFFSET} points."
+            )
+        legs.append(Leg(kind, int(offset), -1 if side == "S" else 1, far == "F"))
+    if not 1 <= len(legs) <= MAX_LEGS:
+        raise ValueError(f"A structure has 1 to {MAX_LEGS} legs.")
+    if sum(leg.far for leg in legs) > 1:
+        raise ValueError("Only one leg may sit on the next monthly expiry.")
+    cadence = params.get("cadence")
+    if cadence not in SESSIONS_BEFORE:
+        raise ValueError("cadence must be weekly or monthly.")
+    move = params.get("move_filter", "none")
+    if move not in ("none", "call", "put"):
+        raise ValueError("move_filter must be none, call or put.")
+    return Spec(name, cadence, tuple(legs), None if move == "none" else move)
+
+
+def screen_registration(
+    registration: dict[str, Any],
+    chain: Chain,
+    nifty_close: pd.Series,
+    vix_close: pd.Series,
+    lot_for: Callable[[pd.Timestamp], int | None],
+    primary: tuple[pd.Timestamp, pd.Timestamp],
+    overlap: tuple[pd.Timestamp, pd.Timestamp],
+) -> dict[str, Any]:
+    """Run a registered idea's structure once and return the sealed gate results for the primary period.
+
+    The registration must carry the six standard gates, written exactly, because the engine computes
+    those and no others. The overlap period is reported and takes no part in the verdict.
+    """
+    from services.algos import registry
+
+    content = registration["content"]
+    if list(content["gates"]) != list(GATE_TEXT):
+        raise ValueError("The registered gates must be exactly: " + ", ".join(GATE_TEXT) + ".")
+    spec = spec_from_params(content["name"], content["params"])
+    out: dict[str, Any] = {}
+    for label, (first, last) in (("primary", primary), ("overlap", overlap)):
+        result = simulate(spec, chain, nifty_close, vix_close, lot_for, first, last)
+        out[label] = evaluate(result, spec.cadence, chain.sessions)
+    results = dict(out["primary"]["gates"])
+    return {
+        "results": results,
+        "seal": registry.engine_seal(registration["sha256"], results),
+        "primary": out["primary"],
+        "overlap": out["overlap"],
+        "verdict": out["primary"]["verdict"],
+    }

@@ -22,13 +22,27 @@ DEFAULT_KILL_NET = -20_000.0
 FAR_FUTURE = pd.Timestamp("2100-01-01")
 
 
+def spec_for(registration: dict[str, Any]) -> es.Spec | None:
+    """The structure a registration describes: one of the eight by name, or its own legs."""
+    params = registration["content"]["params"]
+    if params.get("structure") in es.SPECS:
+        return es.SPECS[params["structure"]]
+    if "legs" in params:
+        try:
+            return es.spec_from_params(registration["content"]["name"], params)
+        except ValueError:
+            return None
+    return None
+
+
 def parse(registration: dict[str, Any]) -> dict[str, Any] | None:
     """The forward settings a registration carries, or None if it is not an eligible end-of-day
-    structure (it must name the structure and its first counted expiry in its settings)."""
+    structure (it must describe the structure and name its first counted expiry in its settings)."""
     if registration.get("status") != "eligible for a forward test":
         return None
     params = registration["content"]["params"]
-    if params.get("structure") not in es.SPECS or "first_expiry" not in params:
+    spec = spec_for(registration)
+    if spec is None or "first_expiry" not in params:
         return None
     ran = (registration.get("run") or {}).get("at")
     if not ran or pd.Timestamp(params["first_expiry"]) <= pd.Timestamp(str(ran)[:10]):
@@ -36,7 +50,8 @@ def parse(registration: dict[str, Any]) -> dict[str, Any] | None:
     if int(params.get("end_trades", DEFAULT_END_TRADES)) < MIN_END_TRADES:
         return None
     return {
-        "structure": params["structure"],
+        "spec": spec,
+        "structure": spec.name,
         "first_expiry": pd.Timestamp(params["first_expiry"]),
         "end_trades": int(params.get("end_trades", DEFAULT_END_TRADES)),
         "end_date": pd.Timestamp(params["end_date"]) if params.get("end_date") else None,
@@ -45,8 +60,9 @@ def parse(registration: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def run(settings: dict[str, Any], chain, nifty: pd.Series, vix: pd.Series, lot_for) -> es.Result:
-    spec = es.SPECS[settings["structure"]]
-    return es.simulate(spec, chain, nifty, vix, lot_for, settings["first_expiry"], FAR_FUTURE)
+    return es.simulate(
+        settings["spec"], chain, nifty, vix, lot_for, settings["first_expiry"], FAR_FUTURE
+    )
 
 
 def report(
@@ -59,8 +75,9 @@ def report(
         and s["expiry"] > last
     ]  # fmt: skip
     counted = es.Result(result.spec, result.trades, [s for s in result.skipped if s not in pending])
-    spec = es.SPECS[settings["structure"]]
-    evaluated = es.evaluate(counted, spec.cadence, sessions, min_trades=settings["end_trades"])
+    evaluated = es.evaluate(
+        counted, settings["spec"].cadence, sessions, min_trades=settings["end_trades"]
+    )
     trades = sorted(counted.trades, key=lambda t: t["entry"])
     cumulative, lowest = 0.0, 0.0
     for t in trades:
