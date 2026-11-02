@@ -75,3 +75,7 @@ None of these used a result; they correct how the engine reads the data and what
 - **The run marker** is also looked for in the repository's history (`git log --all`), so a fresh clone cannot run the screen again once the marker has been committed. Commit it straight after the run.
 - **Known and accepted:** the equity curve counts a still-open trade's mark without its costs until it closes, so drawdown is understated by the costs of a trade in flight (a few hundred rupees a trade); the report says so.
 
+## Run date brought forward by the owner (2 November 2026, before the run)
+
+The screen was registered to run once on or after 1 December 2026. On 2 November 2026 the owner asked why it had to wait and, told that the wait was the one-new-idea-a-month rule and nothing technical, decided to run it now. The run date is therefore 2 November 2026. What stays: the screen runs once; the rules, costs, gates, periods and amendments above are unchanged; the 8 trials (312 to 319) are counted as written; the primary period decides and the overlap period is only reported; the December idea slot is treated as used by this screen, so the next new idea still waits for January 2027. Before the run, `--coverage` (counts of counted and not-counted weeks with reasons, no price, profit or verdict) is run once to check that the engine reads the data.
+

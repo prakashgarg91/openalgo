@@ -244,15 +244,17 @@ def _script():
     return module
 
 
-def test_the_screen_refuses_before_1_december_and_a_second_run_but_not_the_first_run_after_it():
+def test_the_screen_refuses_before_its_run_date_and_a_second_run_but_not_the_first_run_after_it():
+    """Registered for 1 December 2026; brought forward to 2 November 2026 by the owner (dated note in the
+    registration). It still runs once."""
     from datetime import date
 
     script = _script()
-    assert "on or after 1 December 2026" in script.refusal(date(2026, 11, 30), False)
-    assert script.refusal(date(2026, 12, 1), False) is None
+    assert "on or after 2 November 2026" in script.refusal(date(2026, 11, 1), False)
+    assert script.refusal(date(2026, 11, 2), False) is None
     assert "already been run" in script.refusal(date(2026, 12, 2), True)
-    assert "on or after 1 December 2026" in script.refusal(
-        date(2026, 11, 2), True
+    assert "on or after 2 November 2026" in script.refusal(
+        date(2026, 10, 30), True
     )  # the date comes first
 
 

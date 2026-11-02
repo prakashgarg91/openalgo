@@ -1,6 +1,6 @@
 """Run the registered eight-structure rejection screen (docs/algos/eight-structure-screen-registration.md).
 
-Registered on 2 November 2026 to be run ONCE, on or after 1 December 2026, on the NSE end-of-day data in
+Registered on 2 November 2026 to be run ONCE (first for 1 December 2026, brought forward to 2 November 2026 by the owner), on the NSE end-of-day data in
 the private data repository. ``--check`` only counts what data and documented lot sizes are there and
 evaluates no price, so it is safe to run at any time. A full run refuses to start before 1 December 2026
 and refuses a second run. Read only; places no order.
@@ -20,7 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from services.algos import eod_screen as es  # noqa: E402
 from services.algos import nse_lots  # noqa: E402
 
-RUN_NOT_BEFORE = date(2026, 12, 1)
+# Registered for 1 December 2026; brought forward to 2 November 2026 by the owner's decision on that day
+# (dated note in the registration). The screen still runs once.
+RUN_NOT_BEFORE = date(2026, 11, 2)
 #: Written into the repository when the screen has run, so a fresh clone of the data cannot run it again.
 RUN_MARKER = (
     Path(__file__).resolve().parents[2] / "docs" / "algos" / "eight-structure-screen-run.txt"
@@ -86,6 +88,21 @@ def check(chain: es.Chain, nifty: pd.Series, vix: pd.Series) -> None:
     print("No price was evaluated. The screen itself runs once, on or after 1 December 2026.")
 
 
+def coverage(chain: es.Chain, nifty: pd.Series, vix: pd.Series) -> None:
+    """How many weeks each structure counts and why the others are not counted. NO profit, loss, price
+    or verdict is printed or saved: this only shows that the engine reads the data (an engine that
+    counted nothing, or skipped everything for one reason, would be a fault to fix before the run)."""
+    for label, (a, b) in (("primary", PRIMARY), ("overlap", OVERLAP)):
+        for name, spec in es.SPECS.items():
+            result = es.simulate(spec, chain, nifty, vix, nse_lots.nifty_lot, a, b)
+            reasons = {}
+            for item in result.skipped:
+                reasons[item["reason"]] = reasons.get(item["reason"], 0) + 1
+            print(
+                f"  {label} {name}: {len(result.trades)} counted; not counted: {reasons or 'none'}"
+            )
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     repo = Path(args[0])
@@ -103,6 +120,9 @@ def main() -> int:
     vix = load_daily(repo / "context" / "daily" / "_INDIAVIX.csv")
     if "--check" in sys.argv:
         check(chain, nifty, vix)
+        return 0
+    if "--coverage" in sys.argv:
+        coverage(chain, nifty, vix)
         return 0
     sessions = chain.sessions
     report: dict = {
