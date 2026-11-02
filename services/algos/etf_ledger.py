@@ -267,10 +267,13 @@ def run_ledger(
     costs: Costs = COSTS_V1,
     variant: str = "base",
     matched: dict[str, float] | None = None,
+    targets_fn: Any = None,
 ) -> Ledger:
     """Replay one ledger. ``start`` is the first signal date; the first trade is the next session's close.
 
     ``matched`` (frozen weights of NIFTYBEES and GOLDBEES) turns this into an exposure-matched hold.
+    ``targets_fn(closes, i, book, last)`` replaces the named rule, for a screen of a rule that is not in
+    the nightly set (it returns rupee targets or None, like ``targets``).
     """
     closes = validate(closes)
     first = closes.index.searchsorted(pd.Timestamp(start))
@@ -282,7 +285,11 @@ def run_ledger(
         if matched is not None:
             want = {s: CAPITAL * matched[s] for s in (NIFTY, GOLD)} if not bought else None
         else:
-            want = targets(idea, closes, i - 1, book, last=not bought)
+            want = (
+                targets_fn(closes, i - 1, book, not bought)
+                if targets_fn is not None
+                else targets(idea, closes, i - 1, book, last=not bought)
+            )
         if want is not None:
             buy_n, sell_n = trade(book, want, prices, costs)
         bought = True

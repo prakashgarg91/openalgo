@@ -362,7 +362,9 @@ def worst_day(eq: pd.Series) -> float:
     return float(np.diff(np.r_[0.0, eq.to_numpy()]).min())
 
 
-def bootstrap_lower(values: np.ndarray, level: float = BOOT_LEVEL) -> float:
+def bootstrap_lower(
+    values: np.ndarray, level: float = BOOT_LEVEL, seed: int | None = None
+) -> float:
     """Lower bound of the mean from a moving-block bootstrap over trades (fixed block and seed).
 
     Drawn in chunks so 200,000 draws never hold more than one chunk of resampled series in memory.
@@ -371,7 +373,7 @@ def bootstrap_lower(values: np.ndarray, level: float = BOOT_LEVEL) -> float:
     if n == 0:
         return float("nan")
     block = min(BOOT_BLOCK, n)
-    rng = np.random.default_rng(BOOT_SEED)
+    rng = np.random.default_rng(BOOT_SEED if seed is None else seed)
     means = np.empty(BOOT_DRAWS)
     offsets = np.arange(block)
     for start in range(0, BOOT_DRAWS, BOOT_CHUNK):
