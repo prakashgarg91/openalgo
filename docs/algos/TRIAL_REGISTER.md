@@ -25,6 +25,7 @@ Every rule, filter, side, structure, threshold or post-result change that has be
 | 311 | 1 Nov 2026 | [c1-registration.md](c1-registration.md), month-end ETF window | forward shadow ledger | running from the first month-end in the data |
 | none | 1 Nov 2026 | [nse-eod-registration.md](nse-eod-registration.md), NSE end-of-day Nifty futures and options 2015 to 2026 | data only, no strategy, no trial | registered; download follows |
 | 312 to 319 | run 2 Nov 2026 (registered for 1 Dec, brought forward by the owner) | [eight-structure-screen-registration.md](eight-structure-screen-registration.md), eight structures on NSE end-of-day data | rejection screen, run once | all eight rejected, no survivor: [results](eight-structure-screen-results.md) |
+| 320 | 2 Nov 2026 (owner lifted the monthly slot for it) | [vol-scaled-etf-registration.md](vol-scaled-etf-registration.md), volatility-scaled equity and gold | rejection screen on 15 years of ETF closes, run once | registered, not run |
 
 ## Rules for new entries
 

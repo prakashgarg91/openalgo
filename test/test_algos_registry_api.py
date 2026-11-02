@@ -65,9 +65,9 @@ def test_the_register_starts_with_the_seeded_count_and_the_next_free_month(clien
 def test_registering_returns_201_and_the_count_moves(client):
     response = client.post("/algos/api/registry", json=draft())
     assert response.status_code == 201
-    assert response.get_json()["data"]["trial_numbers"] == [320, 320]
+    assert response.get_json()["data"]["trial_numbers"] == [reg.SEED_TRIALS + 1] * 2
     body = client.get("/algos/api/registry").get_json()["data"]
-    assert body["trial_count"] == 320 and body["registrations"][0]["intact"] is True
+    assert body["trial_count"] == reg.SEED_TRIALS + 1 and body["registrations"][0]["intact"] is True
     assert body["next_free_month"] == "2027-02"
 
 

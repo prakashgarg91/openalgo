@@ -18,6 +18,7 @@ from services.agent.tools import (  # noqa: E402
     select_specs,
 )
 from services.agent.tools.algos_read import AlgosReadToolkit  # noqa: E402
+from services.algos import registry  # noqa: E402
 
 SOURCE = Path(__file__).resolve().parents[1] / "services" / "agent" / "tools" / "algos_read.py"
 FOUR = {"get_idea_register", "get_forward_tests", "check_idea_draft", "was_idea_tried"}
@@ -56,7 +57,7 @@ def test_the_register_view_reads_the_count_without_creating_the_folder(tmp_path,
     folder = tmp_path / "nothing_here"
     monkeypatch.setenv("ALGO_REGISTRY_DIR", str(folder))
     out = payload(toolkit().get_idea_register())
-    assert out["trial_count"] == 319 and out["registrations"] == []
+    assert out["trial_count"] == registry.SEED_TRIALS and out["registrations"] == []
     assert not folder.exists()
 
 

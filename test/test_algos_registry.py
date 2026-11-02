@@ -35,12 +35,12 @@ def draft(**over):
 
 def test_a_complete_draft_is_frozen_with_a_fingerprint_and_the_next_trial_number(tmp_path):
     record = reg.register(draft(), tmp_path, JAN)
-    assert record["trial_numbers"] == [320, 320]
-    assert record["pass_bar"] == pytest.approx(0.025 / 320)
+    assert record["trial_numbers"] == [reg.SEED_TRIALS + 1] * 2
+    assert record["pass_bar"] == pytest.approx(0.025 / (reg.SEED_TRIALS + 1))
     assert record["status"] == "registered" and record["run"] is None
     assert reg.intact(record)
     assert (tmp_path / f"{record['id']}.md").read_text(encoding="utf-8").startswith("# Vol scaled")
-    assert reg.running_count(tmp_path) == 320
+    assert reg.running_count(tmp_path) == reg.SEED_TRIALS + 1
 
 
 def test_an_incomplete_draft_is_refused_in_plain_words(tmp_path):
@@ -84,13 +84,13 @@ def test_one_new_idea_a_month(tmp_path):
         tmp_path,
         FEB,
     )
-    assert second["trial_numbers"] == [321, 321]
+    assert second["trial_numbers"] == [reg.SEED_TRIALS + 2] * 2
 
 
 def test_a_multi_trial_registration_counts_every_trial(tmp_path):
     record = reg.register(draft(trials=8), tmp_path, JAN)
-    assert record["trial_numbers"] == [320, 327]
-    assert reg.running_count(tmp_path) == 327
+    assert record["trial_numbers"] == [reg.SEED_TRIALS + 1, reg.SEED_TRIALS + 8]
+    assert reg.running_count(tmp_path) == reg.SEED_TRIALS + 8
 
 
 def test_the_same_registration_cannot_be_written_twice(tmp_path):
@@ -136,13 +136,15 @@ def test_an_unsafe_id_is_not_looked_up(tmp_path):
 
 
 def test_builder_searches_add_every_configuration_to_the_trial_count(tmp_path):
-    assert reg.running_count(tmp_path) == 319
+    assert reg.running_count(tmp_path) == reg.SEED_TRIALS
     reg.add_builder_trials(tmp_path, 60, "build your own search", JAN)
     reg.add_builder_trials(tmp_path, 40, "weekly re-check", JAN)
     reg.add_builder_trials(tmp_path, 0, "nothing tried", JAN)
-    assert reg.builder_trials(tmp_path) == 100 and reg.running_count(tmp_path) == 419
+    assert (
+        reg.builder_trials(tmp_path) == 100 and reg.running_count(tmp_path) == reg.SEED_TRIALS + 100
+    )
     record = reg.register(draft(), tmp_path, JAN)
-    assert record["trial_numbers"] == [420, 420]
+    assert record["trial_numbers"] == [reg.SEED_TRIALS + 101] * 2
 
 
 def sealed(folder, record, results, now):
@@ -189,10 +191,10 @@ def test_a_setting_that_hides_a_grid_in_text_is_refused(tmp_path):
     for hidden in ("100|150|200", "100, 150", "100 to 200", "50..100", "a;b"):
         with pytest.raises(reg.Refused, match="several values or a range"):
             reg.register(draft(params={"width": hidden}), tmp_path, JAN)
-    assert reg.register(draft(params={"label": "calm days"}), tmp_path, JAN)["trial_numbers"] == [
-        320,
-        320,
-    ]
+    assert (
+        reg.register(draft(params={"label": "calm days"}), tmp_path, JAN)["trial_numbers"]
+        == [reg.SEED_TRIALS + 1] * 2
+    )
 
 
 def test_the_trial_count_of_one_registration_is_bounded_and_a_tampered_file_cannot_get_a_result(
@@ -213,7 +215,7 @@ def test_the_trial_count_of_one_registration_is_bounded_and_a_tampered_file_cann
 def test_one_unreadable_file_in_the_folder_does_not_break_the_register(tmp_path):
     reg.register(draft(), tmp_path, JAN)
     (tmp_path / "broken.json").write_text("{not json", encoding="utf-8")
-    assert reg.running_count(tmp_path) == 320 and len(reg._store(tmp_path)) == 1
+    assert reg.running_count(tmp_path) == reg.SEED_TRIALS + 1 and len(reg._store(tmp_path)) == 1
 
 
 def test_an_algo_that_is_not_in_the_app_cannot_be_named(tmp_path):
@@ -238,7 +240,7 @@ def test_a_reworded_idea_is_the_same_idea_and_is_refused_even_in_a_free_month(tm
         idea="Sell a weekly index put spread on calm days.",
         entry="Enter at the close two sessions before the expiry.",
     )
-    assert reg.register(different, tmp_path, FEB)["trial_numbers"] == [321, 321]
+    assert reg.register(different, tmp_path, FEB)["trial_numbers"] == [reg.SEED_TRIALS + 2] * 2
 
 
 def test_results_that_did_not_come_from_the_engine_are_refused(tmp_path):
@@ -297,7 +299,7 @@ def test_a_json_file_that_is_not_a_registration_is_skipped_and_never_breaks_the_
     reg.register(draft(params={"algo_id": "zen"}), tmp_path, JAN)
     (tmp_path / "stray.json").write_text('{"hello": 1}', encoding="utf-8")
     (tmp_path / "half.json").write_text('{"id": "x", "content": {}}', encoding="utf-8")
-    assert len(reg._store(tmp_path)) == 1 and reg.running_count(tmp_path) == 320
+    assert len(reg._store(tmp_path)) == 1 and reg.running_count(tmp_path) == reg.SEED_TRIALS + 1
     assert reg.forward_passed(tmp_path, "zen") is False  # no raise
     assert reg.forward_summary(tmp_path)["registered"] == 1
 
@@ -313,7 +315,7 @@ def test_a_put_mirror_of_a_registered_call_spread_is_a_different_idea(tmp_path):
         "name": "Weekly put spread",
         "idea": "Sell a weekly index put spread on calm days.",
     }
-    assert reg.register(put, tmp_path, FEB)["trial_numbers"] == [321, 321]
+    assert reg.register(put, tmp_path, FEB)["trial_numbers"] == [reg.SEED_TRIALS + 2] * 2
 
 
 def test_settings_sent_as_a_list_are_refused_in_words_not_with_a_crash(tmp_path):
@@ -408,7 +410,7 @@ def test_two_processes_registering_in_the_same_month_leave_exactly_one_idea(tmp_
     ]
     outputs = [p.communicate(timeout=120)[0].strip() for p in procs]
     assert sorted(outputs) == ["refused"] * 3 + ["registered"]
-    assert len(reg._store(tmp_path)) == 1 and reg.running_count(tmp_path) == 320
+    assert len(reg._store(tmp_path)) == 1 and reg.running_count(tmp_path) == reg.SEED_TRIALS + 1
 
 
 def test_a_lock_left_by_a_crashed_writer_is_taken_over_after_a_minute(tmp_path):

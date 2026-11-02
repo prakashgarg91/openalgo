@@ -28,7 +28,7 @@ MAX_TRIALS_PER_REGISTRATION = 100
 
 #: Trials already counted in docs/algos/TRIAL_REGISTER.md: 311 to C1, plus the 8 reserved for the
 #: December eight-structure screen (counted when it runs). Every registration adds its own on top.
-SEED_TRIALS = 319
+SEED_TRIALS = 320
 SIGNIFICANCE = 0.025
 BUILDER_TRIALS_FILE = "builder_trials.json"
 #: Months whose single idea slot is already taken by a registration made outside the builder.

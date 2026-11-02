@@ -29,13 +29,16 @@ def draft(**over):
 def test_the_register_view_reports_the_count_the_bar_and_the_next_free_month(tmp_path):
     out = av.register_status(tmp_path, NOV)
     assert (
-        out["trial_count"] == 319
+        out["trial_count"] == reg.SEED_TRIALS
         and out["next_free_month"] == "2027-01"
         and out["registrations"] == []
     )
     reg.register(draft(), tmp_path, JAN)
     out = av.register_status(tmp_path, JAN)
-    assert out["trial_count"] == 320 and out["registrations"][0]["status"] == "registered"
+    assert (
+        out["trial_count"] == reg.SEED_TRIALS + 1
+        and out["registrations"][0]["status"] == "registered"
+    )
     assert out["registrations"][0]["intact"] is True
 
 
