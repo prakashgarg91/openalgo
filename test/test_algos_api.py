@@ -291,8 +291,9 @@ def test_the_optional_forward_pass_rule_only_adds_a_requirement(monkeypatch, tmp
             "available": True,
         },
     )
-    assert runner.live_gate(1, "custom_1")["allowed"] is True  # rule off: unchanged
-    monkeypatch.setenv("ALGO_LIVE_REQUIRES_FORWARD_PASS", "1")
+    assert runner.live_gate(1, "custom_1")["allowed"] is True  # rule off: the older gate, unchanged
+    monkeypatch.delenv("ALGO_LIVE_REQUIRES_FORWARD_PASS")  # not set at all means ON
+    assert runner._forward_pass_required() is True
     blocked = runner.live_gate(1, "custom_1")
     assert blocked["allowed"] is False and "forward test" in blocked["reason"]
     draft = {

@@ -150,9 +150,13 @@ def _min_sandbox_runs() -> int:
 
 
 def _forward_pass_required() -> bool:
-    """Optional stricter rule: Live only for an algo whose registered idea passed its forward test.
-    Off unless the owner sets ALGO_LIVE_REQUIRES_FORWARD_PASS=1; it never makes Live easier."""
-    return os.getenv("ALGO_LIVE_REQUIRES_FORWARD_PASS", "0").strip() == "1"
+    """Live only for an algo whose registered idea passed its forward test (docs/algos/algo-builder-v2.md).
+
+    On by default since the owner chose it on 2 November 2026, following the Opus 5.5 review. Setting
+    ALGO_LIVE_REQUIRES_FORWARD_PASS=0 turns it off and leaves the older gate alone. It only adds a
+    requirement; it never makes Live easier.
+    """
+    return os.getenv("ALGO_LIVE_REQUIRES_FORWARD_PASS", "1").strip() != "0"
 
 
 def _forward_pass_found(algo_id: str | None) -> bool:
@@ -193,8 +197,8 @@ def live_gate(strategy_id: int, algo_id: str | None = None) -> dict[str, Any]:
     """Whether this algo has earned Live, with the reason in plain words.
 
     Needs enough closed Sandbox runs and a positive net result. Sandbox fills
-    are idealised, so this is a floor and never a promise of Live profit. When the owner has
-    switched on the forward-pass rule it also needs a registered idea for this algo whose
+    are idealised, so this is a floor and never a promise of Live profit. Unless the owner has
+    switched the forward-pass rule off it also needs a registered idea for this algo whose
     forward test passed (docs/algos/algo-builder-v2.md); that rule only ever adds a requirement.
     """
     if _forward_pass_required() and not _forward_pass_found(algo_id):

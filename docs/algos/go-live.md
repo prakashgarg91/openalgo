@@ -51,3 +51,8 @@ Since 1 April 2026 order APIs only accept calls from an address registered with 
 - Create the Upstox app and register the address.
 - Decide how much to risk. This software does not know your finances.
 - Judge the evidence. The honest verdict today is "no algo has shown a profit after costs".
+
+## Update, 2 November 2026: a forward-test pass is now required
+
+Going Live now needs, in addition to the Sandbox record described above, a registered idea for the algo whose forward test in Sandbox mode has passed ([algo-builder-v2.md](algo-builder-v2.md)). No algo has one yet, so the switch is refused for every algo until one does. The owner can turn the rule off with `ALGO_LIVE_REQUIRES_FORWARD_PASS=0` in `.env`.
+

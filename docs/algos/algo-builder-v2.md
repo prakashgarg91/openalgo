@@ -19,7 +19,7 @@ The Algos page already has a "Build your own" tab (`services/algos/builder.py`):
 ## Built in the third slice (2 November 2026, evening)
 
 - **Forward ledger generator** (`services/algos/forward_eod.py`, `scripts/algo_backtest/run_forward_eod.py`, in the nightly Windows job after the alerts). A registration that was run and found eligible, and whose settings name one of the eight structures (`structure`) and its first counted expiry (`first_expiry`, optionally `end_trades`, `end_date`, `kill_net`), is replayed each night on the exchange's end-of-day files for the days since registration, with the screen's own engine, costs and gates. Weeks whose expiry has not happened are pending, not lost; the kill rule (default minus Rs 20,000 cumulative) stops it as a fail; at its end it is a pass only if every gate holds on at least 26 completed trades, otherwise fail or inconclusive. The verdict is recorded once in the registration (`registry.record_forward`). Report: `db/forward_eod/<id>/report.json`. It does nothing when no idea is waiting. Tested on made-up prices (6 tests); the fetch and Historify steps are exercised only on the PC.
-- **Optional forward-pass rule for Live** (`ALGO_LIVE_REQUIRES_FORWARD_PASS=1`, off by default): `runner.live_gate` then also needs a registered idea for that algo (its `algo_id` setting) with a recorded forward pass. It only ever adds a requirement; the existing gate (closed Sandbox runs with a positive net) is unchanged when it is off. Opus advised making this the real gate. Real-money rules stay the owner's decision, so the switch is built and left off: set the variable to 1 in `.env` to turn it on.
+- **Forward-pass rule for Live, ON by default** (the owner chose this on 2 November 2026 after the Opus 5.5 review): `runner.live_gate` also needs a registered idea for that algo (its `algo_id` setting) with a recorded forward pass, on top of the older gate (closed Sandbox runs with a positive net). It only ever adds a requirement. Consequence: no algo can be switched to Live until one has passed a forward test, which at the earliest is May 2027 (S3n). Set `ALGO_LIVE_REQUIRES_FORWARD_PASS=0` in `.env` to switch the rule off and leave only the older gate.
 
 The "Register an idea" tab now also lists the forward tests in Sandbox mode (`/algos/api/forward`): state, trades done, trades to go and net after costs, with a note that nothing is a result until a test has ended.
 
@@ -27,7 +27,7 @@ The "Register an idea" tab now also lists the forward tests in Sandbox mode (`/a
 
 1. **Generalise the rejection screen** so a registration for a new idea (not only the eight structures) can be run once through `record_run`. Until then only the December screen exists, and nobody can mark a registration run, which is intended.
 2. Add the C1 ETF ledger to the forward list (the list now shows the S3n report and every `db/forward_eod/<id>/report.json`).
-3. **Sandbox and Live gates.** Opus advised that the go-Live gate should be a forward-test pass, not "10 sandbox trades with a positive net". That gate guards real money, so it is the owner's decision and has not been touched. The builder page never goes Live.
+3. **Sandbox and Live gates.** Done: see the forward-pass rule above. The builder page never goes Live.
 4. Replace the old family checkboxes in `BuilderPanel.tsx` with the four steps (Write, Register, Screen, Forward) once the screen is general; the old search keeps working and is now counted.
 
 ## What the builder must never do
