@@ -51,3 +51,8 @@ All eight structures with trades counted, weeks not counted and why, realistic a
 ## Limits
 
 End-of-day close fills are kinder than real fills (no bid, no ask, no time of day), so a pass is an upper bound; the file has no price for a leg on a day it did not trade; the primary period is about three and a half years, so even a survivor has wide uncertainty, and it is mostly a rising Nifty with one fall in 2022. A structure that passes here is a candidate for a forward shadow ledger, not a strategy.
+
+## Build status (2 November 2026)
+
+The engine is built and tested on made-up prices (`services/algos/eod_screen.py`, `test/test_eod_screen.py`); the script `scripts/algo_backtest/eight_structure_screen.py <data_repo>` refuses before 1 December 2026 and refuses a second run, and writes its report to `research/eight_structure_screen/report.json` in the data repository. `--check` (coverage counts only, no prices) found 185 weekly and 42 monthly expiries with a documented lot in the primary period and 114 and 25 in the overlap period. No result has been looked at.
+

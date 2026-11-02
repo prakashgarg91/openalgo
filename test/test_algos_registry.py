@@ -117,3 +117,13 @@ def test_a_failed_gate_rejects(tmp_path):
 
 def test_an_unsafe_id_is_not_looked_up(tmp_path):
     assert reg.get(tmp_path, "../../etc/passwd") is None
+
+
+def test_builder_searches_add_every_configuration_to_the_trial_count(tmp_path):
+    assert reg.running_count(tmp_path) == 319
+    reg.add_builder_trials(tmp_path, 60, "build your own search", JAN)
+    reg.add_builder_trials(tmp_path, 40, "weekly re-check", JAN)
+    reg.add_builder_trials(tmp_path, 0, "nothing tried", JAN)
+    assert reg.builder_trials(tmp_path) == 100 and reg.running_count(tmp_path) == 419
+    record = reg.register(draft(), tmp_path, JAN)
+    assert record["trial_numbers"] == [420, 420]

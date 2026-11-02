@@ -8,11 +8,24 @@ whole minute, so it runs here instead and leaves its answer in the job folder.
 from __future__ import annotations
 
 import json
+import os
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from services.algos import builder, chooser, chooser_store, lab, mandate, universe
+from services.algos import builder, chooser, chooser_store, lab, mandate, registry, universe
+
+
+def _count_trials(found: dict[str, Any], source: str) -> None:
+    """Every configuration a search tries is a trial and goes into the register's count."""
+    try:
+        folder = Path(os.getenv("ALGO_REGISTRY_DIR", "db/algo_registry"))
+        registry.add_builder_trials(folder, int(found.get("trials", 0)), source, datetime.now())
+    except Exception:
+        from utils.logging import get_logger
+
+        get_logger(__name__).exception("Could not add the builder search to the trial count")
 
 
 def _write(path: Path, payload: dict[str, Any]) -> None:
@@ -69,6 +82,7 @@ def _review_one(history: lab.History, model: str, current: dict[str, Any]) -> di
             ).trades
         ),
     )
+    _count_trials(found, "weekly re-check")
     spec = builder.Spec.from_dict(current)
     lo, hi = found["segments"]["test"]
     mine = [
@@ -219,6 +233,7 @@ def run(job_dir: Path) -> None:
         return lab.run_lab(history, "calm_condor", model=model).trades
 
     found = builder.search(specs, replay, baseline=baseline)
+    _count_trials(found, "build your own search")
     if found.get("winner"):
         found["winner"]["curve"] = _curve(replay(builder.Spec.from_dict(found["winner"]["spec"])))
     found["model"] = model

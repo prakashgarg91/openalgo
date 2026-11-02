@@ -23,6 +23,7 @@ from typing import Any
 #: December eight-structure screen (counted when it runs). Every registration adds its own on top.
 SEED_TRIALS = 319
 SIGNIFICANCE = 0.025
+BUILDER_TRIALS_FILE = "builder_trials.json"
 #: Months whose single idea slot is already taken by a registration made outside the builder.
 SLOTS_USED = {"2026-11": "C1 month-end ETF window", "2026-12": "eight-structure screen"}
 
@@ -95,12 +96,35 @@ def _store(folder: Path) -> list[dict[str, Any]]:
     found = []
     if folder.exists():
         for path in sorted(folder.glob("*.json")):
+            if path.name == BUILDER_TRIALS_FILE:
+                continue
             found.append(json.loads(path.read_text(encoding="utf-8")))
     return found
 
 
+def add_builder_trials(folder: Path, count: int, source: str, now: datetime) -> None:
+    """Count the configurations a builder search tried. Every one is a trial, whatever the verdict."""
+    if count <= 0:
+        return
+    path = folder / BUILDER_TRIALS_FILE
+    entries = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    entries.append(
+        {"at": now.isoformat(timespec="seconds"), "source": source, "trials": int(count)}
+    )
+    folder.mkdir(parents=True, exist_ok=True)
+    _write(path, json.dumps(entries, indent=2))
+
+
+def builder_trials(folder: Path) -> int:
+    path = folder / BUILDER_TRIALS_FILE
+    if not path.exists():
+        return 0
+    return sum(int(e["trials"]) for e in json.loads(path.read_text(encoding="utf-8")))
+
+
 def running_count(folder: Path) -> int:
-    return SEED_TRIALS + sum(int(r["content"].get("trials", 1)) for r in _store(folder))
+    registered = sum(int(r["content"].get("trials", 1)) for r in _store(folder))
+    return SEED_TRIALS + registered + builder_trials(folder)
 
 
 def pass_bar(count: int) -> float:

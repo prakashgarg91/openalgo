@@ -139,3 +139,9 @@ def module_sleep(monkeypatch):
         return fake
 
     return patch
+
+
+@pytest.fixture(autouse=True)
+def _registry_folder_is_temporary(tmp_path_factory, monkeypatch):
+    """Tests that run a builder search must not add trials to the real register under db/."""
+    monkeypatch.setenv("ALGO_REGISTRY_DIR", str(tmp_path_factory.mktemp("algo_registry")))

@@ -10,12 +10,18 @@ The Algos page already has a "Build your own" tab (`services/algos/builder.py`):
 - Registrations are stored as JSON plus a markdown copy under `db/algo_registry/` (git-ignored; copy a registration into `docs/algos/` when it should be kept in the repository).
 - Tests: `test/test_algos_registry.py`, `test/test_algos_registry_api.py`, `RegistryPanel.test.tsx`.
 
+## Built in the second slice (2 November 2026, afternoon)
+
+- **`services/algos/eod_screen.py`**: the rejection-screen engine for the eight registered structures ([eight-structure-screen-registration.md](eight-structure-screen-registration.md)). It holds the structure definitions, the replay on end-of-day closes and settlement prices, the leg-by-leg costs (tested to add up to `costs.realistic_cost`), the six survival gates, the choice of at most two survivors (smallest drawdown first; the long straddle control never goes forward and a control that passes is flagged as a data or cost fault) and verdicts that are only "rejected" or "eligible for a forward test". Tested on made-up prices only (12 tests); no real price was evaluated.
+- **`scripts/algo_backtest/eight_structure_screen.py`**: refuses before 1 December 2026 and refuses a second run, both checked before any data is read. `--check` counts coverage and evaluates no price: on 2 November 2026 it found, for the primary period (1 April 2021 to 26 September 2024), 185 weekly and 42 monthly expiries, all with a documented lot; for the overlap period (3 October 2024 to 27 October 2026) 114 weekly and 25 monthly; 161 earlier expiries are excluded because no circular-based lot is documented for them.
+- **Trial counting**: every configuration the old "Build your own" search and the weekly re-check try is now added to the register's count (`registry.add_builder_trials`, called from `builder_run.py`; the search itself is unchanged). The count started at 319 on 2 November; earlier builder searches were never counted and cannot be recovered. Tests point the register at a temporary folder so they never touch the real count.
+
 ## Next slices (not built)
 
-1. **Rejection screen** that reads a registration and runs it once on the NSE end-of-day data (`nse_eod.py`, `nse_lots.py`, `costs.py`), reporting how many configurations lost, the doubled-cost result and the halves; it writes its gate results through `record_run`. Until it exists nobody can mark a registration run, which is intended.
+1. **Generalise the rejection screen** so a registration for a new idea (not only the eight structures) can be run once through `record_run`. Until then only the December screen exists, and nobody can mark a registration run, which is intended.
 2. **Shadow ledger** generated from an eligible registration, on the pattern of `forward_weekly.py`, shown on the Research page next to the S3n and C1 ledgers, with the kill rule applied.
-3. **Sandbox step** that opens only after a forward test has ended and passed; today's "10 sandbox trades with a positive net" gate is not enough. The page never goes Live.
-4. Retire or count the Sunday re-search and the "check for a better version" pass in the old builder.
+3. **Sandbox and Live gates.** Opus advised that the go-Live gate should be a forward-test pass, not "10 sandbox trades with a positive net". That gate guards real money, so it is the owner's decision and has not been touched. The builder page never goes Live.
+4. Replace the old family checkboxes in `BuilderPanel.tsx` with the four steps (Write, Register, Screen, Forward) once the screen is general; the old search keeps working and is now counted.
 
 ## What the builder must never do
 
