@@ -10,6 +10,7 @@ fix, live in [docs/releases](releases/).
 
 ### Fixed
 
+- Research result: the eight-structure end-of-day screen was run once on 2 November 2026 (docs/algos/eight-structure-screen-results.md). All eight structures were rejected in the primary period (April 2021 to September 2024); seven lost money at realistic costs and the long-straddle control lost heavily. Nothing goes forward from it, and the earlier weekly call spread (S3n) near miss looks like a property of the last two years. No platform behaviour changed.
 - Order API (`/api/v1/placeorder`): a new optional field, `sandbox_only`. An order that carries it is refused with a plain message unless analyzer mode is on, and the mode is read once, in the same step that routes the order, so a switch to Live between the caller's own check and the order cannot send it to the broker. An order without the field is routed exactly as before. The sandbox bot now sends it on every order. Chosen by the owner on 2 November 2026.
 - Historify: date ranges in exports and downloads are now exchange (India) days, starting at India midnight on any computer. On a UTC server a daily bar stamped at India midnight on the first day used to fall outside the range.
 - Registry: writes are now exclusive across processes as well as threads (a lock file, taken over after a minute if a writer crashed), so the nightly scripts and the app cannot overwrite each other.

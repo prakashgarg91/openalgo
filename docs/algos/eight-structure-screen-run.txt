@@ -1,0 +1,1 @@
+The eight-structure screen was run on 2026-11-02. Commit this file. It stays so the screen cannot be run a second time from another copy of the data.
