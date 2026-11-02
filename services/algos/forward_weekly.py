@@ -37,8 +37,14 @@ BOOT_SEED = 20261101
 BOOT_LEVEL = 0.025
 
 
-def run(bars: OptionBars, index_1m: pd.DataFrame, vix: pd.Series) -> dict[str, fs.ShadowResult]:
-    """Both ledgers over every stored week from the first counted expiry."""
+def run(
+    bars: OptionBars, index_1m: pd.DataFrame, vix: pd.Series, is_session=None
+) -> dict[str, fs.ShadowResult]:
+    """Both ledgers over every stored week from the first counted expiry.
+
+    ``is_session`` is the exchange calendar; with it a week whose entry session was not captured is
+    not counted (without it the entry moves to an earlier stored day).
+    """
     days = set(bars.days())
     return {
         name: condor.simulate_weekly(
@@ -51,6 +57,7 @@ def run(bars: OptionBars, index_1m: pd.DataFrame, vix: pd.Series) -> dict[str, f
             last_bar=LAST_CANDLE,
             require_entry_candle=True,
             first_expiry=FIRST_EXPIRY,
+            is_session=is_session,
         )  # fmt: skip
         for name, width in LEDGERS.items()
     }

@@ -13,6 +13,8 @@ The order logic takes an injected ``client`` (anything with ``post(path, **paylo
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -31,6 +33,8 @@ SESSIONS_BEFORE = 2
 STRIKE_STEP = 50
 FILL_WAIT_SECONDS = 60
 MAX_LOTS = 1
+#: Recorded states in which something is still held, so a new entry is refused.
+ACTIVE = ("open", "orphan_hedge", "short_bought_back")
 
 
 class Refused(Exception):
@@ -119,8 +123,12 @@ class Bot:
         return {}
 
     def save(self, state: dict) -> None:
+        """Write the state in one step, so a crash never leaves half a file."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(state, indent=2, default=str), encoding="utf-8")
+        handle, name = tempfile.mkstemp(dir=self.path.parent, suffix=".tmp")
+        with os.fdopen(handle, "w", encoding="utf-8") as out:
+            out.write(json.dumps(state, indent=2, default=str))
+        os.replace(name, self.path)
 
     # guards ---------------------------------------------------------------------------------
     def require_sandbox(self) -> None:
@@ -137,6 +145,9 @@ class Bot:
     def _place(
         self, symbol: str, action: str, quantity: int, pricetype: str, price: float = 0.0
     ) -> str:
+        # Asked again before EVERY order: the toggle can be switched between two orders, and the
+        # order endpoint follows whatever it says when the order arrives.
+        self.require_sandbox()
         reply = self.client.post(
             "/api/v1/placeorder", strategy=STRATEGY, exchange=EXCHANGE, symbol=symbol,
             action=action, quantity=quantity, pricetype=pricetype, product=PRODUCT, price=price,
@@ -164,6 +175,24 @@ class Bot:
                 return None
             self.sleep(5)
             waited += 5
+
+    def _settle(self, orderid: str) -> Fill | None:
+        """Wait for a fill. If none comes, cancel and look once more: an order can fill in the moment
+        between the last look and the cancel, and then the position exists and must be recorded."""
+        fill = self._filled(orderid)
+        if fill is not None:
+            return fill
+        self._cancel(orderid)
+        data = self.client.post("/api/v1/orderstatus", strategy=STRATEGY, orderid=orderid).get(
+            "data", {}
+        )
+        if str(data.get("order_status", "")).lower() == "complete":
+            return Fill(
+                orderid,
+                float(data.get("average_price") or 0),
+                int(float(data.get("quantity") or 0)),
+            )
+        return None
 
     def _cancel(self, orderid: str) -> None:
         self.client.post("/api/v1/cancelorder", strategy=STRATEGY, orderid=orderid)
@@ -193,7 +222,7 @@ class Bot:
         self.require_sandbox()
         today = now.date()
         if state := self.state():
-            if state.get("status") in ("open", "orphan_hedge"):
+            if state.get("status") in ACTIVE:
                 raise Refused(
                     f"A spread is already recorded ({state.get('status')}); nothing new was placed."
                 )
@@ -217,19 +246,25 @@ class Bot:
         if dry_run:
             return {"status": "dry_run", **plan}
         hedge_id = self._place(long_sym, "BUY", qty, "LIMIT", buy_at)
-        hedge = self._filled(hedge_id)
+        hedge = self._settle(hedge_id)
         if hedge is None:
-            self._cancel(hedge_id)
             self.notify(
                 f"Sandbox bot: the hedge {long_sym} did not fill, so the call was not sold. Nothing is open."
             )
             return {"status": "no_hedge", **plan}
-        short_id = self._place(sold_sym, "SELL", qty, "LIMIT", sell_at)
-        short = self._filled(short_id)
+        # The hedge is held from here on: record it before anything else can go wrong.
+        state = {**plan, "status": "orphan_hedge", "hedge_fill": hedge.__dict__}
+        self.save(state)
+        try:
+            short_id = self._place(sold_sym, "SELL", qty, "LIMIT", sell_at)
+        except Refused as why:
+            self.notify(
+                f"Sandbox bot: the hedge {long_sym} is held but the call {sold_sym} was not placed "
+                f"({why}). Only the bought call is held; close it with the exit command."
+            )
+            raise
+        short = self._settle(short_id)
         if short is None:
-            self._cancel(short_id)
-            state = {**plan, "status": "orphan_hedge", "hedge_fill": hedge.__dict__}
-            self.save(state)
             self.notify(
                 f"Sandbox bot: the hedge {long_sym} filled but the call {sold_sym} did not. Only the "
                 "bought call is held; close it with the exit command."
@@ -253,7 +288,7 @@ class Bot:
         """Both legs must be held. A sold call without its hedge is the failure that matters."""
         self.require_sandbox()
         state = self.state()
-        if state.get("status") != "open":
+        if state.get("status") not in ACTIVE:
             return {"status": state.get("status", "flat")}
         held = {}
         for key in ("sold", "long"):
@@ -266,11 +301,12 @@ class Bot:
             )
             held[key] = int(float(reply.get("quantity") or 0))
         qty = state["quantity"]
-        if held["sold"] == -qty and held["long"] == qty:
+        expected_sold = -qty if state["status"] == "open" else 0  # the call is held only when open
+        if held["sold"] == expected_sold and held["long"] == qty:
             return {"status": "ok", "held": held}
         self.notify(
-            f"Sandbox bot ALERT: expected {state['sold']} at -{qty} and {state['long']} at +{qty}, found "
-            f"{held['sold']} and {held['long']}. Look at the positions now."
+            f"Sandbox bot ALERT: expected {state['sold']} at {expected_sold} and {state['long']} at +{qty}, "
+            f"found {held['sold']} and {held['long']}. Look at the positions now."
         )
         return {"status": "mismatch", "held": held}
 
@@ -278,7 +314,7 @@ class Bot:
         """Close both legs, buying the call back first. Market orders: leaving is the priority."""
         self.require_sandbox()
         state = self.state()
-        if state.get("status") not in ("open", "orphan_hedge"):
+        if state.get("status") not in ACTIVE:
             raise Refused("No spread is recorded as open, so there is nothing to close.")
         if not force and today is not None and today < date.fromisoformat(state["expiry"]):
             raise Refused(
@@ -289,17 +325,24 @@ class Bot:
             return {"status": "dry_run", "would_close": state["status"]}
         qty, closed = state["quantity"], {}
         if state["status"] == "open":
-            buy = self._filled(self._place(state["sold"], "BUY", qty, "MARKET"))
+            buy_id = self._place(state["sold"], "BUY", qty, "MARKET")
+            buy = self._settle(buy_id)
             if buy is None:
                 self.notify(
                     f"Sandbox bot ALERT: could not buy back {state['sold']}. Close it by hand."
                 )
                 return {**state, "status": "exit_failed"}
             closed["buyback_fill"] = buy.__dict__
-        sell = self._filled(self._place(state["long"], "SELL", qty, "MARKET"))
+            # The call is closed: record it before the hedge is sold, so a retry never buys it twice.
+            state = {**state, **closed, "status": "short_bought_back"}
+            self.save(state)
+        elif state["status"] == "short_bought_back":
+            closed["buyback_fill"] = state["buyback_fill"]
+        sell_id = self._place(state["long"], "SELL", qty, "MARKET")
+        sell = self._settle(sell_id)
         if sell is None:
             self.notify(f"Sandbox bot ALERT: could not sell {state['long']}. Close it by hand.")
-            return {**state, **closed, "status": "exit_failed"}
+            return {**state, **closed, "status": "short_bought_back"}
         closed["sell_hedge_fill"] = sell.__dict__
         done = {
             **state,

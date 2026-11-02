@@ -21,6 +21,10 @@ from services.algos import eod_screen as es  # noqa: E402
 from services.algos import nse_lots  # noqa: E402
 
 RUN_NOT_BEFORE = date(2026, 12, 1)
+#: Written into the repository when the screen has run, so a fresh clone of the data cannot run it again.
+RUN_MARKER = (
+    Path(__file__).resolve().parents[2] / "docs" / "algos" / "eight-structure-screen-run.txt"
+)
 PRIMARY = (pd.Timestamp("2021-04-01"), pd.Timestamp("2024-09-26"))
 OVERLAP = (pd.Timestamp("2024-10-03"), pd.Timestamp("2026-10-27"))
 RUNNING_COUNT_AFTER = 319
@@ -73,7 +77,7 @@ def main() -> int:
     repo = Path(args[0])
     out_dir = repo / "research" / "eight_structure_screen"
     if "--check" not in sys.argv:
-        why = refusal(date.today(), (out_dir / "report.json").exists())
+        why = refusal(date.today(), (out_dir / "report.json").exists() or RUN_MARKER.exists())
         if why:
             print(why)
             return 2
@@ -101,6 +105,11 @@ def main() -> int:
         n for n, r in report["primary"].items() if r["stats"]["net"] < 0
     )
     out_dir.mkdir(parents=True, exist_ok=True)
+    RUN_MARKER.write_text(
+        f"The eight-structure screen was run on {date.today()}. Commit this file. It stays so the screen "
+        "cannot be run a second time from another copy of the data.\n",
+        encoding="utf-8",
+    )
     (out_dir / "report.json").write_text(
         json.dumps(report, indent=2, default=str), encoding="utf-8"
     )

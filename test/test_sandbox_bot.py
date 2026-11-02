@@ -12,9 +12,20 @@ NOW = datetime(2026, 11, 6, 10, 15)
 
 class FakeApi:
     def __init__(
-        self, analyze=True, fill_hedge=True, fill_short=True, vix=14.0, spot=25010.0, positions=None
+        self,
+        analyze=True,
+        fill_hedge=True,
+        fill_short=True,
+        vix=14.0,
+        spot=25010.0,
+        positions=None,
+        flip_after_orders=None,
+        fill_buyback=True,
+        fill_after_cancel=False,
     ):
         self.analyze, self.vix, self.spot = analyze, vix, spot
+        self.flip_after_orders, self.fill_buyback = flip_after_orders, fill_buyback
+        self.fill_after_cancel = fill_after_cancel
         self.fill = {"hedge": fill_hedge, "short": fill_short}
         self.calls, self.orders, self.cancelled = [], {}, []
         self.positions = positions or {}
@@ -39,18 +50,25 @@ class FakeApi:
         if path == "/api/v1/placeorder":
             oid = f"id{len(self.orders) + 1}"
             self.orders[oid] = p
+            if self.flip_after_orders is not None and len(self.orders) >= self.flip_after_orders:
+                self.analyze = False  # the owner switches to Live right after this order
             return {"status": "success", "orderid": oid}
         if path == "/api/v1/orderstatus":
             order = self.orders[p["orderid"]]
             hedge = order["action"] == "BUY" and order["symbol"].endswith("25100CE")
+            buyback = order["action"] == "BUY" and order["symbol"].endswith("25000CE")
             ok = (
-                self.fill["hedge"]
+                self.fill_buyback
+                if buyback
+                else self.fill["hedge"]
                 if hedge
                 else self.fill["short"]
                 if order["action"] == "SELL" and order["symbol"].endswith("25000CE")
                 else True
             )
             price = order["price"] or (20.2 if order["action"] == "BUY" else 5.4)
+            if self.fill_after_cancel and p["orderid"] in self.cancelled:
+                ok = True  # it filled in the moment between the last look and the cancel
             return {
                 "data": {
                     "order_status": "complete" if ok else "open",
@@ -190,3 +208,81 @@ def test_exit_buys_back_the_call_first_then_sells_the_hedge_and_compares_with_th
 def test_the_entry_session_for_the_holiday_shifted_9_november_expiry_is_thursday_the_5th():
     """10 November 2026 is a market holiday; Sunday 8 November is a special evening session only."""
     assert sb.entry_day(date(2026, 11, 9), {date(2026, 11, 10)}) == date(2026, 11, 5)
+
+
+def test_a_switch_to_live_between_the_hedge_and_the_call_stops_the_call_and_keeps_the_hedge_on_record(
+    tmp_path,
+):
+    api, notes = (
+        FakeApi(flip_after_orders=1),
+        [],
+    )  # Live is switched on right after the hedge is placed
+    b = bot(tmp_path, api, notes)
+    with pytest.raises(sb.Refused, match="never trades live"):
+        b.enter(EXPIRY, NOW, set())
+    assert [o["action"] for o in api.orders.values()] == ["BUY"]  # no short call was sent
+    assert b.state()["status"] == "orphan_hedge" and "close it with the exit command" in notes[-1]
+    with pytest.raises(sb.Refused, match="already recorded"):
+        api.analyze = True
+        b.enter(EXPIRY, NOW, set())  # and a second hedge is not bought
+
+
+def test_a_switch_to_live_during_the_exit_leaves_the_state_saying_the_call_is_already_closed(
+    tmp_path,
+):
+    api = FakeApi()
+    b = bot(tmp_path, api)
+    b.enter(EXPIRY, NOW, set())
+    api.orders.clear()
+    api.flip_after_orders = 1  # Live is switched on right after the call is bought back
+    with pytest.raises(sb.Refused, match="never trades live"):
+        b.exit(today=EXPIRY)
+    assert [o["action"] for o in api.orders.values()] == ["BUY"]
+    assert b.state()["status"] == "short_bought_back"
+    api.analyze, api.flip_after_orders = True, None
+    api.orders.clear()
+    done = b.exit(today=EXPIRY)  # the retry sells the hedge and never buys the call back twice
+    assert [o["action"] for o in api.orders.values()] == ["SELL"] and done["status"] == "closed"
+
+
+def test_an_unfilled_buyback_is_cancelled_and_the_state_stays_open(tmp_path):
+    api, notes = FakeApi(), []
+    b = bot(tmp_path, api, notes)
+    b.enter(EXPIRY, NOW, set())
+    api.fill_buyback = False
+    out = b.exit(today=EXPIRY)
+    assert out["status"] == "exit_failed" and b.state()["status"] == "open"
+    assert api.cancelled and "could not buy back" in notes[-1]
+
+
+def test_the_saved_state_is_written_in_one_step(tmp_path):
+    b = bot(tmp_path, FakeApi())
+    b.save({"status": "open"})
+    assert b.state() == {"status": "open"}
+    assert [p.name for p in tmp_path.iterdir()] == ["state.json"]  # no temp file left behind
+
+
+def test_an_order_that_fills_between_the_last_look_and_the_cancel_is_recorded_not_forgotten(
+    tmp_path,
+):
+    api, notes = FakeApi(fill_short=False, fill_after_cancel=True), []
+    state = bot(tmp_path, api, notes).enter(EXPIRY, NOW, set())
+    assert state["status"] == "open" and state["short_fill"]["price"] > 0  # the call is on record
+    assert "opened" in notes[-1]
+
+
+def test_check_expects_no_sold_call_after_the_exit_started_and_flags_a_naked_one(tmp_path):
+    api, notes = FakeApi(), []
+    b = bot(tmp_path, api, notes)
+    b.save(
+        {
+            "status": "short_bought_back",
+            "sold": "NIFTY10NOV2625000CE",
+            "long": "NIFTY10NOV2625100CE",
+            "quantity": 65,
+        }
+    )
+    api.positions = {"NIFTY10NOV2625100CE": 65}
+    assert b.check()["status"] == "ok"  # the call is closed, the hedge is held: as recorded
+    api.positions = {"NIFTY10NOV2625000CE": -65}  # a short call with no hedge
+    assert b.check()["status"] == "mismatch" and "ALERT" in notes[-1]

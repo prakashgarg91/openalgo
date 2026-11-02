@@ -31,6 +31,7 @@ from services.algos.templates import (
     build,
 )
 from utils.db_sessions import releases_scoped_sessions
+from utils.keyed_locks import KeyedLocks, LockBusy
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -207,7 +208,8 @@ def live_gate(strategy_id: int, algo_id: str | None = None) -> dict[str, Any]:
             "needed_runs": _min_sandbox_runs(),
             "reason": (
                 "Going Live needs a registered idea for this algo whose forward test in Sandbox "
-                "mode has passed. None is recorded yet."
+                "mode has passed. No algo has one yet, and the forward tests running now end in "
+                "2027 at the earliest, so Live is not available for any algo today."
             ),
             "record": track_record(strategy_id),
         }
@@ -393,6 +395,11 @@ def committed_today(user_id: str, today: date) -> float:
     return total
 
 
+#: One entry at a time per trader. Keyed by user id, so the registry holds only traders mid-entry.
+_entry_locks = KeyedLocks(name="algo-entry")
+ENTRY_LOCK_WAIT_SECONDS = 120.0
+
+
 @releases_scoped_sessions
 def run_entry(deployment_id: int, *, today: date | None = None) -> dict[str, Any]:
     """The daily entry check for one deployment.
@@ -457,55 +464,69 @@ def run_entry(deployment_id: int, *, today: date | None = None) -> dict[str, Any
         if plan.action != "trade":
             return _record(deployment_id, "skip", plan.reason, **regime_fields)
 
-        cap = mandate.daily_cap_from_env()
-        if cap is not None:
-            used = committed_today(user_id, today)
-            if used + float(plan.max_loss_inr or 0) > cap:
-                return _record(
-                    deployment_id,
-                    "skip",
-                    f"Today's loss limit of Rs {cap:,.0f} would be passed: Rs {used:,.0f} is "
-                    f"already at risk from your other algos and this one could lose "
-                    f"Rs {plan.max_loss_inr or 0:,.0f} more.",
-                    **regime_fields,
+        try:
+            # One entry at a time per trader: the loss-limit check, the start and the record of the
+            # trade must be one step, or algos that fire together (15:05) all see nothing committed.
+            with _entry_locks.hold(user_id, timeout=ENTRY_LOCK_WAIT_SECONDS):
+                cap = mandate.daily_cap_from_env()
+                if cap is not None:
+                    used = committed_today(user_id, today)
+                    if used + float(plan.max_loss_inr or 0) > cap:
+                        return _record(
+                            deployment_id,
+                            "skip",
+                            f"Today's loss limit of Rs {cap:,.0f} would be passed: Rs {used:,.0f} is "
+                            f"already at risk from your other algos and this one could lose "
+                            f"Rs {plan.max_loss_inr or 0:,.0f} more.",
+                            **regime_fields,
+                        )
+
+                from blueprints.strategy_module import validate_strategy_config
+                from services.strategy_module import engine
+
+                shell = dict(plan.config)
+                shell["name"] = row.name
+                config, error = validate_strategy_config(shell)
+                if error:
+                    return _record(deployment_id, "error", error, **regime_fields)
+
+                updated, message = sm_store.update_strategy(
+                    dep["strategy_id"],
+                    user_id,
+                    {
+                        "legs": config["legs"],
+                        "daily_loss_limit_inr": config["daily_loss_limit_inr"],
+                    },
                 )
+                if not updated:
+                    return _record(
+                        deployment_id, "error", message or "Could not set the legs", **regime_fields
+                    )
 
-        from blueprints.strategy_module import validate_strategy_config
-        from services.strategy_module import engine
-
-        shell = dict(plan.config)
-        shell["name"] = row.name
-        config, error = validate_strategy_config(shell)
-        if error:
-            return _record(deployment_id, "error", error, **regime_fields)
-
-        updated, message = sm_store.update_strategy(
-            dep["strategy_id"],
-            user_id,
-            {"legs": config["legs"], "daily_loss_limit_inr": config["daily_loss_limit_inr"]},
-        )
-        if not updated:
-            return _record(
-                deployment_id, "error", message or "Could not set the legs", **regime_fields
-            )
-
-        result = engine.start_run(
-            dep["strategy_id"], user_id, dep["mode"], trigger_source="scheduler"
-        )
-        fields = {
-            **regime_fields,
-            "side": plan.side,
-            "lots": plan.lots,
-            "max_loss_inr": plan.max_loss_inr,
-        }
-        if not result.ok:
+                result = engine.start_run(
+                    dep["strategy_id"], user_id, dep["mode"], trigger_source="scheduler"
+                )
+                fields = {
+                    **regime_fields,
+                    "side": plan.side,
+                    "lots": plan.lots,
+                    "max_loss_inr": plan.max_loss_inr,
+                }
+                if not result.ok:
+                    return _record(
+                        deployment_id,
+                        "error",
+                        result.error or "The run could not be started.",
+                        **fields,
+                    )
+                return _record(deployment_id, "trade", plan.reason, run_id=result.run_id, **fields)
+        except LockBusy:
             return _record(
                 deployment_id,
                 "error",
-                result.error or "The run could not be started.",
-                **fields,
+                "Another of your algos was being started at the same moment. It will try again tomorrow.",
+                **regime_fields,
             )
-        return _record(deployment_id, "trade", plan.reason, run_id=result.run_id, **fields)
     except Exception:
         logger.exception("Entry check failed for deployment %s", deployment_id)
         return _record(

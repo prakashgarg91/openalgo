@@ -310,3 +310,51 @@ def test_the_regime_dict_flags_a_reading_built_on_too_little_data():
     assert d["reliable"] is False
     assert d["missing_labels"] == ["India VIX", "today's Nifty move"]
     assert runner.regime_to_dict(_regime(confidence=0.9))["reliable"] is True
+
+
+def test_algos_that_fire_together_cannot_both_pass_the_daily_loss_limit(env, monkeypatch):
+    """Two algos entering at the same moment used to see nothing committed and both start."""
+    import threading
+    import time
+
+    zen, condor = _deploy("zen"), _deploy("calm_condor")
+    worst = max(
+        runner.max_loss_ceiling("zen", 500_000) or 0,
+        runner.max_loss_ceiling("calm_condor", 500_000) or 0,
+    )
+    assert worst > 0
+    monkeypatch.setenv("ALGO_MAX_DAILY_LOSS_INR", str(worst * 1.5))  # room for one, not for two
+    # Decisions are stamped with the real clock, so count "today" the way the log does.
+    from datetime import UTC, datetime, timedelta
+
+    real = runner.committed_today
+    monkeypatch.setattr(
+        runner,
+        "committed_today",
+        lambda user_id, today: real(
+            user_id, (datetime.now(UTC) + timedelta(hours=5, minutes=30)).date()
+        ),
+    )
+
+    class Slow:
+        ok, run_id, error = True, 21, None
+
+    def slow_start(strategy_id, user_id, mode, trigger_source="manual", **kw):
+        env.append((strategy_id, mode, trigger_source))
+        time.sleep(0.4)  # the window in which the second entry used to run its check
+        return Slow()
+
+    monkeypatch.setattr(sm_engine, "start_run", slow_start)
+    results = []
+    threads = [
+        threading.Thread(
+            target=lambda d=d: results.append(runner.run_entry(d["id"], today=WEEKDAY))
+        )
+        for d in (zen, condor)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+    assert sorted(r["action"] for r in results) == ["skip", "trade"], results
+    assert len(env) == 1  # only one run was started

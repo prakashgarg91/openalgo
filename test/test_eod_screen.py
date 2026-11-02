@@ -36,7 +36,7 @@ def options(spot_by_day=None, settle_spot=24050.0, drop=None, expiries=(E,)):
                             else max(strike - settle_spot, 0.0)
                         )
                     rows.append({"date": day, "instrument": "OPTIDX", "expiry": expiry, "strike": float(strike),
-                                 "kind": kind, "close": px, "settle": px, "contracts": 100})  # fmt: skip
+                                 "kind": kind, "close": px, "settle": (settle_spot if expiry == day else px), "contracts": 100})  # fmt: skip
     return pd.DataFrame(rows)
 
 
@@ -254,3 +254,47 @@ def test_the_screen_refuses_before_1_december_and_a_second_run_but_not_the_first
     assert "on or after 1 December 2026" in script.refusal(
         date(2026, 11, 2), True
     )  # the date comes first
+
+
+def test_an_option_is_valued_at_expiry_from_the_index_settlement_not_from_the_settle_column_of_its_row():
+    """On an expiry date the file's settle column is the INDEX's final price on every strike; the
+    option's value is its intrinsic value against it. Real layout: close is the option's own close."""
+    opts = options(settle_spot=24050.0)
+    on_expiry = opts["date"] == E
+    assert (opts.loc[on_expiry, "settle"] == 24050.0).all()  # the same number on every strike
+    trade = run("WC", opts=opts).trades[0]
+    sold, bought = trade["legs"]
+    assert sold["exit"] == pytest.approx(50.0)  # 24050 - 24000, not 24050
+    assert bought["exit"] == 0.0  # 24100 call is out of the money
+    assert trade["pts"] == pytest.approx((50.0 - 50.0) + (0.0 - premium("CE", 24100, 24000.0)))
+    straddle = run("STR", opts=opts).trades[0]
+    assert [g["exit"] for g in straddle["legs"]] == [50.0, 0.0]  # call 50, put 0: never about 24000
+
+
+def test_a_week_whose_expiry_rows_disagree_on_the_index_settlement_is_not_counted():
+    opts = options()
+    first = opts.index[(opts["date"] == E)][0]
+    opts.loc[first, "settle"] = 99999.0  # one row says something else
+    result = run("WC", opts=opts)
+    assert (
+        not result.trades
+        and result.skipped[0]["reason"] == "no index settlement price on the expiry date"
+    )
+
+
+def test_a_calendar_whose_legs_have_different_lot_sizes_is_not_counted():
+    both = pd.concat([options(), options(expiries=(M,))], ignore_index=True)
+    chain = es.Chain(both)
+    lots = lambda e: 75 if e == E else 50  # noqa: E731 (the near leg at 75, the far month already at 50)
+    out = es.simulate(
+        es.SPECS["CAL"],
+        chain,
+        series(24000.0),
+        series(14.0),
+        lots,
+        pd.Timestamp("2021-05-01"),
+        pd.Timestamp("2021-06-30"),
+    )
+    assert (
+        not out.trades and out.skipped[0]["reason"] == "the legs' expiries have different lot sizes"
+    )

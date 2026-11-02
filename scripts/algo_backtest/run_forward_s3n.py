@@ -21,13 +21,29 @@ from services.algos import forward_weekly as fw  # noqa: E402
 OUT = Path(__file__).resolve().parents[2] / "db" / "forward_s3n"
 
 
+def _calendar():
+    """The exchange calendar: a weekday that is not an NFO holiday. Without the app's calendar
+    (not installed here), fall back to the stored-day count and say so."""
+    try:
+        from database.market_calendar_db import is_market_holiday
+
+        return lambda d: (
+            pd.Timestamp(d).weekday() < 5 and not is_market_holiday(pd.Timestamp(d).date(), "NFO")
+        )
+    except Exception:
+        print(
+            "The exchange calendar could not be read, so a missed capture day can move an entry earlier."
+        )
+        return None
+
+
 def main() -> int:
     bars, index, vix = data.load()
     days = bars.days()
     if not days or index.empty:
         print("No stored candles yet. Run capture_option_candles.py after a trading day first.")
         return 1
-    results = fw.run(bars, index, vix)
+    results = fw.run(bars, index, vix, is_session=_calendar())
     report = fw.build_report(results, index, days, pd.Timestamp.now().normalize())
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "report.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")

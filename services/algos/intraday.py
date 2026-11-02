@@ -46,7 +46,19 @@ LOT_LAST_75 = pd.Timestamp("2025-12-30")
 
 
 def lot_size_for_expiry(expiry: pd.Timestamp) -> int:
-    """Units per Nifty lot for a contract that expires on ``expiry``."""
+    """Units per Nifty lot for a contract that expires on ``expiry``.
+
+    The exchange-circular table in ``nse_lots`` is the source before October 2024 (documented from
+    April 2021); from then on the contract-master rule below, which the circulars phase in by
+    contract introduction date, is unchanged.
+    """
+    from services.algos import nse_lots
+
+    expiry = pd.Timestamp(expiry)
+    if expiry < pd.Timestamp("2024-10-03"):  # before the two intraday years: the circular table
+        documented = nse_lots.nifty_lot(expiry)
+        if documented is not None:
+            return documented
     expiry = pd.Timestamp(expiry)
     if expiry <= LOT_LAST_25:
         return 25

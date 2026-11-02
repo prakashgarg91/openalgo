@@ -112,6 +112,13 @@ class Chain:
             key = (r.date, r.expiry, r.kind, float(r.strike))
             self.rows[key] = (float(r.close), float(r.settle), int(r.contracts))
             self.by_day_expiry.setdefault((r.date, r.expiry), []).append((r.kind, float(r.strike)))
+        # On an expiry date the file's settle column holds the INDEX's final settlement price, the same
+        # number on every strike, not the option's value. Keep it per expiry (None if rows disagree).
+        self.final: dict[pd.Timestamp, float | None] = {}
+        on_expiry = frame[frame["date"] == frame["expiry"]]
+        for expiry, rows in on_expiry.groupby("expiry"):
+            values = {round(float(v), 4) for v in rows["settle"] if float(v) > 0}
+            self.final[pd.Timestamp(expiry)] = values.pop() if len(values) == 1 else None
         self.sessions = [pd.Timestamp(d) for d in sorted(frame["date"].unique())]
         self.expiries = [pd.Timestamp(e) for e in sorted(frame["expiry"].unique())]
 
@@ -119,9 +126,14 @@ class Chain:
         row = self.rows.get((pd.Timestamp(day), pd.Timestamp(expiry), kind, float(strike)))
         return row[0] if row and row[2] > 0 and row[0] > 0 else None
 
-    def settle(self, day, expiry, kind, strike) -> float | None:
-        row = self.rows.get((pd.Timestamp(day), pd.Timestamp(expiry), kind, float(strike)))
-        return row[1] if row else None
+    def expiry_value(self, expiry, kind, strike) -> float | None:
+        """An option's value at expiry: its intrinsic value against the index's final settlement."""
+        index = self.final.get(pd.Timestamp(expiry))
+        if index is None:
+            return None
+        if kind == "CE":
+            return max(index - float(strike), 0.0)
+        return max(float(strike) - index, 0.0)
 
     def atm(self, day, expiry) -> int | None:
         """Strike where call and put closes are closest; spot is strike plus call minus put."""
@@ -230,13 +242,16 @@ def simulate(
             if g["far"]:
                 px = chain.close(expiry, g["expiry"], g["kind"], g["strike"])
             else:
-                px = chain.settle(expiry, expiry, g["kind"], g["strike"])
+                px = chain.expiry_value(expiry, g["kind"], g["strike"])
             if px is None:
                 priced = False
                 break
             g["exit"] = px
         if not priced:
-            why("a leg has no price on the expiry date")
+            why("no index settlement price on the expiry date")
+            continue
+        if len({lot_for(g["expiry"]) for g in legs}) > 1:
+            why("the legs' expiries have different lot sizes")
             continue
         pts = sum(g["side"] * (g["exit"] - g["entry"]) for g in legs)
         cost = sum(leg_cost(g["side"], g["entry"], g["exit"], day, expiry, lot) for g in legs)

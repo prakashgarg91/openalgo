@@ -44,7 +44,11 @@ def main() -> int:
         messages.extend(new)
         seen_path.write_text(json.dumps(sorted(seen)), encoding="utf-8")
     for message in messages:
-        fa.notify(message)
+        print(f"ALERT: {message}")
+        if not fa.notify(message):
+            print(
+                "(The Telegram bot is off or unreachable, so this alert was only written to the log.)"
+            )
     if not messages:
         print("Forward test alerts: nothing new.")
     return 0

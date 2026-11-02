@@ -176,7 +176,7 @@ def catalogue():
         return _error("Not authenticated", 401)
     deployed = {d["algo_id"]: d for d in algo_db.list_deployments(user)}
     items = []
-    for algo_id in ALGOS:
+    for algo_id in list(ALGOS):
         item = _spec(algo_id)
         dep = deployed.get(algo_id)
         item["deployment"] = _deployment_view(dep) if dep else None
@@ -553,6 +553,7 @@ def _builder_request(data: dict) -> tuple[dict | None, str | None]:
 
 
 REGISTRY_DIR = Path(os.getenv("ALGO_REGISTRY_DIR", "db/algo_registry"))
+REGISTRY_MAX_BODY = 64 * 1024
 
 
 @algos_bp.route("/api/registry", methods=["GET"])
@@ -645,11 +646,13 @@ def forward_tests():
 @_api_limit
 def registry_create():
     """Freeze an idea before anything runs. It cannot run, edit or promote anything."""
+    if (request.content_length or 0) > REGISTRY_MAX_BODY:
+        return _error("That registration is too large. Shorten the text and try again.", 413)
     data, error = _body()
     if error:
         return error
     try:
-        record = registry.register(data, REGISTRY_DIR, datetime.now())
+        record = registry.register(data, REGISTRY_DIR, datetime.now(), set(ALGOS))
     except registry.Refused as why:
         return _error(str(why), 400)
     return _ok({"data": record}, 201)

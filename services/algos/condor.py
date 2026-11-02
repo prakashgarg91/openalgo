@@ -8,6 +8,7 @@ network, no clock.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import time as dtime
 
@@ -42,6 +43,18 @@ def legs_for(spec: WeeklySpec) -> list[tuple[str, int]]:
     if spec.kind == "condor":
         return [("CE", INNER), ("PE", -INNER)]
     return [("CE", 0)]
+
+
+def calendar_session_before(
+    day: pd.Timestamp, steps: int, is_session: Callable[[pd.Timestamp], bool]
+) -> pd.Timestamp:
+    """The trading day ``steps`` sessions before ``day``, by the exchange calendar (not by what was stored)."""
+    out, left = pd.Timestamp(day).normalize(), steps
+    while left:
+        out -= pd.Timedelta(days=1)
+        if is_session(out):
+            left -= 1
+    return out
 
 
 def _enter(spec, bars, index_1m, vix, day, expiry, width, require_entry_candle):
@@ -104,6 +117,7 @@ def simulate_weekly(
     last_bar: dtime = LAST_BAR,
     require_entry_candle: bool = False,
     first_expiry: pd.Timestamp | None = None,
+    is_session: Callable[[pd.Timestamp], bool] | None = None,
 ) -> fs.ShadowResult:
     """Replay one weekly structure over every stored expiry whose entry session is in ``allowed_days``.
 
@@ -125,7 +139,21 @@ def simulate_weekly(
         if first_expiry is not None and e < pd.Timestamp(first_expiry).normalize():
             continue
         ahead = bool(days) and e > days[-1]
-        if ahead:
+        if is_session is not None:
+            # The calendar names the entry session; it must have been captured, with the session before it.
+            day = calendar_session_before(e, spec.sessions_before, is_session)
+            if day not in position:
+                if not ahead:
+                    _skip(result, e, "entry session was not captured")
+                continue
+            if not ahead and e not in position:
+                _skip(result, e, "expiry is not a stored session")
+                continue
+            previous = fs.previous_session(index_1m, day)
+            if previous is None or previous != calendar_session_before(day, 1, is_session):
+                _skip(result, e, "session before the entry was not captured")
+                continue
+        elif ahead:
             # Expiry session not stored yet: the entry session is taken as that many weekdays before.
             day = pd.Timestamp(np.busday_offset(e.date(), -spec.sessions_before, roll="backward"))
             if day not in position:

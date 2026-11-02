@@ -155,3 +155,43 @@ def test_only_a_recorded_forward_pass_for_that_algo_counts(tmp_path):
     reg.record_forward(tmp_path, done["id"], "pass", {}, FEB)
     assert reg.forward_passed(tmp_path, "custom_7") is True
     assert reg.forward_passed(tmp_path, "custom_8") is False
+
+
+def test_a_setting_that_hides_a_grid_in_text_is_refused(tmp_path):
+    for hidden in ("100|150|200", "100, 150", "100 to 200", "50..100", "a;b"):
+        with pytest.raises(reg.Refused, match="several values or a range"):
+            reg.register(draft(params={"width": hidden}), tmp_path, JAN)
+    assert reg.register(draft(params={"label": "calm days"}), tmp_path, JAN)["trial_numbers"] == [
+        320,
+        320,
+    ]
+
+
+def test_the_trial_count_of_one_registration_is_bounded_and_a_tampered_file_cannot_get_a_result(
+    tmp_path,
+):
+    with pytest.raises(reg.Refused, match="from 1 to 100"):
+        reg.register(draft(trials=10_000), tmp_path, JAN)
+    done = eligible_record(tmp_path)
+    path = tmp_path / f"{done['id']}.json"
+    path.write_text(
+        path.read_text(encoding="utf-8").replace('"width": 100', '"width": 300'),
+        encoding="utf-8",
+    )
+    with pytest.raises(reg.Refused, match="changed after it was frozen"):
+        reg.record_forward(tmp_path, done["id"], "pass", {}, FEB)
+
+
+def test_one_unreadable_file_in_the_folder_does_not_break_the_register(tmp_path):
+    reg.register(draft(), tmp_path, JAN)
+    (tmp_path / "broken.json").write_text("{not json", encoding="utf-8")
+    assert reg.running_count(tmp_path) == 320 and len(reg._store(tmp_path)) == 1
+
+
+def test_an_algo_that_is_not_in_the_app_cannot_be_named(tmp_path):
+    with pytest.raises(reg.Refused, match="not one of the algos"):
+        reg.register(draft(params={"algo_id": "made_up"}), tmp_path, JAN, {"zen", "calm_condor"})
+    assert (
+        reg.register(draft(params={"algo_id": "zen"}), tmp_path, JAN, {"zen"})["status"]
+        == "registered"
+    )

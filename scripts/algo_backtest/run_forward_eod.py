@@ -13,6 +13,7 @@ Usage:
 import json
 import os
 import sys
+import tempfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -34,12 +35,22 @@ LEAD_DAYS = (
 )
 
 
+def _write_atomic(path: Path, text: str) -> None:
+    """Replace the file in one step so a reader never sees half a report."""
+    handle, name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    with os.fdopen(handle, "w", encoding="utf-8") as out:
+        out.write(text)
+    os.replace(name, path)
+
+
 def update_prices(start: date, end: date) -> pd.DataFrame:
     """The forward end-of-day table, extended with every weekday since the last stored one."""
     OUT.mkdir(parents=True, exist_ok=True)
     have = pd.read_csv(FILE) if FILE.exists() else pd.DataFrame()
     last = pd.Timestamp(have["date"].max()).date() if len(have) else None
-    first = max(start, last + timedelta(days=1)) if last else start
+    # Re-fetch the last week every night: a day that failed to download, or was not published yet,
+    # is picked up again instead of being skipped for good (duplicates are dropped below).
+    first = max(start, last - timedelta(days=7)) if last else start
     days = [first + timedelta(days=i) for i in range((end - first).days + 1)]
     days = [d for d in days if d.weekday() < 5]
     frames = []

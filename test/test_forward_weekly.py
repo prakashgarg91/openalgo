@@ -177,3 +177,56 @@ def test_the_first_counted_week_is_the_holiday_shifted_one():
     assert (
         pd.Timestamp("2026-11-03") < fw.FIRST_EXPIRY
     )  # the week entered before registration stays out
+
+
+def _weekdays_only(day):
+    return pd.Timestamp(day).weekday() < 5
+
+
+def _four_sessions(drop=None):
+    """Thursday 5, Friday 6, Monday 9 and Tuesday 10 November 2026; ``drop`` removes one stored day."""
+    days = [pd.Timestamp(d) for d in ("2026-11-05", "2026-11-06", "2026-11-09", "2026-11-10")]
+    if drop:
+        days = [d for d in days if d != pd.Timestamp(drop)]
+    frames = {}
+    for key, (before, at_expiry) in {
+        (EXPIRY, "CE", 25000.0): (20.0, 2.0),
+        (EXPIRY, "CE", 25100.0): (5.0, 1.0),
+        (EXPIRY, "CE", 25250.0): (3.0, 0.5),
+    }.items():
+        frames[key] = pd.concat(
+            [minutes(d, (9, 15), (15, 29), at_expiry if d == EXPIRY else before) for d in days]
+        )
+    index = pd.concat(
+        [minutes(d, (9, 15), (15, 29), 25010.0) for d in [pd.Timestamp("2026-11-04"), *days]]
+    )
+    vix_series = pd.Series(dict.fromkeys([pd.Timestamp("2026-11-04"), *days], 14.0))
+    return OptionBars(frames), index, vix_series
+
+
+def test_a_missed_capture_on_the_entry_day_removes_the_week_instead_of_moving_the_entry_earlier():
+    bars_, index, vix_ = _four_sessions(drop="2026-11-06")  # the Friday capture failed
+    moved = fw.run(bars_, index, vix_)["L1"]  # old behaviour: stored-day count
+    assert moved.trades and moved.trades[0]["entry"].day == 5  # silently entered on Thursday
+    fixed = fw.run(bars_, index, vix_, is_session=_weekdays_only)["L1"]
+    assert not fixed.trades
+    assert fixed.weeks_skipped == [{"expiry": EXPIRY, "reason": "entry session was not captured"}]
+
+
+def test_with_every_session_captured_the_calendar_gives_the_same_entry_as_before():
+    bars_, index, vix_ = _four_sessions()
+    plain = fw.run(bars_, index, vix_)["L1"].trades[0]
+    cal = fw.run(bars_, index, vix_, is_session=_weekdays_only)["L1"].trades[0]
+    assert (
+        plain["entry"] == cal["entry"] == pd.Timestamp("2026-11-06 10:15")
+    )  # two sessions before Tuesday
+
+
+def test_a_missed_capture_the_session_before_the_entry_also_removes_the_week():
+    bars_, index, vix_ = _four_sessions()
+    index = index[index.index.normalize() != pd.Timestamp("2026-11-05")]  # the day before the entry
+    out = fw.run(bars_, index, vix_, is_session=_weekdays_only)["L1"]
+    assert (
+        not out.trades
+        and out.weeks_skipped[0]["reason"] == "session before the entry was not captured"
+    )

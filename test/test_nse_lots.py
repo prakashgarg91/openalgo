@@ -47,3 +47,13 @@ def test_it_agrees_with_the_lot_the_replays_already_use_from_october_2024():
         "2026-10-27",
     ):
         assert nse_lots.nifty_lot(expiry) == intraday.lot_size_for_expiry(pd.Timestamp(expiry))
+
+
+def test_the_replay_lot_function_uses_the_circular_table_before_october_2024():
+    for expiry, lot in (
+        ("2021-08-05", 50),
+        ("2023-06-29", 50),
+        ("2024-05-02", 25),
+        ("2024-09-26", 25),
+    ):
+        assert intraday.lot_size_for_expiry(pd.Timestamp(expiry)) == lot

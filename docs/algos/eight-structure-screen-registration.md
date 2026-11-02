@@ -10,7 +10,7 @@ The two intraday years have been examined many times, so they cannot confirm any
 
 - **Prices:** `openalgo-data/nse_fo_eod/` (Nifty index options, end of day, close and settlement price). Entry fills are at the day's close of each leg. A leg with no trade (contracts 0) or a zero close on the entry day makes that week "not counted", recorded with its reason and never filled in.
 - **At the money:** the strike where the call close and the put close are closest on that expiry (both traded), spot taken as strike plus call minus put, rounded to the nearest 50. The file's own underlying price exists only from July 2024, so it is not used.
-- **Expiry value:** the exchange's settlement price on the expiry date. It is present on every expiry-day session from February 2020; before that it is zero, so the screen does not use any expiry before February 2020 unless a later registration says what replaces it.
+- **Expiry value (corrected 2 November 2026, before any run):** on an expiry date the file's `settle` column holds the index's final settlement price, the same number on every strike (zero before February 2020), not the option's own value. An option's value at expiry is therefore its intrinsic value against that price (a call: the settlement less the strike, never below zero; a put the other way round). A week whose expiry-date rows disagree on that price, or carry none, is not counted. This replaces the earlier wording that read the column as each option's settlement price; the first version of the engine did that, which an audit caught from the data on 2 November, and it was fixed with a test on the real layout. It is a correction, not a new trial, and no result had been looked at.
 - **Lot size:** by expiry, from `services/algos/nse_lots.py`, which cites the exchange's own circulars (NSE/FAOP/47854, 61415, 64625 and 70616, all opened and read on 2 November 2026). Expiries before 1 April 2021 have no documented lot, so the screen excludes them: the August 2015 revision (press reports 25 to 75) is not backed by a circular that has been opened. If that circular is found and added to the table, with a test, before the run, the period before April 2021 may be added and reported separately. No lot is guessed.
 - **Primary period (never used for any option test):** expiries from 1 April 2021 to the last expiry before 3 October 2024 (the first expiry in the two intraday years). Survival is decided here and only here.
 - **Overlap period (already seen in every earlier study):** expiries from 3 October 2024 to 27 October 2026. Reported for completeness; it takes no part in any decision.
@@ -26,7 +26,7 @@ Weekly structures enter at the close two sessions before the weekly expiry (the 
 4. **MP, monthly put spread:** as 2 on the monthly expiry.
 5. **WK, weekly condor:** sell the call 150 above and the put 150 below the money, buy the call 400 above and the put 400 below (the geometry of the earlier S2).
 6. **MK, monthly condor:** the same geometry on the monthly expiry.
-7. **CAL, calendar:** sell the at-the-money call of the weekly expiry, buy the same strike call of the next monthly expiry. The weekly leg settles at expiry; the monthly leg is closed at that day's close.
+7. **CAL, calendar:** sell the at-the-money call of the weekly expiry, buy the same strike call of the next monthly expiry. The weekly leg expires at its intrinsic value; the monthly leg is closed at that day's close. A week whose two legs have different lot sizes is not counted.
 8. **STR, long straddle (control):** buy the at-the-money call and put of the weekly expiry. It is the buyer of the variance premium that the earlier tests found real but not reliably extractable. It is expected to lose. If the control passes every gate, the data or the cost code is suspect and the other seven results are not read until that is explained.
 
 ## Costs
@@ -55,4 +55,10 @@ End-of-day close fills are kinder than real fills (no bid, no ask, no time of da
 ## Build status (2 November 2026)
 
 The engine is built and tested on made-up prices (`services/algos/eod_screen.py`, `test/test_eod_screen.py`); the script `scripts/algo_backtest/eight_structure_screen.py <data_repo>` refuses before 1 December 2026 and refuses a second run, and writes its report to `research/eight_structure_screen/report.json` in the data repository. `--check` (coverage counts only, no prices) found 185 weekly and 42 monthly expiries with a documented lot in the primary period and 114 and 25 in the overlap period. No result has been looked at.
+
+## Audit notes (2 November 2026, before any run)
+
+- The screen can only be run once per repository, not per copy of the data: running it writes `docs/algos/eight-structure-screen-run.txt`, which must be committed, and the script refuses while that file exists.
+- Exchange charges: `costs.py` uses a flat 0.0345 percent; the actual rate was about 0.05 percent over 2021 to September 2024. STT is overstated by more (0.10 against 0.0625 percent), so costs stay conservative overall, but the screen's report must say so.
+- The survival gate uses a bootstrap at the 0.025 level, while `TRIAL_REGISTER.md` rule 3 describes a bar of 0.025 divided by the running count. The registered text above is what the code does; the owner should settle before 1 December whether the stricter bar applies to the screen.
 

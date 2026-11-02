@@ -15,9 +15,17 @@ import json
 import os
 import re
 import tempfile
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+#: Registering and counting are read-modify-write: one at a time within a process.
+_LOCK = threading.Lock()
+MAX_TRIALS_PER_REGISTRATION = 100
 
 #: Trials already counted in docs/algos/TRIAL_REGISTER.md: 311 to C1, plus the 8 reserved for the
 #: December eight-structure screen (counted when it runs). Every registration adds its own on top.
@@ -81,14 +89,25 @@ def problems(draft: dict[str, Any]) -> list[str]:
         out.append("Fix every setting to one value (name each one).")
     else:
         for name, value in params.items():
-            if value is None or isinstance(value, (list, tuple, set, dict)):
+            if isinstance(value, str) and re.search(r"[,;|]|\.\.|\bto\b", value):
+                out.append(
+                    f"Setting '{name}' looks like several values or a range. Pick one: trying "
+                    "several is a search, and every configuration tried counts as a trial."
+                )
+            elif value is None or isinstance(value, (list, tuple, set, dict)):
                 out.append(
                     f"Setting '{name}' has more than one value. Pick one: trying several is a search, "
                     "and every configuration tried counts as a trial."
                 )
     trials = draft.get("trials", 1)
-    if isinstance(trials, bool) or not isinstance(trials, int) or trials < 1:
-        out.append("Say how many trials this adds (a whole number, at least 1).")
+    if (
+        isinstance(trials, bool)
+        or not isinstance(trials, int)
+        or not 1 <= trials <= MAX_TRIALS_PER_REGISTRATION
+    ):
+        out.append(
+            f"Say how many trials this adds (a whole number from 1 to {MAX_TRIALS_PER_REGISTRATION})."
+        )
     return out
 
 
@@ -98,7 +117,10 @@ def _store(folder: Path) -> list[dict[str, Any]]:
         for path in sorted(folder.glob("*.json")):
             if path.name == BUILDER_TRIALS_FILE:
                 continue
-            found.append(json.loads(path.read_text(encoding="utf-8")))
+            try:
+                found.append(json.loads(path.read_text(encoding="utf-8")))
+            except (ValueError, OSError):
+                logger.exception("Skipping an unreadable registration file: %s", path.name)
     return found
 
 
@@ -107,12 +129,13 @@ def add_builder_trials(folder: Path, count: int, source: str, now: datetime) -> 
     if count <= 0:
         return
     path = folder / BUILDER_TRIALS_FILE
-    entries = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
-    entries.append(
-        {"at": now.isoformat(timespec="seconds"), "source": source, "trials": int(count)}
-    )
-    folder.mkdir(parents=True, exist_ok=True)
-    _write(path, json.dumps(entries, indent=2))
+    with _LOCK:
+        entries = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+        entries.append(
+            {"at": now.isoformat(timespec="seconds"), "source": source, "trials": int(count)}
+        )
+        folder.mkdir(parents=True, exist_ok=True)
+        _write(path, json.dumps(entries, indent=2))
 
 
 def builder_trials(folder: Path) -> int:
@@ -144,9 +167,30 @@ def next_free_slot(folder: Path, now: datetime) -> str:
     return f"{year}-{month:02d}"
 
 
-def register(draft: dict[str, Any], folder: Path, now: datetime) -> dict[str, Any]:
-    """Freeze a draft. Refuses an incomplete draft, a month whose slot is used, and a duplicate."""
+def register(
+    draft: dict[str, Any],
+    folder: Path,
+    now: datetime,
+    known_algo_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    """Freeze a draft. Refuses an incomplete draft, a month whose slot is used, and a duplicate.
+
+    One at a time: the month check, the trial numbers and the write are one step, so two quick
+    submissions cannot both pass the check or share trial numbers.
+    """
+    with _LOCK:
+        return _register(draft, folder, now, known_algo_ids)
+
+
+def _register(
+    draft: dict[str, Any], folder: Path, now: datetime, known_algo_ids: set[str] | None
+) -> dict[str, Any]:
     issues = problems(draft)
+    named = (draft.get("params") or {}).get("algo_id")
+    if named is not None and known_algo_ids is not None and named not in known_algo_ids:
+        issues.append(
+            "The algo named in the settings (algo_id) is not one of the algos in this app."
+        )
     if issues:
         raise Refused(" ".join(issues))
     slot = _month(now)
@@ -265,6 +309,10 @@ def record_forward(
         raise Refused("No such registration.")
     if verdict not in FORWARD_VERDICTS:
         raise Refused("The forward verdict must be pass, fail or inconclusive.")
+    if not intact(record):
+        raise Refused(
+            "This registration was changed after it was frozen, so no result can be recorded."
+        )
     if record.get("forward") is not None:
         raise Refused("The forward result of this registration is already recorded.")
     if record["status"] != "eligible for a forward test":

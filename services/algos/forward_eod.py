@@ -17,6 +17,7 @@ import pandas as pd
 from services.algos import eod_screen as es
 
 DEFAULT_END_TRADES = 26
+MIN_END_TRADES = 26  # a forward test shorter than this is not a test
 DEFAULT_KILL_NET = -20_000.0
 FAR_FUTURE = pd.Timestamp("2100-01-01")
 
@@ -28,6 +29,11 @@ def parse(registration: dict[str, Any]) -> dict[str, Any] | None:
         return None
     params = registration["content"]["params"]
     if params.get("structure") not in es.SPECS or "first_expiry" not in params:
+        return None
+    ran = (registration.get("run") or {}).get("at")
+    if not ran or pd.Timestamp(params["first_expiry"]) <= pd.Timestamp(str(ran)[:10]):
+        return None  # only days after the screen was run are forward days
+    if int(params.get("end_trades", DEFAULT_END_TRADES)) < MIN_END_TRADES:
         return None
     return {
         "structure": params["structure"],

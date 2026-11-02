@@ -10,6 +10,11 @@ fix, live in [docs/releases](releases/).
 
 ### Fixed
 
+- Sandbox bot (`services/algos/sandbox_bot.py`): analyzer mode is now checked before every order, not once at the start, so switching to Live between the hedge and the call can no longer send the call Live; the hedge is recorded before the call is placed; an exit that bought the call back is remembered, so a retry never buys it twice; an order that fills between the last look and the cancel is recorded; the position check understands every state.
+- Algo entries (`services/algos/runner.py`): algos that fire at the same moment could each pass the daily loss limit, because the check ran before the position was recorded. One entry at a time per trader now.
+- S3n forward ledger: a missed capture on the entry day silently moved the entry to an earlier day. With the exchange calendar the week is now not counted (as the registration says), and the report names the reason.
+- Eight-structure screen engine: an option's value at expiry is its intrinsic value against the index's final settlement price (the file's settle column on an expiry date is the index price, not the option's). Corrected before any run.
+- Registry: forward results need an intact registration, a first expiry after the screen was run and at least 26 trades; registering is one step at a time, an unreadable file no longer breaks the page, trials per registration are capped, and a grid written as text (a list, a range or values separated by commas) is refused.
 - `database/historify_db.py`: weekly and monthly candles built from daily data started 5.5 hours off on a computer set to India time, because the day, week and month cut-offs used the machine's timezone. They are now identical on every machine; a test re-runs the bucket checks under an India-time clock.
 - Sandbox bot (`scripts/algo_backtest/sandbox_bot.py`): the broker feed returns 0 for an index's previous close, which would have made every entry refuse; the bot now uses the last earlier daily bar. Verified against a running OpenAlgo in analyzer mode (dry run).
 - Forward test of the weekly call spread: 10 November 2026 is a market holiday, so the first counted expiry is Monday 9 November (entry Thursday 5 November). Dated correction in docs/algos/forward-s3n-registration.md; no rule, filter, width, time or cost changed.

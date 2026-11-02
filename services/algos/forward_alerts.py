@@ -10,6 +10,10 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def capture_message(code: int, day: str) -> str | None:
     """What a trader should read when the nightly capture did not finish cleanly."""
@@ -27,7 +31,7 @@ def capture_message(code: int, day: str) -> str | None:
             "again; a week with a missing entry or expiry day is not counted in the forward test."
         )
     return (
-        f"Nightly capture for {day} stopped before saving (exit code {code}). Check log\\capture.log, "
+        f"Nightly capture for {day} stopped before saving. Check log\\capture.log, "
         "then run the capture again."
     )
 
@@ -98,13 +102,13 @@ def events(report: dict[str, Any], seen: set[str]) -> tuple[list[str], set[str]]
 
 def notify(message: str) -> bool:
     """Print the message and send it to every Telegram user with notifications on."""
-    print(f"ALERT: {message}")
+    logger.info("Forward test alert: %s", message)
     try:
         from database.telegram_db import get_all_telegram_users
         from services.telegram_alert_service import telegram_alert_service
 
         if not telegram_alert_service.is_bot_active():
-            print("(Telegram bot is off, so this alert was only written to the log.)")
+            logger.info("Telegram bot is off, so the alert was only written to the log")
             return False
         sent = False
         for user in get_all_telegram_users({}):
@@ -112,7 +116,5 @@ def notify(message: str) -> bool:
                 sent |= bool(telegram_alert_service.send_alert_sync(user["telegram_id"], message))
         return sent
     except Exception:
-        from utils.logging import get_logger
-
-        get_logger(__name__).exception("Could not send the forward test alert")
+        logger.exception("Could not send the forward test alert")
         return False

@@ -17,7 +17,7 @@ def premium(kind, strike, spot):
     return intrinsic + max(1.0, 50.0 - abs(strike - spot) * 0.2)
 
 
-def options(expiries=(E,)):
+def options(expiries=(E,), settle_spot=24050.0):
     rows = []
     for expiry in expiries:
         for day in DAYS:
@@ -25,16 +25,23 @@ def options(expiries=(E,)):
                 for kind in ("CE", "PE"):
                     px = premium(kind, strike, 24000.0)
                     if expiry == day:
-                        s = 24050.0
-                        px = max(s - strike, 0.0) if kind == "CE" else max(strike - s, 0.0)
+                        px = (
+                            max(settle_spot - strike, 0.0)
+                            if kind == "CE"
+                            else max(strike - settle_spot, 0.0)
+                        )
                     rows.append({"date": day, "instrument": "OPTIDX", "expiry": expiry, "strike": float(strike),
-                                 "kind": kind, "close": px, "settle": px, "contracts": 100})  # fmt: skip
+                                 "kind": kind, "close": px, "settle": (settle_spot if expiry == day else px), "contracts": 100})  # fmt: skip
     return pd.DataFrame(rows)
 
 
-def registration(status="eligible for a forward test", **params):
+def registration(status="eligible for a forward test", ran="2021-04-20T10:00:00", **params):
     base = {"structure": "WC", "first_expiry": "2021-05-01", "end_trades": 26}
-    return {"status": status, "content": {"params": {**base, **params}}}
+    return {
+        "status": status,
+        "run": {"at": ran} if ran else None,
+        "content": {"params": {**base, **params}},
+    }
 
 
 def series(v):
