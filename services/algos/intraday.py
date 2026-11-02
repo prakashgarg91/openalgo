@@ -37,11 +37,28 @@ from services.algos import lab
 
 FIELDS = ["open", "high", "low", "close"]
 BAR = pd.Timedelta(minutes=5)
-LOT_CHANGE = pd.Timestamp("2025-12-30")  # Nifty lot size 75 until this date, 65 after
+# Nifty units per lot by the contract's EXPIRY, read from Upstox's expired-contract listing (lot_size per
+# expiry) on 2 November 2026: 25 up to the 26 December 2024 expiry, 75 from 2 January 2025 to the
+# 30 December 2025 expiry, 65 from 6 January 2026. Expiries before October 2024 are not served by that
+# listing; broker and news pages say 50 from July 2021 and 25 from 26 April 2024 (not verified from a circular).
+LOT_LAST_25 = pd.Timestamp("2024-12-26")
+LOT_LAST_75 = pd.Timestamp("2025-12-30")
+
+
+def lot_size_for_expiry(expiry: pd.Timestamp) -> int:
+    """Units per Nifty lot for a contract that expires on ``expiry``."""
+    expiry = pd.Timestamp(expiry)
+    if expiry <= LOT_LAST_25:
+        return 25
+    return 75 if expiry <= LOT_LAST_75 else 65
 
 
 def lot_size_for(day: pd.Timestamp) -> int:
-    return 65 if pd.Timestamp(day) >= LOT_CHANGE else 75
+    """Lot for a position opened on ``day`` when the expiry is not at hand (today's bot, published entries).
+
+    A replay that knows the contract's expiry must use ``lot_size_for_expiry`` instead.
+    """
+    return lot_size_for_expiry(day)
 
 
 def _clock(text: str) -> dtime:
@@ -237,8 +254,10 @@ def _trade_record(
 ) -> dict[str, Any]:
     credit = entry[0] - entry[1]
     pts = credit - walk.exit_value
-    cost = lab.trade_cost(model, list(entry), [walk.exit_s, walk.exit_l], [True, False])
-    lot = lot_size_for(ts0)
+    lot = lot_size_for_expiry(expiry)
+    cost = lab.trade_cost(
+        model, list(entry), [walk.exit_s, walk.exit_l], [True, False], lot_size=lot
+    )
     return {
         "entry": ts0,
         "exit": walk.exit_ts,

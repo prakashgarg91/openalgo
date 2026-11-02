@@ -241,7 +241,7 @@ def simulate_rule(
                         "sold": sold,
                         "long": long_,
                         "credit": entry[0] - entry[1],
-                        "lot": intraday.lot_size_for(ts),
+                        "lot": intraday.lot_size_for_expiry(expiry),
                         "marks": _marks(pair, ts, held.index[-1]),
                     }
                 )
@@ -252,7 +252,7 @@ def simulate_rule(
                 rule=rule,
                 episode=episode,
                 reversal=reversals,
-                lot=intraday.lot_size_for(ts),
+                lot=intraday.lot_size_for_expiry(expiry),
                 marks=_marks(pair, ts, walk.exit_ts),
             )
             result.trades.append(record)

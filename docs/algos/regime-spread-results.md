@@ -58,3 +58,8 @@ This test: 12 cells (6 distinct), one selection, one held-out replay under the c
 ## Limits
 
 Candle fills with no bid and ask, a stop that assumes the worst high in a candle, one lot, one regime, 108 expiries (one listed expiry missing).
+
+## Correction (2 November 2026)
+
+The lot size used in this replay was wrong for the October to December 2024 weeks (75 where the lot was 25). The study was re-run as a correction; the verdict is unchanged and the corrected tables are in [lot-size-correction.md](lot-size-correction.md).
+

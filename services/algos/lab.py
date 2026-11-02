@@ -337,11 +337,18 @@ def summarize(pnls: list[float]) -> dict[str, Any]:
     }
 
 
-def trade_cost(model: Model, entry: list[float], exit_: list[float], sells: list[bool]) -> float:
+def trade_cost(
+    model: Model,
+    entry: list[float],
+    exit_: list[float],
+    sells: list[bool],
+    lot_size: int = LOT_SIZE,
+) -> float:
     """Rupees per lot for one round trip.
 
     ``entry`` and ``exit_`` are each leg's premium at entry and exit, and
-    ``sells[i]`` is True for a short leg. The flat model ignores the legs.
+    ``sells[i]`` is True for a short leg. The flat model ignores the legs. ``lot_size`` is the
+    contract's units per lot (75 unless the caller knows the expiry's real lot).
     """
     if model.flat_cost is not None:
         return model.flat_cost
@@ -353,10 +360,10 @@ def trade_cost(model: Model, entry: list[float], exit_: list[float], sells: list
     sell_value = sum(e if short else x for e, x, short in zip(entry, exit_, sells, strict=True))
     turnover = sum(entry) + sum(exit_)
     return (
-        slip_pts * LOT_SIZE
+        slip_pts * lot_size
         + model.brokerage
-        + sell_value * LOT_SIZE * model.stt_pct
-        + turnover * LOT_SIZE * model.exchange_pct
+        + sell_value * lot_size * model.stt_pct
+        + turnover * lot_size * model.exchange_pct
     )
 
 

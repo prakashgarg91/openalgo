@@ -44,3 +44,8 @@ These two, with the first four structures, the 12 spread cells, the 36 earlier Z
 ## Limits
 
 Candle fills with no bid and ask; one window in which the Nifty fell overall; 30 weekly trades in the last third; the held-out third was seen twice before this test and the 250-point results were known when 100 was chosen.
+
+## Correction (2 November 2026)
+
+The lot size used in this replay was wrong for the October to December 2024 weeks (75 where the lot was 25). The study was re-run as a correction; the verdict is unchanged and the corrected tables are in [lot-size-correction.md](lot-size-correction.md).
+

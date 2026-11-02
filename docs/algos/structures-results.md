@@ -46,3 +46,8 @@ Registered gates for S1 and S3: at least 20 trades (met), positive at realistic 
 ## Limits
 
 Candle fills with no bid and ask; one window in which the Nifty fell overall; selling only calls takes the full loss of a sharp rally, limited only by the 250-point wing; the condor pairs two spreads priced from separate candles; S1's trades overlap overnight; the held-out third had been seen twice.
+
+## Correction (2 November 2026)
+
+The lot size used in this replay was wrong for the October to December 2024 weeks (75 where the lot was 25). The study was re-run as a correction; the verdict is unchanged and the corrected tables are in [lot-size-correction.md](lot-size-correction.md).
+

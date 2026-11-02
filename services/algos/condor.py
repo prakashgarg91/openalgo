@@ -142,7 +142,7 @@ def simulate_weekly(
             _skip(result, e, entered)
             continue
         ts, opened = entered
-        lot = intraday.lot_size_for(ts)
+        lot = intraday.lot_size_for_expiry(expiry)
         if ahead:
             result.open_positions.append(
                 _open_record(spec, n, ts, e, opened, lot, days[-1] + pd.Timedelta(days=1))
@@ -169,7 +169,9 @@ def simulate_weekly(
             )  # fmt: skip
             credit += entry[0] - entry[1]
             exit_value += x_s - x_l
-            cost += lab.trade_cost(model, [entry[0], entry[1]], [x_s, x_l], [True, False])
+            cost += lab.trade_cost(
+                model, [entry[0], entry[1]], [x_s, x_l], [True, False], lot_size=lot
+            )
             for d, (close_val, worst) in fs._marks(pair, ts, last_ts).items():
                 a, b = marks.get(d, (0.0, 0.0))
                 marks[d] = (a + close_val, b + worst)

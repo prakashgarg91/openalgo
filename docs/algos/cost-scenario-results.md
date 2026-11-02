@@ -41,3 +41,8 @@ The no-gate, skip-group-5 and groups-1-to-3 cells are identical here (no session
 ## What changes next
 
 The slippage assumption now decides the control's sign. The bid and ask snapshots ([bid-ask-snapshots.md](bid-ask-snapshots.md)) replace it with a measurement after about 60 trading days. Until then no structure is promoted. The alternative structures proposed in the review (no stop, 250-point wings, weekly condor held to expiry) are the next thing to register, with fewer trades and so less cost drag.
+
+## Correction (2 November 2026)
+
+The lot size used in this replay was wrong for the October to December 2024 weeks (75 where the lot was 25). The study was re-run as a correction; the verdict is unchanged and the corrected tables are in [lot-size-correction.md](lot-size-correction.md).
+
