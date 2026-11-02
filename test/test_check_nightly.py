@@ -43,7 +43,7 @@ def catalog(symbols):
     return rows
 
 
-FIX_SHADOW = "Run run_forward_shadow.py tonight"
+FIX_SHADOW = "Run run_forward_s3n.py tonight"
 FIX_LEDGER = "Run run_etf_ledgers.py tonight"
 
 
@@ -64,7 +64,7 @@ def good_counts(**over):
             "GOLDBEES": ["2026-10-28", "2026-10-29"],
         },
         "before_close": False,
-        "artifacts": [artifact("db/forward_shadow/report.json"), artifact("db/etf_ledger")],
+        "artifacts": [artifact("db/forward_s3n/report.json"), artifact("db/etf_ledger")],
     }
     counts.update(over)
     return counts
@@ -164,20 +164,20 @@ def test_before_the_close_the_previous_session_close_is_accepted():
 def test_a_missing_nightly_report_is_a_problem():
     counts = good_counts(
         artifacts=[
-            artifact("db/forward_shadow/report.json", exists=False),
+            artifact("db/forward_s3n/report.json", exists=False),
             artifact("db/etf_ledger"),
         ]
     )
     found = cn.check_day(THURSDAY, catalog(option_symbols()), counts)
     assert len(problems(found)) == 1
     message = problems(found)[0]
-    assert "report.json" in message and "run_forward_shadow.py" in message
+    assert "report.json" in message and "run_forward_s3n.py" in message
 
 
 def test_a_stale_nightly_report_is_a_problem():
     counts = good_counts(
         artifacts=[
-            artifact("db/forward_shadow/report.json", age_hours=36.0),  # 36 hours is still fresh
+            artifact("db/forward_s3n/report.json", age_hours=36.0),  # 36 hours is still fresh
             artifact("db/etf_ledger", age_hours=40.0),
         ]
     )

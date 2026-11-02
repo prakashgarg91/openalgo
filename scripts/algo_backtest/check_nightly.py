@@ -235,9 +235,9 @@ def collect(day: date, before_close: bool) -> tuple[list[dict], dict]:
     artifacts = []
     for name, path, fix in (
         (
-            "db/forward_shadow/report.json",
-            ROOT / "db" / "forward_shadow" / "report.json",
-            "Run run_forward_shadow.py tonight",
+            "db/forward_s3n/report.json",
+            ROOT / "db" / "forward_s3n" / "report.json",
+            "Run run_forward_s3n.py tonight",
         ),
         ("db/etf_ledger", ROOT / "db" / "etf_ledger", "Run run_etf_ledgers.py tonight"),
     ):
