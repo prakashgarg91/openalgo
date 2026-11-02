@@ -348,3 +348,76 @@ def test_two_post_mortems_written_at_the_same_moment_record_only_one(tmp_path):
     for t in threads:
         t.join(timeout=20)
     assert sorted(results) == ["ok"] + ["refused"] * 5
+
+
+def _worker_script(folder, body):
+    return (
+        "import sys, json\n"
+        "sys.path.insert(0, '.')\n"
+        "from datetime import datetime\n"
+        "from pathlib import Path\n"
+        "from services.algos import registry as reg\n"
+        f"folder = Path({str(folder)!r})\n" + body
+    )
+
+
+def test_writers_in_different_processes_cannot_overwrite_each_other(tmp_path):
+    """Eight separate processes add builder trials to the same file at the same moment: none is lost."""
+    import subprocess
+    import sys
+
+    code = _worker_script(
+        tmp_path, "reg.add_builder_trials(folder, 7, 'worker', datetime(2027, 1, 4))\n"
+    )
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "-c", code],
+            cwd=str(__import__("pathlib").Path(__file__).resolve().parents[1]),
+        )
+        for _ in range(8)
+    ]
+    assert [p.wait(timeout=120) for p in procs] == [0] * 8
+    assert reg.builder_trials(tmp_path) == 56  # 8 workers x 7, every write kept
+    assert not (tmp_path / ".lock").exists()
+
+
+def test_two_processes_registering_in_the_same_month_leave_exactly_one_idea(tmp_path):
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    payload = json.dumps(draft())
+    code = _worker_script(
+        tmp_path,
+        "d = json.loads(sys.argv[1])\n"
+        "d['name'] = 'Idea ' + sys.argv[2]\n"
+        "d['idea'] = 'Distinct words for worker ' + sys.argv[2] + ' ' + ' '.join(['w' + sys.argv[2] + str(i) for i in range(8)])\n"
+        "d['entry'] = 'Entry for worker ' + sys.argv[2] + ' ' + ' '.join(['e' + sys.argv[2] + str(i) for i in range(8)])\n"
+        "try:\n    reg.register(d, folder, datetime(2027, 1, 4))\n    print('registered')\nexcept reg.Refused as why:\n    print('refused')\n",
+    )
+    root = str(Path(__file__).resolve().parents[1])
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "-c", code, payload, str(i)],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        for i in range(4)
+    ]
+    outputs = [p.communicate(timeout=120)[0].strip() for p in procs]
+    assert sorted(outputs) == ["refused"] * 3 + ["registered"]
+    assert len(reg._store(tmp_path)) == 1 and reg.running_count(tmp_path) == 320
+
+
+def test_a_lock_left_by_a_crashed_writer_is_taken_over_after_a_minute(tmp_path):
+    import os
+    import time
+
+    tmp_path.mkdir(exist_ok=True)
+    lock = tmp_path / ".lock"
+    lock.write_text("", encoding="utf-8")
+    os.utime(lock, (time.time() - 120, time.time() - 120))  # left two minutes ago
+    reg.add_builder_trials(tmp_path, 3, "after a crash", JAN)
+    assert reg.builder_trials(tmp_path) == 3 and not lock.exists()

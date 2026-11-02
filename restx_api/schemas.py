@@ -32,6 +32,8 @@ class OrderSchema(Schema):
         missing="MARKET", validate=validate.OneOf(["MARKET", "LIMIT", "SL", "SL-M"])
     )
     product = fields.Str(missing="MIS", validate=validate.OneOf(["MIS", "NRML", "CNC"]))
+    # Optional. True means "refuse this order unless analyzer mode is on"; it never routes anywhere.
+    sandbox_only = fields.Bool(missing=False)
     price = fields.Float(
         missing=0.0, validate=validate.Range(min=0, error="Price must be a non-negative number.")
     )

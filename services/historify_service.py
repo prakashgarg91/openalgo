@@ -10,7 +10,7 @@ Business logic for historical market data management:
 """
 
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -45,6 +45,19 @@ from utils.constants import FNO_EXCHANGES as _CENTRAL_FNO_EXCHANGES
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+_IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _ist_day_start(day: str, plus_days: int = 0) -> int:
+    """Epoch seconds of 00:00 India time on ``day`` (YYYY-MM-DD), plus whole days.
+
+    Date ranges are exchange days, so they start at India midnight whatever timezone the computer keeps:
+    a bar stamped at India midnight on the first day is inside the range on a UTC server as well.
+    """
+    start = datetime.strptime(day, "%Y-%m-%d").replace(tzinfo=_IST)
+    return int((start + timedelta(days=plus_days)).timestamp())
+
 
 
 def validate_symbol(symbol: str, exchange: str) -> tuple[bool, str]:
@@ -472,11 +485,10 @@ def get_chart_data(
         end_ts = None
 
         if start_date:
-            start_ts = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp())
+            start_ts = _ist_day_start(start_date)
         if end_date:
             # Add 1 day to include end date
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
-            end_ts = int(end_dt.timestamp())
+            end_ts = _ist_day_start(end_date, 1)
 
         df = get_ohlcv(
             symbol=symbol,
@@ -657,9 +669,9 @@ def export_data_to_csv(
 
         # Convert dates to timestamps
         start_ts = (
-            int(datetime.strptime(start_date, "%Y-%m-%d").timestamp()) if start_date else None
+            _ist_day_start(start_date) if start_date else None
         )
-        end_ts = int(datetime.strptime(end_date, "%Y-%m-%d").timestamp()) if end_date else None
+        end_ts = _ist_day_start(end_date) if end_date else None
 
         success, msg = db_export_to_csv(
             output_path=output_path,
@@ -706,8 +718,8 @@ def get_export_dataframe(
     Returns:
         DataFrame with datetime index and OHLCV columns
     """
-    start_ts = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp()) if start_date else None
-    end_ts = int(datetime.strptime(end_date, "%Y-%m-%d").timestamp()) if end_date else None
+    start_ts = _ist_day_start(start_date) if start_date else None
+    end_ts = _ist_day_start(end_date) if end_date else None
 
     return export_to_dataframe(symbol, exchange, interval, start_ts, end_ts)
 

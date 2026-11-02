@@ -156,6 +156,7 @@ class Bot:
         reply = self.client.post(
             "/api/v1/placeorder", strategy=STRATEGY, exchange=EXCHANGE, symbol=symbol,
             action=action, quantity=quantity, pricetype=pricetype, product=PRODUCT, price=price,
+            sandbox_only=True,  # the order service refuses it unless analyzer mode is on, in one step
         )  # fmt: skip
         if reply.get("status") != "success" or not reply.get("orderid"):
             raise Refused(

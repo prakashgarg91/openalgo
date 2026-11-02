@@ -106,6 +106,7 @@ curl -X POST http://127.0.0.1:5000/api/v1/placeorder \
 | exchange | Exchange code accepted by the shared validation constants | Mandatory | - |
 | pricetype | Price type: MARKET, LIMIT, SL, SL-M | Optional | MARKET |
 | product | Product type: MIS, CNC, NRML | Optional | MIS |
+| sandbox_only | Optional. true means: refuse this order unless analyzer mode is on, decided inside the order service in the same step that routes it, so nothing can reach the broker if the mode is switched in between. An order without it is routed as always. | Optional | false |
 | quantity | Positive numeric order quantity | Mandatory | - |
 | price | Order price (required for LIMIT and SL orders) | Optional | 0 |
 | trigger_price | Trigger price (required for SL and SL-M orders) | Optional | 0 |

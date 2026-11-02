@@ -164,7 +164,26 @@ def place_order_with_auth(
     # (see orderbook_service). This is the same idea made explicit, because a
     # write path should not infer intent from whether a logging argument
     # happens to be None.
-    if get_analyze_mode() and not force_live:
+    #
+    # sandbox_only is the opposite request: a caller that must never reach the broker (the sandbox
+    # bot) says so, and the order is refused unless analyze mode is on. The mode is read ONCE here, so
+    # the refusal and the routing below cannot disagree even if the toggle is switched in between. It
+    # only ever refuses; an order that does not carry it is routed exactly as before.
+    analyze_mode = get_analyze_mode()
+    if original_data.get("sandbox_only") and not analyze_mode:
+        return (
+            False,
+            {
+                "status": "error",
+                "message": (
+                    "This order was marked sandbox only, but analyzer mode is off, so nothing was "
+                    "sent to the broker."
+                ),
+            },
+            403,
+        )
+    order_data = {k: v for k, v in order_data.items() if k != "sandbox_only"}
+    if analyze_mode and not force_live:
         from services.sandbox_service import sandbox_place_order
 
         if not api_key:

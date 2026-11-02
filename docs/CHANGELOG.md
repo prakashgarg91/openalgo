@@ -10,6 +10,9 @@ fix, live in [docs/releases](releases/).
 
 ### Fixed
 
+- Order API (`/api/v1/placeorder`): a new optional field, `sandbox_only`. An order that carries it is refused with a plain message unless analyzer mode is on, and the mode is read once, in the same step that routes the order, so a switch to Live between the caller's own check and the order cannot send it to the broker. An order without the field is routed exactly as before. The sandbox bot now sends it on every order. Chosen by the owner on 2 November 2026.
+- Historify: date ranges in exports and downloads are now exchange (India) days, starting at India midnight on any computer. On a UTC server a daily bar stamped at India midnight on the first day used to fall outside the range.
+- Registry: writes are now exclusive across processes as well as threads (a lock file, taken over after a minute if a writer crashed), so the nightly scripts and the app cannot overwrite each other.
 - Sandbox bot: an order still open after the cancel, or only partly filled, is recorded as needing a person (nothing more is placed until someone has looked) instead of being treated as nothing open.
 - Registry: results are written one at a time, a stray or half-written file in the register is skipped, the Live gate's reason quotes the real counts instead of guessing about the future, a put mirror of a registered call idea is no longer refused as a duplicate, the request size limit also covers chunked bodies, and settings sent as a list get a plain message instead of a crash.
 - Eight-structure screen engine (before any run, see the amendments in docs/algos/eight-structure-screen-registration.md): re-dated expiries no longer shadow the real ones, the entry session is counted on the trading calendar so a missing stored session removes the week instead of moving the entry, and the single run now saves every trade, every skipped week and the trailing-market split.

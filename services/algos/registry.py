@@ -15,7 +15,8 @@ import json
 import os
 import re
 import tempfile
-import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -23,8 +24,6 @@ from typing import Any
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
-#: Registering and counting are read-modify-write: one at a time within a process.
-_LOCK = threading.Lock()
 MAX_TRIALS_PER_REGISTRATION = 100
 
 #: Trials already counted in docs/algos/TRIAL_REGISTER.md: 311 to C1, plus the 8 reserved for the
@@ -56,6 +55,44 @@ SUBMITTED = (*FIELDS, "gates", "params")
 
 class Refused(Exception):
     """The registry declines; the message is written for the trader."""
+
+
+LOCK_WAIT_SECONDS = 15.0
+STALE_LOCK_SECONDS = 60.0
+
+
+@contextmanager
+def _exclusive(folder: Path):
+    """One writer at a time across threads AND processes: the app, the nightly scripts and the screens.
+
+    An exclusively created ``.lock`` file is the lock: creating it is atomic for every thread and
+    process alike, and it works the same on Windows and Linux. No other lock is held while waiting.
+    A lock left behind by a crashed writer is taken over after a minute. Holding it must be short:
+    read, check, write.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / ".lock"
+    deadline = time.monotonic() + LOCK_WAIT_SECONDS
+    while True:
+        try:
+            os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            break
+        except FileExistsError:
+            try:
+                if time.time() - path.stat().st_mtime > STALE_LOCK_SECONDS:
+                    path.unlink(missing_ok=True)
+                    continue
+            except OSError:
+                continue
+            if time.monotonic() > deadline:
+                raise Refused(
+                    "The register is busy with another save. Try again in a moment."
+                ) from None
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        path.unlink(missing_ok=True)
 
 
 def _slug(text: str) -> str:
@@ -194,7 +231,7 @@ def add_builder_trials(folder: Path, count: int, source: str, now: datetime) -> 
     if count <= 0:
         return
     path = folder / BUILDER_TRIALS_FILE
-    with _LOCK:
+    with _exclusive(folder):
         entries = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
         entries.append(
             {"at": now.isoformat(timespec="seconds"), "source": source, "trials": int(count)}
@@ -243,7 +280,7 @@ def register(
     One at a time: the month check, the trial numbers and the write are one step, so two quick
     submissions cannot both pass the check or share trial numbers.
     """
-    with _LOCK:
+    with _exclusive(folder):
         return _register(draft, folder, now, known_algo_ids)
 
 
@@ -354,7 +391,7 @@ def record_run(
 ) -> dict[str, Any]:
     """Store the one run of a registration. A second run is refused. The only verdicts are
     'rejected' and 'eligible for a forward test'."""
-    with _LOCK:
+    with _exclusive(folder):
         record = get(folder, record_id)
         if record is None:
             raise Refused("No such registration.")
@@ -391,7 +428,7 @@ def record_forward(
 ) -> dict[str, Any]:
     """Store the end of a forward test. Only a registration that was run and found eligible can have
     one, and it can be recorded once. A pass here is what the optional Live requirement looks for."""
-    with _LOCK:
+    with _exclusive(folder):
         record = get(folder, record_id)
         if record is None:
             raise Refused("No such registration.")
@@ -429,7 +466,7 @@ def needs_post_mortem(record: dict[str, Any]) -> bool:
 def add_post_mortem(folder: Path, record_id: str, text: str, now: datetime) -> dict[str, Any]:
     """The owner's written account of what a forward test showed and what it did not. A forward pass
     counts toward Live only once it has one, so the result is read before it is relied on."""
-    with _LOCK:
+    with _exclusive(folder):
         record = get(folder, record_id)
         if record is None:
             raise Refused("No such registration.")

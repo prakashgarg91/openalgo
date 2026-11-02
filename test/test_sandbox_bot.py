@@ -24,11 +24,13 @@ class FakeApi:
         fill_after_cancel=False,
         stuck_open=False,
         partial_qty=None,
+        flip_after_check=None,
     ):
         self.analyze, self.vix, self.spot = analyze, vix, spot
         self.flip_after_orders, self.fill_buyback = flip_after_orders, fill_buyback
         self.fill_after_cancel = fill_after_cancel
         self.stuck_open, self.partial_qty = stuck_open, partial_qty
+        self.flip_after_check, self.refused_by_server, self.checks = flip_after_check, [], 0
         self.fill = {"hedge": fill_hedge, "short": fill_short}
         self.calls, self.orders, self.cancelled = [], {}, []
         self.positions = positions or {}
@@ -36,7 +38,11 @@ class FakeApi:
     def post(self, path, **p):
         self.calls.append((path, p))
         if path == "/api/v1/analyzer":
-            return {"status": "success", "data": {"analyze_mode": self.analyze}}
+            answer = {"status": "success", "data": {"analyze_mode": self.analyze}}
+            self.checks += 1
+            if self.flip_after_check == self.checks:
+                self.analyze = False  # Live is switched on right after this look
+            return answer
         if path == "/api/v1/quotes":
             if p["symbol"] == "NIFTY":
                 return {"data": {"ltp": self.spot, "prev_close": 0}}  # the real feed returns 0 here
@@ -51,6 +57,9 @@ class FakeApi:
                 "data": [{"timestamp": day(5), "close": close}, {"timestamp": day(6), "close": 1.0}]
             }
         if path == "/api/v1/placeorder":
+            if p.get("sandbox_only") and not self.analyze:  # what the order service now does
+                self.refused_by_server.append(p["symbol"])
+                return {"status": "error", "message": "marked sandbox only, analyzer mode is off"}
             oid = f"id{len(self.orders) + 1}"
             self.orders[oid] = p
             if self.flip_after_orders is not None and len(self.orders) >= self.flip_after_orders:
@@ -321,3 +330,23 @@ def test_an_exit_whose_buyback_is_unresolved_keeps_the_state_open_and_flags_it(t
     with pytest.raises(sb.Unresolved):
         b.exit(today=EXPIRY)
     assert b.state()["status"] == "open" and "needs_attention" in b.state()
+
+
+def test_every_order_the_bot_sends_carries_sandbox_only(tmp_path):
+    api = FakeApi()
+    b = bot(tmp_path, api)
+    b.enter(EXPIRY, NOW, set())
+    b.exit(today=EXPIRY)
+    sent = [c[1] for c in api.calls if c[0] == "/api/v1/placeorder"]
+    assert sent and all(o["sandbox_only"] is True for o in sent)
+
+
+def test_a_switch_to_live_in_the_instant_after_the_check_is_refused_by_the_order_service(tmp_path):
+    """The bot's own check passed, then Live was switched on: the server refuses the order itself."""
+    api = FakeApi(
+        flip_after_check=2
+    )  # look 1 is the entry check, look 2 is the one right before the order
+    b = bot(tmp_path, api)
+    with pytest.raises(sb.Refused, match="not accepted"):
+        b.enter(EXPIRY, NOW, set())
+    assert api.orders == {} and api.refused_by_server  # nothing was placed, the server said no
