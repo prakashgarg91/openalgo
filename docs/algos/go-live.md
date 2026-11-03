@@ -37,6 +37,18 @@ Since 1 April 2026 order APIs only accept calls from an address registered with 
    helps if OpenAlgo runs on the machine that owns it, for example a small cloud server with that address.
 3. OpenAlgo cannot see Upstox's list, so this step always stays "please check".
 
+### With a rented static-IP proxy (home internet)
+
+If OpenAlgo runs on a home connection, rent a static-IP proxy and send only the order writes through it. In `.env` set
+`UPSTOX_ORDER_PROXY_URL='http://user:password@host:port'` (the values come from the provider; percent-encode odd characters in the
+login) and restart. Order place, modify and cancel and GTT writes then leave through the proxy; quotes, candles, the order book and
+funds still go direct. Unset, orders go direct as before. A value that is set but malformed stops order sending with a message
+instead of sending direct, because Upstox would refuse a direct order anyway.
+
+1. Register the proxy's outbound IP (the `ip` column the provider gave you, not its host name) as the primary IP in Upstox's developer settings. Upstox lets you change it once a calendar week.
+2. Note the provider's validity date and renew before it, or orders stop.
+3. Check without placing an order: a request through the proxy to a what-is-my-IP page must print the registered address, and `https://api-hft.upstox.com/` must answer (a 404 on the bare address is normal).
+
 ## Your first Live day
 
 1. All checklist steps are done and your Sandbox record is real and reviewed.

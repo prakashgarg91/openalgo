@@ -27,6 +27,7 @@ from utils.broker_backpressure import (
 )
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
+from utils.order_proxy import order_client
 from utils.position_read import (
     PositionReadError,
     read_position_book,
@@ -97,7 +98,8 @@ def get_api_response(
             logger.error("BROKER_API_KEY environment variable not set.")
             return {"status": "error", "message": "BROKER_API_KEY not set"}
 
-        client = get_httpx_client()
+        # Order writes live on the api-hft host and need the registered static IP; reads do not.
+        client = order_client() if base_url == UPSTOX_HFT_BASE_URL else get_httpx_client()
         headers = {
             "Authorization": f"Bearer {auth}",
             "Content-Type": "application/json",
@@ -364,7 +366,7 @@ def place_order_api(data, auth):
         payload = json.dumps(order_payload)
         logger.debug(f"Placing order with payload: {payload}")
 
-        client = get_httpx_client()
+        client = order_client()
         headers = {
             "Authorization": f"Bearer {auth}",
             "Content-Type": "application/json",

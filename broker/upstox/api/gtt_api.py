@@ -44,6 +44,7 @@ from database.token_db import get_token
 from utils.broker_backpressure import BrokerBusyError
 from utils.httpx_client import get_httpx_client
 from utils.logging import get_logger
+from utils.order_proxy import order_client
 
 logger = get_logger(__name__)
 
@@ -203,7 +204,7 @@ def place_gtt_order(data, auth):
     except BrokerBusyError as exc:
         # Refused by the pacer before anything was sent (gthread only).
         return _FakeResponse(429), {"status": "error", "message": str(exc)}, None
-    client = get_httpx_client()
+    client = order_client()
     response = client.post(f"{_GTT_BASE}/place", headers=_headers(auth), content=payload)
     response.status = response.status_code  # parity with other order APIs
     logger.info(f"Upstox place_gtt raw: status={response.status_code}, body={response.text}")
@@ -250,7 +251,7 @@ def modify_gtt_order(data, auth):
         apply_rate_limit(_RATE_LIMIT_CATEGORY)
     except BrokerBusyError as exc:
         return {"status": "error", "message": str(exc)}, 429
-    client = get_httpx_client()
+    client = order_client()
     response = client.put(f"{_GTT_BASE}/modify", headers=_headers(auth), content=payload)
     logger.info(f"Upstox modify_gtt raw: status={response.status_code}, body={response.text}")
 
@@ -288,7 +289,7 @@ def cancel_gtt_order(trigger_id, auth):
         apply_rate_limit(_RATE_LIMIT_CATEGORY)
     except BrokerBusyError as exc:
         return {"status": "error", "message": str(exc)}, 429
-    client = get_httpx_client()
+    client = order_client()
     response = client.request(
         "DELETE", f"{_GTT_BASE}/cancel", headers=_headers(auth), content=payload
     )
