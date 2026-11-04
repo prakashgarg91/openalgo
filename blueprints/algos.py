@@ -257,6 +257,7 @@ def readiness_check():
         broker_logged_in=bool(broker and get_auth_token(user)),
         master_contract_ready=bool(broker and check_if_ready(broker)),
         public_ip=netinfo.public_ip(),
+        **netinfo.proxy_facts(date.today()),
     )
     return _ok({"data": readiness.evaluate(facts)})
 
