@@ -28,8 +28,12 @@ def todays_block(log_text: str, day: date) -> str:
     return block
 
 
-def judge(log_text: str, day: date, labels_seen: set[str]) -> list[str]:
-    """Problems that stop the shutdown; an empty list means the day is complete."""
+def judge(log_text: str, day: date, labels_seen: set[str], early: bool = False) -> list[str]:
+    """Problems that stop the shutdown; an empty list means the day is complete.
+
+    ``early`` is a day the trader chose to close before the market ended: the later bid-ask snapshots and
+    the full-day candle check cannot be there, so only the 10:15 snapshot and a clean capture are required.
+    """
     problems = []
     block = todays_block(log_text, day)
     if not block:
@@ -44,11 +48,11 @@ def judge(log_text: str, day: date, labels_seen: set[str]) -> list[str]:
         problems.append("the index, VIX and ETF context reported failures")
     if "ETF ledgers" not in block:
         problems.append("the ETF ledger report is missing")
-    if "Everything the forward tests need from this day is in place." not in block:
+    if not early and "Everything the forward tests need from this day is in place." not in block:
         problems.append("the nightly data check did not pass")
     if f"Snapshot written: historify-{day.strftime('%Y%m%d')}" not in block:
         problems.append("the database snapshot was not written")
-    missing = [x for x in LABELS if x not in labels_seen]
+    missing = [x for x in (LABELS[:1] if early else LABELS) if x not in labels_seen]
     if missing:
         problems.append("bid-ask snapshots missing: " + ", ".join(missing))
     return problems
@@ -62,7 +66,7 @@ def labels_in(path: Path) -> set[str]:
 
 
 def main() -> int:
-    args = sys.argv[1:]
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
         print(__doc__)
         return 2
@@ -72,7 +76,8 @@ def main() -> int:
     text = (
         log.read_text(encoding="utf-8", errors="replace").replace("\r", "") if log.exists() else ""
     )
-    problems = judge(text, day, labels_in(repo / "bidask" / f"{day.isoformat()}.csv"))
+    early = "--early" in sys.argv
+    problems = judge(text, day, labels_in(repo / "bidask" / f"{day.isoformat()}.csv"), early)
     if problems:
         print(f"Day {day.isoformat()} is NOT complete:")
         for p in problems:

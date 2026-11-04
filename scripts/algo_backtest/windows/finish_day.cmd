@@ -6,7 +6,7 @@ set SSLKEYLOGFILE=
 set DATAREPO=D:\Github\openalgo-data
 for /f %%d in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd"') do set TODAY=%%d
 echo ==== finish_day %TODAY% %time% >> log\finish_day.log
-uv run python scripts\algo_backtest\day_complete.py %DATAREPO% %TODAY% >> log\finish_day.log 2>&1
+uv run python scripts\algo_backtest\day_complete.py %DATAREPO% %TODAY% %1 >> log\finish_day.log 2>&1
 if errorlevel 1 (
   echo Day not complete: computer left on. >> log\finish_day.log
   exit /b 1

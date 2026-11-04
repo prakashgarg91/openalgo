@@ -52,3 +52,15 @@ def test_failed_nightly_check_blocks():
 def test_missing_snapshot_or_label_blocks():
     assert dc.judge(GOOD.replace("historify-20261102", "historify-20261030"), DAY, ALL)
     assert any("1430" in p for p in dc.judge(GOOD, DAY, {"1015", "1500"}))
+
+
+def test_an_early_close_needs_only_the_first_snapshot_and_a_clean_capture():
+    early_log = GOOD.replace(
+        "Everything the forward tests need from this day is in place.\n",
+        "PROBLEM only 260 candles\n",
+    )
+    assert dc.judge(early_log, DAY, {"1015"}) != []
+    assert dc.judge(early_log, DAY, {"1015"}, early=True) == []
+    assert dc.judge(early_log, DAY, set(), early=True) != []
+    bad = early_log.replace("'no_data': 0, 'failed': 0", "'no_data': 0, 'failed': 4")
+    assert dc.judge(bad, DAY, {"1015"}, early=True) != []
