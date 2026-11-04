@@ -163,7 +163,7 @@ export const algoQueryKeys = {
   registry: () => [...algoQueryKeys.all, 'registry'] as const,
   forward: () => [...algoQueryKeys.all, 'forward'] as const,
   reconciliation: () => [...algoQueryKeys.all, 'reconciliation'] as const,
-  picker: () => [...algoQueryKeys.all, 'picker'] as const,
+  picker: (margins = false) => [...algoQueryKeys.all, 'picker', margins] as const,
 }
 
 export async function fetchCatalogue(): Promise<AlgoItem[]> {
@@ -561,6 +561,30 @@ export type PickerRow = {
     breakevens: number[]
   }
   costs?: { charges: number; spread: number; total: number }
+  history?: PickerHistory | null
+}
+
+export type PickerHistory = {
+  available: boolean
+  reason?: string
+  trades?: number
+  mean?: number
+  median?: number
+  win_rate?: number
+  worst?: number
+  p05?: number
+  mean_lower?: number
+  older_mean?: number | null
+  recent_mean?: number
+  note?: string
+  today_bucket?: {
+    bucket: string | null
+    note?: string
+    trades?: number
+    mean?: number
+    win_rate?: number
+    worst?: number
+  }
 }
 
 export type PickerView = {
@@ -578,12 +602,20 @@ export type PickerView = {
     margins_from_broker?: number
     vix?: number | null
     regime?: { label: string; bias: string; reasons: string[] } | null
+    history_note?: string | null
+    research?: {
+      expected_gap: {
+        gap_pct: number | null
+        links: { label: string; move_pct: number; coefficient: number; implied_gap_pct: number }[]
+      }
+      skill: Record<string, { r2: number; usable: boolean; note: string }>
+    }
   }
   ranked: PickerRow[]
   blocked: PickerRow[]
 }
 
-export async function fetchPicker(margins = true): Promise<PickerView> {
+export async function fetchPicker(margins = false): Promise<PickerView> {
   const response = await webClient.get<{ data: PickerView }>(`${BASE}/picker`, {
     params: { margins: margins ? '1' : '0' },
   })

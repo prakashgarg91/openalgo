@@ -7,21 +7,24 @@ reading as zero. Read only: it asks for quotes and margin estimates and never pl
 
 from __future__ import annotations
 
+import json
 import time
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
-from services.algos import picker
+from services.algos import picker, research_view
 from services.algos.context import MarketInputs, RegimeResult
 from services.algos.mandate import Mandate
 from utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+HISTORY_FILE = Path(__file__).resolve().parents[2] / "db" / "picker_history" / "history.json"
 UNDERLYING = "NIFTY"
 STRIKES_EACH_SIDE = 12
 IST = timezone(timedelta(hours=5, minutes=30))
-MARGIN_BUDGET_SECONDS = 25.0
+MARGIN_BUDGET_SECONDS = 12.0
 _MONTHS = {
     m: i
     for i, m in enumerate(
@@ -121,6 +124,7 @@ def build_conditions(
     lot: int,
     dte: int,
     now: datetime,
+    expected_gap_pct: float | None = None,
 ) -> picker.Conditions:
     return picker.Conditions(
         bias=regime.bias if regime else "neutral",
@@ -135,6 +139,7 @@ def build_conditions(
         step=picker.STRIKE_STEP,
         lot=lot,
         momentum_pct=momentum_pct(nifty),
+        expected_gap_pct=expected_gap_pct,
     )
 
 
@@ -143,13 +148,17 @@ def fetch_margins(
     chain: dict[tuple[str, float], dict[str, Any]],
     cond: picker.Conditions,
     budget_seconds: float = MARGIN_BUDGET_SECONDS,
+    only: set[str] | None = None,
 ) -> dict[str, float]:
-    """Broker margin for each priceable structure, within a time budget; the rest fall back to estimates."""
+    """Broker margin for the structures in ``only`` (all if None), within a time budget; the rest fall back
+    to estimates. Each call is a round trip to the broker, so callers ask for as few as they can."""
     from services.margin_service import calculate_margin
 
     margins: dict[str, float] = {}
     started = time.monotonic()
     for tpl in picker.TEMPLATES:
+        if only is not None and tpl.id not in only:
+            continue
         if time.monotonic() - started > budget_seconds:
             logger.warning("Picker margin budget used up after %d structures", len(margins))
             break
@@ -170,6 +179,14 @@ def fetch_margins(
         if isinstance(required, (int, float)):
             margins[tpl.id] = float(required)
     return margins
+
+
+def load_history(path: Path | None = None) -> dict[str, Any] | None:
+    """Past weekly results written by scripts/algo_backtest/picker_history.py, if that has been run."""
+    try:
+        return json.loads((path or HISTORY_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def gather(
@@ -207,11 +224,30 @@ def gather(
     nifty = feed._quote(api_key, "NIFTY", "NSE_INDEX")
     expiry_date = parse_expiry(expiry)
     dte = max(0, (expiry_date - now.date()).days) if expiry_date else 0
+    study = research_view.load()
+    moves = {
+        field: getattr(inputs, field, None) if inputs else None
+        for field in research_view.INPUT_TO_NODE
+    }
+    gap = research_view.expected_gap(study, moves)
     cond = build_conditions(
-        regime=regime, inputs=inputs, nifty=nifty, spot=float(spot), lot=lot, dte=dte, now=now
+        regime=regime,
+        inputs=inputs,
+        nifty=nifty,
+        spot=float(spot),
+        lot=lot,
+        dte=dte,
+        now=now,
+        expected_gap_pct=gap["gap_pct"],
     )
-    margins = fetch_margins(api_key, chain, cond) if with_margins else {}
-    result = picker.rank(cond, chain, mandate, margins)
+    history = load_history()
+    result = picker.rank(cond, chain, mandate, None, history)
+    margins: dict[str, float] = {}
+    if with_margins:
+        # Only structures inside the trader's limits need a broker margin; the rest are already blocked.
+        wanted = {row["id"] for row in result["ranked"]}
+        margins = fetch_margins(api_key, chain, cond, only=wanted)
+        result = picker.rank(cond, chain, mandate, margins, history)
     result["header"]["expiry"] = expiry
     result["header"]["margins_from_broker"] = len(margins)
     result["header"]["regime"] = (
@@ -220,4 +256,5 @@ def gather(
         else None
     )
     result["header"]["vix"] = cond.vix
+    result["header"]["research"] = {"expected_gap": gap, "skill": research_view.skill(study)}
     return result

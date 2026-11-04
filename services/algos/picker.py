@@ -291,6 +291,7 @@ class Conditions:
     step: int
     lot: int
     momentum_pct: float | None = None
+    expected_gap_pct: float | None = None
 
 
 @dataclass(frozen=True)
@@ -405,12 +406,27 @@ def _clip(x: float, lo: float = -1.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, x))
 
 
+#: After the open the gap has happened. The research study found nothing that predicts the move from there
+#: (out-of-sample R squared below zero), so direction is allowed only a small tilt.
+POST_OPEN_DIRECTION_SHARE = 0.35
+
+
 def _direction_fit(tpl: Template, c: Conditions) -> float:
     if tpl.direction == "any":
         return 0.5
+    raw = _raw_direction_fit(tpl, c)
+    if c.minutes_since_open < FIRST_MINUTES:
+        return raw
+    return 0.5 + POST_OPEN_DIRECTION_SHARE * (raw - 0.5)
+
+
+def _raw_direction_fit(tpl: Template, c: Conditions) -> float:
     bias = c.bias_score if c.bias_score is not None else 0.0
     mom = _clip((c.momentum_pct or 0.0) / 0.5)
-    s = _clip(0.6 * bias + 0.4 * mom)
+    if c.minutes_since_open < FIRST_MINUTES and c.expected_gap_pct is not None:
+        s = _clip(0.7 * _clip(c.expected_gap_pct / 0.5) + 0.3 * bias)  # the study's estimate leads
+    else:
+        s = _clip(0.6 * bias + 0.4 * mom)
     if tpl.direction == "bullish":
         return (s + 1) / 2
     if tpl.direction == "bearish":
@@ -461,11 +477,62 @@ def expected_moves(vix: float | None, spot: float) -> dict[str, float | None]:
     }
 
 
+VIX_BUCKETS = (("low", 0.0, 14.0), ("mid", 14.0, 18.0), ("high", 18.0, 20.0))
+MIN_COMPARABLE_WEEKS = 15
+HISTORY_NOTE = (
+    "Past weekly results: the same structure entered two sessions before a weekly expiry and held to expiry, "
+    "after realistic costs, one lot. Past results, not a forecast, and not a 15-minute trade."
+)
+
+
+def vix_bucket(vix: float | None) -> str | None:
+    if vix is None:
+        return None
+    for name, lo, hi in VIX_BUCKETS:
+        if lo <= vix < hi:
+            return name
+    return None
+
+
+def history_view(
+    template_id: str, history: dict[str, Any] | None, vix: float | None
+) -> dict[str, Any] | None:
+    """What this structure did in past comparable weeks, or None when no history was loaded."""
+    if not history:
+        return None
+    row = (history.get("structures") or {}).get(template_id)
+    if not row or not row.get("replayable", False):
+        return {
+            "available": False,
+            "reason": (row or {}).get("reason", "Not replayable on past data."),
+        }
+    out = {"available": True, **{k: row[k] for k in row if k != "by_vix"}}
+    bucket = vix_bucket(vix)
+    if bucket is None:
+        reason = (
+            "India VIX is unknown."
+            if vix is None
+            else "The replay skips weeks entered above India VIX 20, so no weeks are comparable."
+        )
+        out["today_bucket"] = {"bucket": None, "note": reason}
+    else:
+        cell = (row.get("by_vix") or {}).get(bucket) or {}
+        if cell.get("trades", 0) >= MIN_COMPARABLE_WEEKS:
+            out["today_bucket"] = {"bucket": bucket, **cell}
+        else:
+            out["today_bucket"] = {
+                "bucket": bucket,
+                "note": f"Only {cell.get('trades', 0)} comparable weeks with India VIX in this range; too few to read.",
+            }
+    return out
+
+
 def rank(
     cond: Conditions,
     chain: dict[tuple[str, float], dict[str, Any]],
     mandate: Mandate,
     margins: dict[str, float] | None = None,
+    history: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Score every structure. ``margins`` maps template id to the broker's margin, when it was fetched."""
     margins = margins or {}
@@ -492,6 +559,7 @@ def rank(
                 for leg in tpl.legs
             ],
             "evidence": EVIDENCE.get(tpl.id, UNTESTED),
+            "history": history_view(tpl.id, history, cond.vix),
             "priced": legs is not None,
             "blocked_because": [],
         }
@@ -557,6 +625,7 @@ def rank(
     return {
         "header": {
             "disclaimer": DISCLAIMER,
+            "history_note": HISTORY_NOTE if history else None,
             "notes": notes,
             "confidence": round(cond.regime_confidence, 2),
             "expected_move": expected_moves(cond.vix, cond.spot),

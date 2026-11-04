@@ -32,6 +32,7 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- The strategy picker now uses the research study (expected opening gap from overseas markets before the open, direction counted for little after it) and shows how each structure did in past weekly trades after costs, including weeks with a similar India VIX. It no longer fetches broker margins by default; the Get broker margins button does, only for structures inside your limits. See docs/algos/strategy-picker.md.
 - Strategy picker tab on the Algos page: 24 option structures priced from the live Nifty chain with the most each can earn and lose, the capital it needs (the broker's margin), breakevens, round-trip costs, a fit score for today's conditions and what has been tested. Read only: it never picks, orders or registers. Structures with unlimited loss, a worst loss above the daily cap or a capital need above the account are listed as outside the limits with the reason. The fit score is not a forecast. See docs/algos/strategy-picker.md.
 - A rejected Upstox order now carries Upstox's own reason, and the Order Book shows it under the status.
 - Upstox orders can go out through a static-IP proxy: set `UPSTOX_ORDER_PROXY_URL` in `.env` and place, modify, cancel and GTT writes leave from the proxy's fixed address while data and quotes stay direct. Unset, nothing changes. A malformed value stops order sending with a message rather than sending direct. Steps and the weekly limit on changing the registered IP are in docs/algos/go-live.md.

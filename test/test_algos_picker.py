@@ -35,7 +35,7 @@ def make_chain(spot=SPOT, step=STEP, half_spread=0.5):
 
 
 def conditions(**kw):
-    base = dict(
+    base = dict(  # noqa: C408
         bias="neutral",
         bias_score=0.0,
         regime_label="calm",
@@ -223,3 +223,80 @@ def test_the_header_carries_the_typical_move_from_india_vix():
         40 < header["expected_move"]["fifteen_minutes"] < 60
     )  # 23,950 at 16 percent is about 49 points
     assert header["expected_move"]["day"] > header["expected_move"]["fifteen_minutes"]
+
+
+def test_before_the_open_the_research_gap_estimate_leads_the_direction():
+    up = picker.rank(
+        conditions(minutes_since_open=-10, expected_gap_pct=0.5), make_chain(), ONE_LAKH
+    )
+    down = picker.rank(
+        conditions(minutes_since_open=-10, expected_gap_pct=-0.5), make_chain(), ONE_LAKH
+    )
+    assert by_id(up, "bull_call_spread")["components"]["direction"] > 0.8
+    assert by_id(down, "bull_call_spread")["components"]["direction"] < 0.2
+
+
+def test_after_the_open_direction_counts_only_a_small_tilt_because_nothing_predicts_it():
+    before = picker.rank(
+        conditions(minutes_since_open=-10, bias_score=0.9, expected_gap_pct=0.5),
+        make_chain(),
+        ONE_LAKH,
+    )
+    after = picker.rank(
+        conditions(minutes_since_open=60, bias_score=0.9, momentum_pct=0.5), make_chain(), ONE_LAKH
+    )
+    a = by_id(after, "bull_call_spread")["components"]["direction"]
+    assert 0.5 < a < 0.7  # tilted, never decisive
+    assert by_id(before, "bull_call_spread")["components"]["direction"] > a
+
+
+HISTORY = {
+    "structures": {
+        "long_call": {
+            "replayable": True,
+            "trades": 200,
+            "mean": -120.0,
+            "median": -900.0,
+            "win_rate": 0.41,
+            "worst": -9000.0,
+            "p05": -5000.0,
+            "mean_lower": -450.0,
+            "by_vix": {
+                "low": {"trades": 80, "mean": 50.0, "win_rate": 0.45, "worst": -4000.0},
+                "mid": {"trades": 9, "mean": 300.0, "win_rate": 0.6, "worst": -1000.0},
+            },
+        },
+        "short_straddle": {
+            "replayable": False,
+            "reason": "Unlimited loss structures are not replayed here.",
+        },
+    }
+}
+
+
+def test_a_row_shows_what_the_structure_did_in_comparable_past_weeks():
+    result = picker.rank(conditions(vix=12.0), make_chain(), ONE_LAKH, history=HISTORY)
+    hist = by_id(result, "long_call")["history"]
+    assert hist["available"] and hist["trades"] == 200
+    assert hist["today_bucket"]["bucket"] == "low" and hist["today_bucket"]["trades"] == 80
+    assert "not a forecast" in result["header"]["history_note"].lower()
+
+
+def test_too_few_comparable_weeks_are_not_read_and_vix_above_20_has_none():
+    mid = by_id(
+        picker.rank(conditions(vix=16.0), make_chain(), ONE_LAKH, history=HISTORY), "long_call"
+    )["history"]
+    assert "too few" in mid["today_bucket"]["note"].lower()
+    high = by_id(
+        picker.rank(conditions(vix=24.0), make_chain(), ONE_LAKH, history=HISTORY), "long_call"
+    )["history"]
+    assert "above India VIX 20" in high["today_bucket"]["note"]
+
+
+def test_without_history_the_row_says_nothing_and_a_non_replayable_one_says_why():
+    plain = by_id(picker.rank(conditions(), make_chain(), ONE_LAKH), "long_call")
+    assert plain["history"] is None
+    row = by_id(
+        picker.rank(conditions(), make_chain(), ONE_LAKH, history=HISTORY), "short_straddle"
+    )["history"]
+    assert row["available"] is False and "Unlimited" in row["reason"]

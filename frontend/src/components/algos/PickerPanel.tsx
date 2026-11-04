@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Loader2, RefreshCw } from 'lucide-react'
-import { algoQueryKeys, fetchPicker, type PickerRow } from '@/api/algos'
+import { useState } from 'react'
+import { algoQueryKeys, fetchPicker, type PickerHistory, type PickerRow } from '@/api/algos'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,6 +12,36 @@ const rupees = (value: number | null | undefined) =>
 function errorText(error: unknown): string {
   const data = (error as { response?: { data?: { message?: string } } })?.response?.data
   return data?.message || 'The picker could not be loaded. Check that you are signed in to Upstox.'
+}
+
+function PastWeeks({ history }: { history: PickerHistory | null | undefined }) {
+  if (!history) return <span className="text-muted-foreground">-</span>
+  if (!history.available) {
+    return <span className="text-xs text-muted-foreground">{history.reason}</span>
+  }
+  const bucket = history.today_bucket
+  return (
+    <div className="space-y-0.5 text-xs">
+      <div className="font-mono">
+        Average {rupees(history.mean)}, won {Math.round((history.win_rate ?? 0) * 100)}%
+      </div>
+      <div className="font-mono text-muted-foreground">
+        Worst {rupees(history.worst)}, {history.trades} weeks
+      </div>
+      <div className="font-mono text-muted-foreground">
+        Older {rupees(history.older_mean)}, recent {rupees(history.recent_mean)}
+      </div>
+      {bucket?.trades ? (
+        <div className="font-mono">
+          With VIX like today ({bucket.bucket}): {rupees(bucket.mean)}, won{' '}
+          {Math.round((bucket.win_rate ?? 0) * 100)}%, {bucket.trades} weeks
+        </div>
+      ) : (
+        <div className="text-muted-foreground">{bucket?.note}</div>
+      )}
+      {history.note && <div className="text-amber-600">{history.note}</div>}
+    </div>
+  )
 }
 
 function Row({ row, blocked }: { row: PickerRow; blocked: boolean }) {
@@ -47,7 +78,10 @@ function Row({ row, blocked }: { row: PickerRow; blocked: boolean }) {
       <td className="py-2 pr-3 text-right font-mono">
         {stats?.breakevens.length ? stats.breakevens.map((b) => Math.round(b)).join(', ') : '-'}
       </td>
-      <td className="py-2 text-right font-mono">{rupees(row.costs?.total)}</td>
+      <td className="py-2 pr-3 text-right font-mono">{rupees(row.costs?.total)}</td>
+      <td className="min-w-[210px] py-2">
+        <PastWeeks history={row.history} />
+      </td>
     </tr>
   )
 }
@@ -65,7 +99,8 @@ function Table({ rows, blocked }: { rows: PickerRow[]; blocked: boolean }) {
             <th className="py-2 pr-3 text-right">Capital needed</th>
             <th className="py-2 pr-3 text-right">Entry</th>
             <th className="py-2 pr-3 text-right">Breakevens</th>
-            <th className="py-2 text-right">Costs, in and out</th>
+            <th className="py-2 pr-3 text-right">Costs, in and out</th>
+            <th className="py-2">Past weeks of the same structure</th>
           </tr>
         </thead>
         <tbody>
@@ -79,18 +114,22 @@ function Table({ rows, blocked }: { rows: PickerRow[]; blocked: boolean }) {
 }
 
 export function PickerPanel() {
+  const [withMargins, setWithMargins] = useState(false)
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: algoQueryKeys.picker(),
-    queryFn: () => fetchPicker(true),
-    refetchInterval: 120_000,
+    queryKey: algoQueryKeys.picker(withMargins),
+    queryFn: () => fetchPicker(withMargins),
     retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 45_000,
   })
 
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Pricing every structure from the live chain.
-        This takes up to half a minute.
+        <Loader2 className="h-4 w-4 animate-spin" />
+        {withMargins
+          ? 'Asking the broker for margins. This can take up to 15 seconds.'
+          : 'Pricing every structure from the live chain.'}
       </div>
     )
   }
@@ -98,6 +137,7 @@ export function PickerPanel() {
     return <p className="text-sm text-red-500">{errorText(error)}</p>
   }
   const h = data.header
+  const gap = h.research?.expected_gap
   return (
     <div className="space-y-4">
       <Card>
@@ -106,13 +146,21 @@ export function PickerPanel() {
             <div>
               <CardTitle>Strategy picker</CardTitle>
               <CardDescription>
-                Every structure priced live: what it can earn and lose, the capital it needs, and
-                how well today suits it. You choose. Nothing here places an order.
+                Every structure priced live: what it can earn and lose, the capital it needs, how
+                well today suits it, and how the same structure did in past weeks. You choose.
+                Nothing here places an order.
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshCw className={`mr-1 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
-            </Button>
+            <div className="flex gap-2">
+              {!withMargins && (
+                <Button variant="outline" size="sm" onClick={() => setWithMargins(true)}>
+                  Get broker margins
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+                <RefreshCw className={`mr-1 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
@@ -138,11 +186,40 @@ export function PickerPanel() {
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground">{h.disclaimer}</p>
+          {h.history_note && <p className="text-xs text-muted-foreground">{h.history_note}</p>}
           <p className="text-xs text-muted-foreground">
             Earn and loss figures are for one lot held to expiry. Capital needed is the broker's
-            margin ({h.margins_from_broker ?? 0} structures) or the premium paid. Costs are the
-            charges plus the gap between buy and sell prices for getting in and out once.
+            margin ({h.margins_from_broker ?? 0} structures; press Get broker margins) or else the
+            premium paid. Costs are the charges plus the gap between buy and sell prices for getting
+            in and out once.
           </p>
+          {h.research && (
+            <div className="rounded-md border p-2 text-xs">
+              <div className="font-medium">What the research data says</div>
+              {gap?.gap_pct !== null && gap?.gap_pct !== undefined ? (
+                <p>
+                  Overseas markets today point to a Nifty opening gap of about{' '}
+                  {gap.gap_pct >= 0 ? '+' : ''}
+                  {gap.gap_pct.toFixed(2)} percent (
+                  {gap.links
+                    .map((l) => `${l.label} ${l.move_pct >= 0 ? '+' : ''}${l.move_pct.toFixed(2)}%`)
+                    .join(', ')}
+                  ). A rough estimate from links that held on years the study had not seen.
+                </p>
+              ) : (
+                <p>No overseas moves were available, so there is no gap estimate.</p>
+              )}
+              {Object.entries(h.research.skill).map(([key, item]) => (
+                <p key={key} className={item.usable ? '' : 'text-muted-foreground'}>
+                  {item.note}
+                </p>
+              ))}
+              <p className="text-muted-foreground">
+                So the picker lets direction matter only before the open. After it, direction counts
+                for little, and volatility, cost and your limits do most of the work.
+              </p>
+            </div>
+          )}
           {h.notes.map((note) => (
             <p key={note} className="text-xs text-amber-600">
               {note}
@@ -153,7 +230,9 @@ export function PickerPanel() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Within your limits ({data.ranked.length})</CardTitle>
-          <CardDescription>Highest fit first. Fit is not a forecast of profit.</CardDescription>
+          <CardDescription>
+            Highest fit first. Fit is not a forecast of profit, and past weeks are not a promise.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table rows={data.ranked} blocked={false} />
