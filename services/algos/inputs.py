@@ -9,11 +9,15 @@ missing input and a lower confidence instead of reading it as zero.
 
 from __future__ import annotations
 
+import hashlib
+import threading
+import time
 from datetime import date, timedelta
 from typing import Any
 
 from services.algos.context import MarketInputs
 from utils.logging import get_logger
+from utils.thread_safe_cache import LockedTTLCache
 
 logger = get_logger(__name__)
 
@@ -24,8 +28,16 @@ _GLOBAL_SYMBOLS = {
     "crude": "CL=F",
     "dxy": "DX-Y.NYB",
 }
-_FETCH_TIMEOUT = 6.0
+_FETCH_TIMEOUT = 4.0
+_GLOBALS_DEADLINE = 8.0
 _MA_WINDOW = 20
+
+# Several pages ask for the market reading at once (the regime, the chooser, the picker), and a reading costs
+# two broker quotes, a month of daily history and four overseas fetches. The whole snapshot is kept for 30
+# seconds, and the two slow sources, which change once a day, for ten minutes. One caller builds it at a time.
+_SNAPSHOT_CACHE = LockedTTLCache(maxsize=8, ttl=30)
+_SLOW_CACHE = LockedTTLCache(maxsize=16, ttl=600)
+_collect_lock = threading.Lock()
 
 
 def pct_change(now: float | None, previous: float | None) -> float | None:
@@ -124,7 +136,11 @@ def _global_changes() -> dict[str, float | None]:
 
     client = get_httpx_client()
     out: dict[str, float | None] = {}
+    started = time.monotonic()
     for key, symbol in _GLOBAL_SYMBOLS.items():
+        if time.monotonic() - started > _GLOBALS_DEADLINE:
+            out[key] = None
+            continue
         try:
             response = client.get(
                 _YAHOO_URL.format(symbol=symbol),
@@ -139,11 +155,33 @@ def _global_changes() -> dict[str, float | None]:
     return out
 
 
+def _slow(key: str, loader, worth_keeping) -> Any:
+    """A source that changes once a day: kept ten minutes, but only when it actually answered."""
+    return _SLOW_CACHE.get_or_load(key, loader, should_cache=worth_keeping)
+
+
 def collect(api_key: str) -> MarketInputs:
-    """Fetch every source once and assemble a snapshot."""
-    return assemble_inputs(
-        nifty=_quote(api_key, "NIFTY", "NSE_INDEX"),
-        vix=_quote(api_key, "INDIAVIX", "NSE_INDEX"),
-        closes=_daily_closes(api_key, "NIFTY", "NSE_INDEX"),
-        globals_=_global_changes(),
-    )
+    """Fetch every source and assemble a snapshot, reusing a recent one when several pages ask at once."""
+    key = hashlib.sha256(api_key.encode()).hexdigest()
+    cached = _SNAPSHOT_CACHE.get(key)
+    if cached is not None:
+        return cached
+    with _collect_lock:
+        cached = _SNAPSHOT_CACHE.get(key)
+        if cached is not None:
+            return cached
+        snapshot = assemble_inputs(
+            nifty=_quote(api_key, "NIFTY", "NSE_INDEX"),
+            vix=_quote(api_key, "INDIAVIX", "NSE_INDEX"),
+            closes=_slow(
+                f"closes:{key}", lambda: _daily_closes(api_key, "NIFTY", "NSE_INDEX"), bool
+            ),
+            globals_=_slow(
+                "globals",
+                _global_changes,
+                lambda v: any(x is not None for x in (v or {}).values()),
+            )
+            or {},
+        )
+        _SNAPSHOT_CACHE[key] = snapshot
+        return snapshot

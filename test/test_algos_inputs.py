@@ -2,6 +2,7 @@
 
 import pytest
 
+from services.algos import inputs as feed
 from services.algos.inputs import (
     assemble_inputs,
     pct_change,
@@ -74,3 +75,59 @@ def test_assemble_leaves_the_opening_gap_unknown_when_the_quote_has_no_open():
         nifty={"ltp": 100.0, "prev_close": 99.0}, vix=None, closes=None, globals_={}
     )
     assert m.open_gap_pct is None
+
+
+def _reset():
+    feed._SNAPSHOT_CACHE.clear()
+    feed._SLOW_CACHE.clear()
+
+
+def test_a_second_collect_within_the_window_does_not_ask_any_source_again(monkeypatch):
+    _reset()
+    calls = {"quote": 0, "closes": 0, "globals": 0}
+
+    def quote(api_key, symbol, exchange):
+        calls["quote"] += 1
+        return {"ltp": 100.0, "prev_close": 99.0, "open": 99.5}
+
+    def closes(api_key, symbol, exchange):
+        calls["closes"] += 1
+        return [float(i) for i in range(1, 30)]
+
+    def globals_():
+        calls["globals"] += 1
+        return {"sp500": 0.5, "nasdaq": 0.4, "crude": None, "dxy": None}
+
+    monkeypatch.setattr(feed, "_quote", quote)
+    monkeypatch.setattr(feed, "_daily_closes", closes)
+    monkeypatch.setattr(feed, "_global_changes", globals_)
+    first = feed.collect("key")
+    second = feed.collect("key")
+    assert first == second
+    assert calls == {
+        "quote": 2,
+        "closes": 1,
+        "globals": 1,
+    }  # Nifty and VIX once each, the rest once
+
+
+def test_the_slow_sources_are_kept_longer_than_the_live_quotes(monkeypatch):
+    _reset()
+    calls = {"quote": 0, "closes": 0, "globals": 0}
+    monkeypatch.setattr(
+        feed, "_quote", lambda *a: calls.__setitem__("quote", calls["quote"] + 1) or {"ltp": 1.0}
+    )
+    monkeypatch.setattr(
+        feed,
+        "_daily_closes",
+        lambda *a: calls.__setitem__("closes", calls["closes"] + 1) or [1.0] * 25,
+    )
+    monkeypatch.setattr(
+        feed,
+        "_global_changes",
+        lambda: calls.__setitem__("globals", calls["globals"] + 1) or {"sp500": 0.1},
+    )
+    feed.collect("key")
+    feed._SNAPSHOT_CACHE.clear()  # the short window has passed; the daily closes and overseas moves have not
+    feed.collect("key")
+    assert calls["quote"] == 4 and calls["closes"] == 1 and calls["globals"] == 1
