@@ -33,6 +33,7 @@ from services.algos import (
     maintenance,
     mandate,
     netinfo,
+    picker_inputs,
     readiness,
     registry,
     runner,
@@ -163,6 +164,14 @@ def _ensure_custom_loaded() -> None:
             _custom_loaded = True
 
 
+def _positive_float(raw, default):
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
 @algos_bp.before_request
 def _load_built_algos():
     _ensure_custom_loaded()
@@ -201,6 +210,33 @@ def regime():
         return runner.regime_to_dict(result)
 
     return _ok({"data": _regime_cache.get_or_load(user, load)})
+
+
+@algos_bp.route("/api/picker", methods=["GET"])
+@check_session_validity
+@_api_limit
+def picker_today():
+    """Every structure priced live, with its payoff, capital need, costs and a fit score. Read only.
+
+    The trader chooses; nothing here names a pick, places an order or registers anything.
+    """
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    api_key = runner._api_key(user)
+    if not api_key:
+        return _error("No OpenAlgo API key found. Generate one on the API Key page.", 400)
+    capital = _positive_float(os.getenv("ALGO_CAPITAL_INR"), 100_000.0)
+    cap = mandate.daily_cap_from_env() or 20_000.0
+    result = picker_inputs.gather(
+        api_key,
+        mandate.Mandate(capital=capital, max_daily_loss=cap),
+        expiry=(request.args.get("expiry") or "").strip() or None,
+        with_margins=request.args.get("margins", "1") != "0",
+    )
+    if "error" in result:
+        return _error(result["error"], 502)
+    return _ok({"data": result})
 
 
 @algos_bp.route("/api/readiness", methods=["GET"])

@@ -163,6 +163,7 @@ export const algoQueryKeys = {
   registry: () => [...algoQueryKeys.all, 'registry'] as const,
   forward: () => [...algoQueryKeys.all, 'forward'] as const,
   reconciliation: () => [...algoQueryKeys.all, 'reconciliation'] as const,
+  picker: () => [...algoQueryKeys.all, 'picker'] as const,
 }
 
 export async function fetchCatalogue(): Promise<AlgoItem[]> {
@@ -538,5 +539,53 @@ export interface Reconciliation {
 
 export async function fetchReconciliation(): Promise<Reconciliation> {
   const response = await webClient.get<{ data: Reconciliation }>(`${BASE}/reconciliation`)
+  return response.data.data
+}
+
+export type PickerRow = {
+  id: string
+  name: string
+  direction: string
+  priced: boolean
+  evidence: string
+  blocked_because: string[]
+  score?: number
+  capital_required?: number | null
+  capital_source?: string
+  components?: Record<string, number>
+  stats?: {
+    max_loss: number | null
+    unbounded_loss: boolean
+    max_profit: number | null
+    net_credit: number
+    breakevens: number[]
+  }
+  costs?: { charges: number; spread: number; total: number }
+}
+
+export type PickerView = {
+  header: {
+    disclaimer: string
+    notes: string[]
+    confidence: number
+    expected_move: { fifteen_minutes: number | null; day: number | null }
+    capital: number
+    daily_cap: number
+    lot: number
+    spot: number
+    dte: number
+    expiry?: string
+    margins_from_broker?: number
+    vix?: number | null
+    regime?: { label: string; bias: string; reasons: string[] } | null
+  }
+  ranked: PickerRow[]
+  blocked: PickerRow[]
+}
+
+export async function fetchPicker(margins = true): Promise<PickerView> {
+  const response = await webClient.get<{ data: PickerView }>(`${BASE}/picker`, {
+    params: { margins: margins ? '1' : '0' },
+  })
   return response.data.data
 }
