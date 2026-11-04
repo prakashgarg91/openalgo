@@ -32,6 +32,7 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Readiness checks the static-IP proxy: the address orders leave from, the address you recorded and the plan's last day, with a warning a week before it ends. A read-only readiness check script for the sandbox bot's dry run (scripts/algo_backtest/thursday_check.py) lists what is ready and what is not.
 - The strategy picker now uses the research study (expected opening gap from overseas markets before the open, direction counted for little after it) and shows how each structure did in past weekly trades after costs, including weeks with a similar India VIX. It no longer fetches broker margins by default; the Get broker margins button does, only for structures inside your limits. See docs/algos/strategy-picker.md.
 - Strategy picker tab on the Algos page: 24 option structures priced from the live Nifty chain with the most each can earn and lose, the capital it needs (the broker's margin), breakevens, round-trip costs, a fit score for today's conditions and what has been tested. Read only: it never picks, orders or registers. Structures with unlimited loss, a worst loss above the daily cap or a capital need above the account are listed as outside the limits with the reason. The fit score is not a forecast. See docs/algos/strategy-picker.md.
 - A rejected Upstox order now carries Upstox's own reason, and the Order Book shows it under the status.
