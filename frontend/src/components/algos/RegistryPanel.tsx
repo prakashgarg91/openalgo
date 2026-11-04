@@ -60,7 +60,7 @@ export function RegistryPanel() {
     setProblem(null)
     try {
       await savePostMortem(id, postMortem[id] ?? '')
-      showToast.success('Post-mortem saved.', 'algos')
+      showToast.success('Post-mortem saved.', 'system')
       setPostMortem((old) => ({ ...old, [id]: '' }))
       await queryClient.invalidateQueries({ queryKey: algoQueryKeys.registry() })
     } catch (error) {
@@ -80,7 +80,7 @@ export function RegistryPanel() {
           .filter(Boolean),
         params: parseSettings(settings),
       })
-      showToast.success('Idea registered. It is frozen and counted.', 'algos')
+      showToast.success('Idea registered. It is frozen and counted.', 'system')
       setValues({})
       setGates('')
       setSettings('')
