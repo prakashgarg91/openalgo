@@ -27,6 +27,7 @@ import { DebuggerPanel, ExplainRecent } from '@/components/algos/DebuggerPanel'
 import { EventDaysPanel } from '@/components/algos/EventDaysPanel'
 import { LabPanel } from '@/components/algos/LabPanel'
 import { PickerPanel } from '@/components/algos/PickerPanel'
+import { PicksPanel } from '@/components/algos/PicksPanel'
 import { ReadinessPanel, StartHere } from '@/components/algos/ReadinessPanel'
 import { RegistryPanel } from '@/components/algos/RegistryPanel'
 import { UniversePanel } from '@/components/algos/UniversePanel'
@@ -238,6 +239,7 @@ export default function AlgosVibe() {
             My algos{mine.length > 0 ? ` (${mine.length})` : ''}
           </TabsTrigger>
           <TabsTrigger value="picker">Strategy picker</TabsTrigger>
+          <TabsTrigger value="picks">My picks</TabsTrigger>
           <TabsTrigger value="build">Build your own</TabsTrigger>
           <TabsTrigger value="register">Register an idea</TabsTrigger>
           <TabsTrigger value="lab">Test on history</TabsTrigger>
@@ -319,6 +321,10 @@ export default function AlgosVibe() {
 
         <TabsContent value="picker" className="pt-3">
           <PickerPanel />
+        </TabsContent>
+
+        <TabsContent value="picks" className="pt-3">
+          <PicksPanel />
         </TabsContent>
 
         <TabsContent value="register" className="pt-3">

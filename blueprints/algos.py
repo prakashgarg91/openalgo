@@ -33,6 +33,7 @@ from services.algos import (
     maintenance,
     mandate,
     netinfo,
+    pick_log,
     picker_inputs,
     readiness,
     registry,
@@ -57,6 +58,10 @@ MAX_CAPITAL = 1_000_000_000
 #: Gathering the regime makes several outbound calls, so one snapshot is shared
 #: for a minute instead of being rebuilt on every page refresh.
 _regime_cache = LockedTTLCache(maxsize=8, ttl=60)
+_picker_cache = LockedTTLCache(maxsize=8, ttl=45)
+_pick_log = pick_log.PickLog(
+    Path(__file__).resolve().parents[1] / "db" / "pick_log" / "picks.jsonl"
+)
 
 #: Replays are CPU work and the first one downloads history, so they get a tighter
 #: limit than the rest of the page, and results are cached for a few minutes.
@@ -212,6 +217,24 @@ def regime():
     return _ok({"data": _regime_cache.get_or_load(user, load)})
 
 
+def _picker_data(user: str, api_key: str, expiry: str | None, with_margins: bool) -> dict:
+    """The ranked picker, built once per 45 seconds per trader and shared by every caller."""
+    capital = _positive_float(os.getenv("ALGO_CAPITAL_INR"), 100_000.0)
+    cap = mandate.daily_cap_from_env() or 20_000.0
+
+    def load():
+        return picker_inputs.gather(
+            api_key,
+            mandate.Mandate(capital=capital, max_daily_loss=cap),
+            expiry=expiry,
+            with_margins=with_margins,
+        )
+
+    return _picker_cache.get_or_load(
+        f"{user}:{expiry}:{with_margins}", load, should_cache=lambda r: "error" not in r
+    )
+
+
 @algos_bp.route("/api/picker", methods=["GET"])
 @check_session_validity
 @_api_limit
@@ -226,17 +249,124 @@ def picker_today():
     api_key = runner._api_key(user)
     if not api_key:
         return _error("No OpenAlgo API key found. Generate one on the API Key page.", 400)
-    capital = _positive_float(os.getenv("ALGO_CAPITAL_INR"), 100_000.0)
-    cap = mandate.daily_cap_from_env() or 20_000.0
-    result = picker_inputs.gather(
+    result = _picker_data(
+        user,
         api_key,
-        mandate.Mandate(capital=capital, max_daily_loss=cap),
-        expiry=(request.args.get("expiry") or "").strip() or None,
-        with_margins=request.args.get("margins", "1") != "0",
+        (request.args.get("expiry") or "").strip() or None,
+        request.args.get("margins", "0") == "1",
     )
     if "error" in result:
         return _error(result["error"], 502)
     return _ok({"data": result})
+
+
+def _pick_marks(api_key: str, picks: list[dict]) -> dict[str, float | None]:
+    """Unrealised rupees for each open pick, from one live chain per expiry. Missing prices give None."""
+    marks: dict[str, float | None] = {}
+    mids_by_expiry: dict[str, dict] = {}
+    for item in picks:
+        if item.get("status") != "open":
+            continue
+        expiry = item["expiry"]
+        if expiry not in mids_by_expiry:
+            mids_by_expiry[expiry] = picker_inputs.live_mids(api_key, expiry)
+        marks[item["id"]] = pick_log.PickLog.mark(item, mids_by_expiry[expiry])
+    return marks
+
+
+@algos_bp.route("/api/picks", methods=["GET"])
+@check_session_validity
+@_api_limit
+def picks_list():
+    """The trader's tracked picks with live results for the open ones, and what the closed ones say."""
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    api_key = runner._api_key(user)
+    if not api_key:
+        return _error("No OpenAlgo API key found. Generate one on the API Key page.", 400)
+    picks = _pick_log.all()
+    marks = _pick_marks(api_key, picks)
+    rows = [{**item, "unrealized": marks.get(item["id"])} for item in reversed(picks)]
+    return _ok({"data": {"picks": rows, "summary": pick_log.summarize(picks)}})
+
+
+@algos_bp.route("/api/picks", methods=["POST"])
+@check_session_validity
+@_api_limit
+def picks_add():
+    """Track a structure from the picker. Records its legs and entry prices; places no order."""
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    api_key = runner._api_key(user)
+    if not api_key:
+        return _error("No OpenAlgo API key found. Generate one on the API Key page.", 400)
+    template_id = str((request.get_json(silent=True) or {}).get("template_id") or "")
+    result = _picker_data(user, api_key, None, False)
+    if "error" in result:
+        return _error(result["error"], 502)
+    row = next((r for r in result["ranked"] if r["id"] == template_id), None)
+    if row is None:
+        return _error("That strategy is not available to track right now. Refresh the picker.", 400)
+    header = result["header"]
+    gap = ((header.get("research") or {}).get("expected_gap") or {}).get("gap_pct")
+    pick = {
+        "template_id": row["id"],
+        "name": row["name"],
+        "fit": row["score"],
+        "components": row.get("components"),
+        "expiry": header["expiry"],
+        "legs": row["priced_legs"],
+        "lot": header["lot"],
+        "capital_required": row.get("capital_required"),
+        "max_loss": (row.get("stats") or {}).get("max_loss"),
+        "conditions": {
+            "spot": header["spot"],
+            "vix": header.get("vix"),
+            "dte": header["dte"],
+            "regime": (header.get("regime") or {}).get("label"),
+            "expected_gap_pct": gap,
+        },
+    }
+    try:
+        saved = _pick_log.add(pick, datetime.now())
+    except ValueError as why:
+        return _error(str(why), 400)
+    return _ok({"data": saved})
+
+
+@algos_bp.route("/api/picks/<pick_id>/close", methods=["POST"])
+@check_session_validity
+@_api_limit
+def picks_close(pick_id: str):
+    """Close a tracked pick at its live result, or at a result the trader types in."""
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    api_key = runner._api_key(user)
+    if not api_key:
+        return _error("No OpenAlgo API key found. Generate one on the API Key page.", 400)
+    body = request.get_json(silent=True) or {}
+    pnl = body.get("pnl")
+    if pnl is None:
+        found = next((p for p in _pick_log.all() if p.get("id") == pick_id), None)
+        if found is None:
+            return _error("No such pick.", 404)
+        if found.get("status") == "closed":
+            return _error("This pick is already closed.", 400)
+        pnl = _pick_marks(api_key, [found]).get(pick_id)
+        if pnl is None:
+            return _error(
+                "Live prices for this pick are not available, so type in its result yourself.", 400
+            )
+    elif isinstance(pnl, bool) or not isinstance(pnl, (int, float)):
+        return _error("The result must be a number of rupees.", 400)
+    try:
+        saved = _pick_log.close(pick_id, float(pnl), datetime.now())
+    except ValueError as why:
+        return _error(str(why), 400)
+    return _ok({"data": saved})
 
 
 @algos_bp.route("/api/readiness", methods=["GET"])

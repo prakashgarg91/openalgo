@@ -78,6 +78,35 @@ def chain_map(
     return out, int(lot) if lot else None
 
 
+def mids_from_chain(
+    chain: dict[tuple[str, float], dict[str, Any]],
+) -> dict[tuple[str, float], float]:
+    """Current mid price of every strike: the bid-ask middle when both sides quote, else the last price."""
+    out: dict[tuple[str, float], float] = {}
+    for key, quote in chain.items():
+        bid, ask, ltp = (float(quote.get(f) or 0) for f in ("bid", "ask", "ltp"))
+        if bid > 0 and ask >= bid:
+            out[key] = (bid + ask) / 2.0
+        elif ltp > 0:
+            out[key] = ltp
+    return out
+
+
+def live_mids(api_key: str, expiry: str) -> dict[tuple[str, float], float]:
+    """Mid prices for a tracked pick's expiry from one chain call; empty when the broker cannot answer."""
+    from services.option_chain_service import get_option_chain
+
+    try:
+        ok, response, _ = get_option_chain(UNDERLYING, "NFO", expiry, STRIKES_EACH_SIDE, api_key)
+    except Exception:
+        logger.exception("Live prices for tracked picks failed")
+        return {}
+    if not ok:
+        return {}
+    chain, _lot = chain_map(response)
+    return mids_from_chain(chain)
+
+
 def margin_positions(
     tpl: picker.Template,
     legs: list[picker.PricedLeg],

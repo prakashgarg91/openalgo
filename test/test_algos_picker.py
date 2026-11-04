@@ -300,3 +300,32 @@ def test_without_history_the_row_says_nothing_and_a_non_replayable_one_says_why(
         picker.rank(conditions(), make_chain(), ONE_LAKH, history=HISTORY), "short_straddle"
     )["history"]
     assert row["available"] is False and "Unlimited" in row["reason"]
+
+
+def test_every_priced_row_shows_what_it_earns_or_loses_at_a_few_levels_at_expiry():
+    row = by_id(picker.rank(conditions(vix=16.0, dte=5), make_chain(), ONE_LAKH), "long_call")
+    levels = row["scenarios"]
+    assert [s["multiple"] for s in levels] == [-2, -1, 0, 1, 2]
+    assert (
+        levels[2]["label"] == "No move"
+        and levels[0]["nifty"] < levels[2]["nifty"] < levels[4]["nifty"]
+    )
+    assert (
+        levels[0]["pnl"]
+        <= levels[1]["pnl"]
+        <= levels[2]["pnl"]
+        <= levels[3]["pnl"]
+        <= levels[4]["pnl"]
+    )
+
+
+def test_without_india_vix_there_are_no_scenarios_instead_of_invented_ones():
+    row = by_id(picker.rank(conditions(vix=None), make_chain(), ONE_LAKH), "long_call")
+    assert row["scenarios"] is None
+
+
+def test_a_priced_row_carries_its_legs_with_strikes_and_entry_prices_for_tracking():
+    row = by_id(picker.rank(conditions(), make_chain(), ONE_LAKH), "bull_call_spread")
+    legs = row["priced_legs"]
+    assert [(g["kind"], g["side"], g["qty"]) for g in legs] == [("CE", "B", 1), ("CE", "S", 1)]
+    assert legs[1]["strike"] - legs[0]["strike"] == 150 and all(g["price"] > 0 for g in legs)

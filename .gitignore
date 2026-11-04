@@ -158,3 +158,4 @@ db/forward_shadow/
 db/sandbox_bot/
 db/algo_registry/
 db/picker_history/
+db/pick_log/

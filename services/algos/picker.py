@@ -16,6 +16,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from services.algos import picker_scenarios
 from services.algos.costs import REALISTIC
 from services.algos.mandate import Mandate
 
@@ -581,6 +582,19 @@ def rank(
         row.update(
             stats=stats,
             costs=costs,
+            priced_legs=[
+                {
+                    "kind": g.kind,
+                    "strike": g.strike,
+                    "side": g.side,
+                    "qty": g.qty,
+                    "price": round(g.price, 2),
+                }
+                for g in legs
+            ],
+            scenarios=picker_scenarios.scenario_table(
+                legs, cond.lot, cond.spot, cond.vix, cond.dte, costs["total"]
+            ),
             capital_required=None if capital is None else round(capital, 2),
             capital_source=source,
         )

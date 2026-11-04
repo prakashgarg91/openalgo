@@ -164,6 +164,7 @@ export const algoQueryKeys = {
   forward: () => [...algoQueryKeys.all, 'forward'] as const,
   reconciliation: () => [...algoQueryKeys.all, 'reconciliation'] as const,
   picker: (margins = false) => [...algoQueryKeys.all, 'picker', margins] as const,
+  picks: () => [...algoQueryKeys.all, 'picks'] as const,
 }
 
 export async function fetchCatalogue(): Promise<AlgoItem[]> {
@@ -562,6 +563,7 @@ export type PickerRow = {
   }
   costs?: { charges: number; spread: number; total: number }
   history?: PickerHistory | null
+  scenarios?: { multiple: number; label: string; nifty: number; pnl: number }[] | null
 }
 
 export type PickerHistory = {
@@ -619,5 +621,64 @@ export async function fetchPicker(margins = false): Promise<PickerView> {
   const response = await webClient.get<{ data: PickerView }>(`${BASE}/picker`, {
     params: { margins: margins ? '1' : '0' },
   })
+  return response.data.data
+}
+
+export type TrackedPick = {
+  id: string
+  template_id: string
+  name: string
+  fit: number
+  expiry: string
+  lot: number
+  status: 'open' | 'closed'
+  opened: string
+  closed: string | null
+  pnl: number | null
+  unrealized: number | null
+  capital_required?: number | null
+  max_loss?: number | null
+  legs: { kind: string; strike: number; side: string; qty: number; price: number }[]
+  conditions?: {
+    spot?: number
+    vix?: number | null
+    dte?: number
+    regime?: string | null
+    expected_gap_pct?: number | null
+  }
+}
+
+export type PickSummary = {
+  open: number
+  closed: number
+  wins: number
+  win_rate: number | null
+  average_pnl: number | null
+  worst: number | null
+  best: number | null
+  total: number
+  correlation: number | null
+  verdict: string
+}
+
+export type PicksView = { picks: TrackedPick[]; summary: PickSummary }
+
+export async function fetchPicks(): Promise<PicksView> {
+  const response = await webClient.get<{ data: PicksView }>(`${BASE}/picks`)
+  return response.data.data
+}
+
+export async function trackPick(templateId: string): Promise<TrackedPick> {
+  const response = await webClient.post<{ data: TrackedPick }>(`${BASE}/picks`, {
+    template_id: templateId,
+  })
+  return response.data.data
+}
+
+export async function closePick(id: string, pnl?: number): Promise<TrackedPick> {
+  const response = await webClient.post<{ data: TrackedPick }>(
+    `${BASE}/picks/${id}/close`,
+    pnl === undefined ? {} : { pnl }
+  )
   return response.data.data
 }
