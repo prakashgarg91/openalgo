@@ -752,6 +752,11 @@ export default function OrderBook() {
                                 <StatusIcon className="h-4 w-4" />
                                 <span className="text-sm">{status.label}</span>
                               </div>
+                              {order.order_status === 'rejected' && order.rejection_reason && (
+                                <p className="mt-0.5 max-w-[220px] text-xs text-muted-foreground">
+                                  {order.rejection_reason}
+                                </p>
+                              )}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {formatTime(order.timestamp)}

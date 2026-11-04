@@ -23,6 +23,7 @@ export interface Order {
   orderid: string
   order_status: 'complete' | 'rejected' | 'cancelled' | 'open' | 'pending' | 'trigger pending'
   timestamp: string
+  rejection_reason?: string
 }
 
 export interface Trade {

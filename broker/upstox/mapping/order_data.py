@@ -168,6 +168,13 @@ def transform_order_data(orders):
             "timestamp": order.get("order_timestamp", ""),
         }
 
+        # Upstox says why it refused an order. Carry that text so the order book can show it;
+        # only rejected orders get the key, so every other order keeps its old shape.
+        if transformed_order["order_status"] == "rejected":
+            reason = order.get("status_message") or order.get("status_message_raw")
+            if reason:
+                transformed_order["rejection_reason"] = str(reason)
+
         transformed_orders.append(transformed_order)
 
     return transformed_orders
