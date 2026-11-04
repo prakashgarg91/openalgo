@@ -14,7 +14,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { showToast } from '@/utils/toast'
 
 const rupees = (value: number | null | undefined) =>
-  value === null || value === undefined ? '-' : `Rs ${Math.round(value).toLocaleString('en-IN')}`
+  value === null || value === undefined
+    ? '-'
+    : `${value < 0 ? '-' : ''}Rs ${Math.abs(Math.round(value)).toLocaleString('en-IN')}`
 
 function errorText(error: unknown): string {
   const data = (error as { response?: { data?: { message?: string } } })?.response?.data
@@ -56,7 +58,7 @@ function Scenarios({ row }: { row: PickerRow }) {
   return (
     <div className="space-y-0.5 font-mono text-xs">
       {row.scenarios.map((s) => (
-        <div key={s.multiple} className="flex justify-between gap-3">
+        <div key={s.multiple} className="flex justify-between gap-4 whitespace-nowrap">
           <span className="text-muted-foreground">
             {s.multiple === 0 ? 'Flat' : `${s.multiple > 0 ? '+' : ''}${s.multiple} move`} (
             {Math.round(s.nifty).toLocaleString('en-IN')})
@@ -83,7 +85,7 @@ function Row({
   const credit = stats?.net_credit ?? 0
   return (
     <tr className="border-b align-top">
-      <td className="py-2 pr-3 font-medium">
+      <td className="min-w-[210px] py-2 pr-4 font-medium">
         {row.name}
         <div className="max-w-[260px] text-xs font-normal text-muted-foreground">
           {row.evidence}
@@ -95,24 +97,28 @@ function Row({
             </div>
           ))}
       </td>
-      <td className="py-2 pr-3 text-right font-mono">{blocked ? '-' : row.score?.toFixed(0)}</td>
-      <td className="py-2 pr-3 text-right font-mono text-green-600">
+      <td className="whitespace-nowrap py-2 pr-4 text-right font-mono">
+        {blocked ? '-' : row.score?.toFixed(0)}
+      </td>
+      <td className="whitespace-nowrap py-2 pr-4 text-right font-mono text-green-600">
         {stats ? (stats.max_profit === null ? 'Unlimited' : rupees(stats.max_profit)) : '-'}
       </td>
-      <td className="py-2 pr-3 text-right font-mono text-red-500">
+      <td className="whitespace-nowrap py-2 pr-4 text-right font-mono text-red-500">
         {stats ? (stats.unbounded_loss ? 'Unlimited' : rupees(stats.max_loss)) : '-'}
       </td>
-      <td className="py-2 pr-3 text-right font-mono">
+      <td className="whitespace-nowrap py-2 pr-4 text-right font-mono">
         {rupees(row.capital_required)}
         <div className="text-xs text-muted-foreground">{row.capital_source}</div>
       </td>
-      <td className="py-2 pr-3 text-right font-mono">
+      <td className="whitespace-nowrap py-2 pr-4 text-right font-mono">
         {stats ? `${credit >= 0 ? 'Credit' : 'Debit'} ${rupees(Math.abs(credit))}` : '-'}
       </td>
-      <td className="py-2 pr-3 text-right font-mono">
+      <td className="whitespace-nowrap py-2 pr-4 text-right font-mono">
         {stats?.breakevens.length ? stats.breakevens.map((b) => Math.round(b)).join(', ') : '-'}
       </td>
-      <td className="py-2 pr-3 text-right font-mono">{rupees(row.costs?.total)}</td>
+      <td className="whitespace-nowrap py-2 pr-4 text-right font-mono">
+        {rupees(row.costs?.total)}
+      </td>
       <td className="min-w-[170px] py-2 pr-3">
         <Scenarios row={row} />
       </td>
@@ -149,7 +155,7 @@ function Table({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[1500px] text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
             <th className="py-2 pr-3">Strategy</th>
