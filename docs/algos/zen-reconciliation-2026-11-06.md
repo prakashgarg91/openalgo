@@ -31,3 +31,7 @@ One lot: deepest fall about Rs 27,000 (above the Rs 20,000 daily limit), worst s
 - The costs here use assumed leg prices; the exit class (stop, target, time) is not in the file.
 - Reconciliation earlier than 2025-07 and after the last stored expiry is not possible with the stored candles.
 - This corrects the earlier note in `stratzy-comparison.md`: Zen's real trades do replay on real prices, and they earned in this window.
+
+## The market during the window
+
+Nifty closed 25,476 on 9 July 2025, 26,130 on 31 December 2025 (plus 2.6 percent) and 23,447 on 23 September 2026 (minus 10.3 percent in 2026, minus 8.0 percent over the whole window; from `openalgo-data/context/daily/_NSEI.csv`). Most of Zen's profit came from call spreads (a bet that Nifty does not rise past the sold strike) in a window that fell. So the result is consistent with a strategy that profits in flat or falling markets, and it has not been tested in a rising one. This is the main reason not to treat the Rs 6 lakh figure as a forecast.
