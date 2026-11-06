@@ -23,6 +23,8 @@ rem Forward ledgers of registered end-of-day structures (does nothing if no idea
 uv run python scripts\algo_backtest\run_forward_eod.py >> log\capture.log 2>&1
 uv run python scripts\algo_backtest\run_etf_ledgers.py >> log\capture.log 2>&1
 rem Then check that the day's candles, VIX, ETF closes and report files really arrived (Telegram alert if not).
+rem The Zen shadow follow ledger (reads a file, places no order; skips quietly if the file is missing).
+uv run python scripts\algo_backtest\run_zen_follow.py >> log\capture.log 2>&1
 uv run python scripts\algo_backtest\check_nightly.py >> log\capture.log 2>&1
 rem Last, a read-only copy of the finished day for other tools (db\snapshots), so they never wait on a lock.
 uv run python scripts\algo_backtest\snapshot_historify.py >> log\capture.log 2>&1
