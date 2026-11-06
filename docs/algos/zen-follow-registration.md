@@ -38,3 +38,7 @@ Code: `services/algos/zen_trades.py` (parser), `services/algos/zen_follow.py` an
 ## Disclosure added on 6 November 2026 (after the freeze, before reading any unseen trade)
 
 The owner reports that Zen has not been earning in recent weeks. That is a remark, not a number, and it is about the unseen window, so the unseen window is no longer completely blind. The rules above are unchanged. The verdict will be read from the refreshed trade file only, and the remark is not used as evidence for or against calls only.
+
+## Second disclosure, 6 November 2026 (public page, before the refreshed trade file is read)
+
+Stratzy's public Zen page shows Zen's results for the unseen window at monthly and daily level, all trades together with no side or strike: October 2026 +6.38 percent and November 2026 so far -13.89 percent of the Rs 3.2 lakh maximum allocation, one-month return -18.10 percent. So the unseen window for Zen-all is now partly known, and Zen-all has not been earning lately. It cannot show how call spreads alone did. The rules above are unchanged, and the calls-only verdict will still be read only from the refreshed trade file; these public figures are not used as evidence for or against calls only. Source and daily rows: the private data repository, `research/stratzy_zen_public_calendar/`.
