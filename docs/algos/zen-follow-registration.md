@@ -34,3 +34,7 @@ All five met: **supported**. Otherwise **unsupported**. Neither word means Live:
 - One lot at a Rs 1 lakh account: Zen's seen results had a deepest fall of about Rs 27,000 for all trades, above the Rs 20,000 limit.
 
 Code: `services/algos/zen_trades.py` (parser), `services/algos/zen_follow.py` and `scripts/algo_backtest/run_zen_follow.py` (the ledger).
+
+## Disclosure added on 6 November 2026 (after the freeze, before reading any unseen trade)
+
+The owner reports that Zen has not been earning in recent weeks. That is a remark, not a number, and it is about the unseen window, so the unseen window is no longer completely blind. The rules above are unchanged. The verdict will be read from the refreshed trade file only, and the remark is not used as evidence for or against calls only.
