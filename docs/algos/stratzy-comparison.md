@@ -203,3 +203,7 @@ Count: 36 cells tried, 34 lost money in the last third. Two were positive in all
 ### Verdict
 
 No rule earns after costs in a way that survives. The exit rules of Zen are real (they reproduce), but run as Zen runs them, with any of the six side rules we could write down, the result lost money in the last third. The Zen in the catalogue is not changed.
+
+## Correction, 6 November 2026
+
+The 16-variant test above replayed a 150-point spread entered near the close, from Stratzy's public text. Zen's 216 real trades (downloaded from Stratzy; see the trading-rex-ai folder, `agent-results/022-stratzy/raw/pastAdvices/`) show a 400-point spread entered mostly between 10:15 and 10:59, held about 24 hours, with a stop near 1.5 times the credit and a target near 69 percent of it. So that test did not replay Zen, and its "all 16 lost" result must not be read as a finding about Zen. The vendor ledger itself reports a win rate near 56 percent and a profit factor near 1.6, unaudited. The real-trade comparison is being built (reconcile each real trade against our own option candles first).
