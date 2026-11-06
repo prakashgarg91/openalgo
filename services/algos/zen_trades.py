@@ -73,6 +73,11 @@ class ZenTrade:
     pnl: float  # rupees as published
     margin: float | None
     exit_class: str  # "target" | "stop" | "time" | "unknown"
+    # Leg prices in points, kept so costs can be worked out leg by leg. None when the record lacks them.
+    sold_entry: float | None = None
+    long_entry: float | None = None
+    sold_exit: float | None = None
+    long_exit: float | None = None
 
 
 @dataclass(frozen=True)
@@ -258,6 +263,10 @@ def _build(record: object) -> tuple[ZenTrade | None, str]:
         pnl=pnl,
         margin=_number(record.get("marginRequired")),
         exit_class=_exit_class(record),
+        sold_entry=sold_entry,
+        long_entry=long_entry,
+        sold_exit=sold_exit,
+        long_exit=long_exit,
     )
     return trade, ""
 

@@ -314,3 +314,12 @@ def test_real_export_parses():
     assert all(t.width == 400 for t in trades)
     assert all(9 <= t.entry_time.hour <= 15 for t in trades)
     assert all(t.entry_credit is not None for t in trades)
+
+
+@pytest.mark.skipif(not REAL_FILE.exists(), reason="the Zen file is outside this repository")
+def test_the_real_file_keeps_each_legs_entry_and_exit_price_when_the_record_has_them():
+    first = load_trades(REAL_FILE)[0]
+    assert first.sold_entry is not None and first.long_entry is not None
+    assert abs((first.sold_entry - first.long_entry) - first.entry_credit) < 1e-9
+    if first.exit_debit is not None:
+        assert abs((first.sold_exit - first.long_exit) - first.exit_debit) < 1e-9
