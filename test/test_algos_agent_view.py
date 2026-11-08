@@ -88,6 +88,8 @@ def test_the_forward_view_lists_s3n_c1_and_registered_structures(tmp_path, monke
     monkeypatch.setenv("ALGO_FORWARD_S3N_REPORT", str(tmp_path / "s3n.json"))
     monkeypatch.setenv("ALGO_FORWARD_C1_CSV", str(tmp_path / "c1.csv"))
     monkeypatch.setenv("ALGO_FORWARD_EOD_DIR", str(tmp_path / "none"))
+    monkeypatch.setenv("ALGO_ZEN_FOLLOW_REPORT", str(tmp_path / "no-zen.json"))
+    monkeypatch.setenv("ALGO_ETF_LEDGER_DIR", str(tmp_path / "no-etf"))
     rows = av.forward_status()
     assert [r["name"][:6] for r in rows] == ["Weekly", "Month-"]
     assert (

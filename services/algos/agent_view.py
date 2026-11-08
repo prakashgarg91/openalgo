@@ -109,6 +109,72 @@ def _c1_row(path: Path) -> dict[str, Any] | None:
     }
 
 
+#: The ETF trend rules running as shadow ledgers since 2 November 2026 (candidate-registration.md).
+ETF_TREND_LEDGERS = (
+    ("c01_trend200", "ETF trend: Nifty ETF above its 200-day average"),
+    ("c02_cross50_200", "ETF trend: 50-day above 200-day average"),
+    ("c03_absmom252", "ETF trend: 252-day return positive, month end"),
+    ("c04_donchian55", "ETF trend: 55-day breakout"),
+    ("c06_gold_trend100", "ETF trend: gold ETF above its 100-day average"),
+    ("c09_both_trend200", "ETF trend: Nifty and gold ETFs, each above its 200-day average"),
+)
+
+
+def _zen_rows(path: Path) -> list[dict[str, Any]]:
+    """The Zen shadow follow ledger: all advices (benchmark) and calls only (candidate), unseen window."""
+    if not path.exists():
+        return []
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        unseen, gates = report["unseen"], report["gates"]
+        return [
+            {
+                "name": "Zen all advices, followed at one lot (benchmark, no orders)",
+                "state": "running",
+                "verdict": None,
+                "completed": unseen["all"]["trades"],
+                "trades_to_go": None,
+                "net": round(unseen["all"]["net"]),
+            },
+            {
+                "name": "Zen call spreads only (candidate, no orders)",
+                "state": "running",
+                "verdict": gates["outcome"],
+                "completed": unseen["calls"]["trades"],
+                "trades_to_go": gates["trades_needed"],
+                "net": round(unseen["calls"]["net"]),
+            },
+        ]
+    except (ValueError, KeyError, OSError):
+        logger.exception("Could not read the Zen follow report")
+        return []
+
+
+def _etf_trend_rows(folder: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for ledger_id, name in ETF_TREND_LEDGERS:
+        path = folder / f"{ledger_id}_base.csv"
+        if not path.exists():
+            continue
+        try:
+            import pandas as pd
+
+            frame = pd.read_csv(path).drop_duplicates("session", keep="last")
+            rows.append(
+                {
+                    "name": name,
+                    "state": "running",
+                    "verdict": None,
+                    "completed": int(len(frame)),
+                    "trades_to_go": None,
+                    "net": round(float(frame["nav"].iloc[-1]) - CAPITAL) if len(frame) else 0,
+                }
+            )
+        except (ValueError, KeyError, OSError):
+            logger.exception("Could not read the ETF ledger %s", ledger_id)
+    return rows
+
+
 def forward_status() -> list[dict[str, Any]]:
     """Where each forward shadow test stands, from the reports the nightly job writes."""
     rows: list[dict[str, Any]] = []
@@ -150,6 +216,8 @@ def forward_status() -> list[dict[str, Any]]:
             )
         except (ValueError, KeyError, OSError):
             logger.exception("Could not read a forward report")
+    rows.extend(_zen_rows(Path(os.getenv("ALGO_ZEN_FOLLOW_REPORT", "db/zen_follow/report.json"))))
+    rows.extend(_etf_trend_rows(Path(os.getenv("ALGO_ETF_LEDGER_DIR", "db/etf_ledger"))))
     return rows
 
 
