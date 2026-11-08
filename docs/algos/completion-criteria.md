@@ -7,7 +7,7 @@ Owner's goal: a system ready for algo trading that is better than Zen from Strat
 | # | Item | State on 8 Nov | Needs |
 | --- | --- | --- | --- |
 | 1 | Data capture, bid-ask snapshots, ETF ledgers, S3n runner, Zen follow ledger run by themselves | Built and scheduled | PC on and signed in every trading day |
-| 2 | A missed login or missed day is noticed within minutes | Built today: `scripts/algo_backtest/daily_check.py` (morning 09:20, midday 10:30, evening 16:30) | Telegram bot on for phone alerts |
+| 2 | A missed login or missed day is noticed within minutes | Built and scheduled Monday to Friday at 09:20, 10:30 and 16:30 (`scripts/algo_backtest/daily_check.py`; tasks "OpenAlgo daily check morning, midday, evening"). A Friday-holiday Monday or a market holiday will warn; that is noise | Telegram bot on for phone alerts; until then it writes `log/daily_check.log` |
 | 3 | Always-on machine so days are not missed | Not done | Owner decision and a small Mumbai server |
 | 4 | Static IP for order writes | Done: proxy renewed to 11 Feb 2027, tested, Readiness checks it | Renew before 11 Feb 2027 |
 | 5 | Live gate: no Live order without a recorded forward pass and a written post-mortem | Built, on by default | Leave on |
