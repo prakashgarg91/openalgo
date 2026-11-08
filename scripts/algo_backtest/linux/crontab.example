@@ -1,0 +1,34 @@
+# OpenAlgo research jobs for an always-on Linux server (Ubuntu 24.04).
+# Linux equivalent of the Windows scheduled tasks in scripts/algo_backtest/windows/.
+#
+# 1. The server clock must be India time. Cron reads the server clock, not your location:
+#        sudo timedatectl set-timezone Asia/Kolkata
+#    Check with:  timedatectl        (the line "Time zone" must say Asia/Kolkata)
+#
+# 2. Open the crontab of the openalgo user with:  crontab -e
+#    Paste the lines below, then check them with:  crontab -l
+#    Replace /home/openalgo/openalgo-cloud with the real clone path if it differs.
+#    The scripts must be executable:  chmod +x /home/openalgo/openalgo-cloud/scripts/algo_backtest/linux/*.sh
+#
+# 3. The jobs run Monday to Friday only. On an exchange holiday they still run, find no
+#    market data and say so in their log; that is expected.
+
+SHELL=/bin/bash
+PATH=/home/openalgo/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+# Bid and ask snapshots (entry and exit times the tests use).
+15 10 * * 1-5 /home/openalgo/openalgo-cloud/scripts/algo_backtest/linux/snapshot_bidask.sh 1015
+30 14 * * 1-5 /home/openalgo/openalgo-cloud/scripts/algo_backtest/linux/snapshot_bidask.sh 1430
+0 15 * * 1-5 /home/openalgo/openalgo-cloud/scripts/algo_backtest/linux/snapshot_bidask.sh 1500
+
+# Nightly option candle capture and the chain after it.
+0 16 * * 1-5 /home/openalgo/openalgo-cloud/scripts/algo_backtest/linux/nightly.sh
+
+# Daily checks: morning, midday and evening.
+20 9 * * 1-5 /home/openalgo/openalgo-cloud/scripts/algo_backtest/linux/daily_check.sh morning
+30 10 * * 1-5 /home/openalgo/openalgo-cloud/scripts/algo_backtest/linux/daily_check.sh midday
+30 16 * * 1-5 /home/openalgo/openalgo-cloud/scripts/algo_backtest/linux/daily_check.sh evening
+
+# Weekly update of both repositories, Sunday at 03:00. Off until you uncomment it.
+# Only fast-forward pulls: a pull that would need a merge stops and leaves the work alone.
+# 0 3 * * 0 cd /home/openalgo/openalgo-cloud && git pull --ff-only && cd /home/openalgo/openalgo-data && git pull --ff-only
