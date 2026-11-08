@@ -323,3 +323,20 @@ def test_the_real_file_keeps_each_legs_entry_and_exit_price_when_the_record_has_
     assert abs((first.sold_entry - first.long_entry) - first.entry_credit) < 1e-9
     if first.exit_debit is not None:
         assert abs((first.sold_exit - first.long_exit) - first.exit_debit) < 1e-9
+
+
+def test_a_jsonl_file_with_one_advice_per_line_loads_the_same_way(tmp_path):
+    advices = (
+        json.loads(REAL_FILE.read_text(encoding="utf-8"))["pastAdvices"][:5]
+        if REAL_FILE.exists()
+        else []
+    )
+    if not advices:
+        pytest.skip("the Zen file is outside this repository")
+    lines = [json.dumps(a) for a in advices]
+    path = tmp_path / "zen.jsonl"
+    path.write_text("\n".join([*lines, "", "not json"]) + "\n", encoding="utf-8")
+    from_lines = load_trades(path)
+    plain = tmp_path / "zen.json"
+    plain.write_text(json.dumps({"pastAdvices": advices}), encoding="utf-8")
+    assert [t.advice_id for t in from_lines] == [t.advice_id for t in load_trades(plain)]

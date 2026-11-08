@@ -285,11 +285,24 @@ def rejection_reason(record: dict) -> str | None:
 
 def load_trades(path: Path) -> list[ZenTrade]:
     """Read an exported advices file and return accepted trades, oldest first."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or not isinstance(data.get("pastAdvices"), list):
-        raise ValueError("expected an object with a pastAdvices list")
+    path = Path(path)
+    text = path.read_text(encoding="utf-8")
+    if path.suffix.lower() == ".jsonl":
+        # One advice object per line, as another export of the same feed writes them.
+        records = []
+        for line in text.splitlines():
+            if line.strip():
+                try:
+                    records.append(json.loads(line))
+                except ValueError:
+                    continue
+    else:
+        data = json.loads(text)
+        if not isinstance(data, dict) or not isinstance(data.get("pastAdvices"), list):
+            raise ValueError("expected an object with a pastAdvices list")
+        records = data["pastAdvices"]
     trades = []
-    for record in data["pastAdvices"]:
+    for record in records:
         trade = parse_trade(record)
         if trade is not None:
             trades.append(trade)

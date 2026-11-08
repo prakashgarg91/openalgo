@@ -24,7 +24,7 @@ from services.algos import zen_follow as zf  # noqa: E402
 from services.algos.zen_trades import load_trades  # noqa: E402
 
 DEFAULT_FILE = Path(
-    r"D:\Github\trading-rex-ai\agent-results\022-stratzy\raw\pastAdvices\68596cd26aa2cba24bbb67da.json"
+    r"D:\Github\trading-rex-ai\agent-results\stratzy-regime-study\trades\68596cd26aa2cba24bbb67da.jsonl"
 )
 FIELDS = [
     "advice_id",

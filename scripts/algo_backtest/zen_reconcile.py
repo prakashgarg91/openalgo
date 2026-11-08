@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from services.algos.zen_trades import IST, ZenTrade, load_trades, parse_symbol  # noqa: E402
 
 DEFAULT_ZEN_JSON = Path(
-    "D:/Github/trading-rex-ai/agent-results/022-stratzy/raw/pastAdvices/68596cd26aa2cba24bbb67da.json"
+    "D:/Github/trading-rex-ai/agent-results/stratzy-regime-study/trades/68596cd26aa2cba24bbb67da.jsonl"
 )
 OUT_SUBDIR = Path("research") / "zen_reconcile"
 STATUSES = (
