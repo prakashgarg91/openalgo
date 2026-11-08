@@ -8,7 +8,7 @@ Owner's goal: a system ready for algo trading that is better than Zen from Strat
 | --- | --- | --- | --- |
 | 1 | Data capture, bid-ask snapshots, ETF ledgers, S3n runner, Zen follow ledger run by themselves | Built and scheduled | PC on and signed in every trading day |
 | 2 | A missed login or missed day is noticed within minutes | Built and scheduled Monday to Friday at 09:20, 10:30 and 16:30 (`scripts/algo_backtest/daily_check.py`; tasks "OpenAlgo daily check morning, midday, evening"). A Friday-holiday Monday or a market holiday will warn; that is noise | Telegram bot on for phone alerts; until then it writes `log/daily_check.log` |
-| 3 | Always-on machine so days are not missed | Not done | Owner decision and a small Mumbai server |
+| 3 | Always-on machine so days are not missed | Owner chose to keep the PC on 8 Nov. Server runbook is ready if that changes ([always-on-server.md](always-on-server.md)). Tasks now wake the PC from sleep, and the capture catches up if the PC starts late the same day | PC on, never asleep or off on trading days, signed in by 09:15 |
 | 4 | Static IP for order writes | Done: proxy renewed to 11 Feb 2027, tested, Readiness checks it | Renew before 11 Feb 2027 |
 | 5 | Live gate: no Live order without a recorded forward pass and a written post-mortem | Built, on by default | Leave on |
 | 6 | Risk limits: Rs 1,00,000 capital, Rs 20,000 daily cap, one lot, defined risk only | In the picker and the live gate | Keep |
