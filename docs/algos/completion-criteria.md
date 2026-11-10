@@ -48,4 +48,4 @@ The forward evidence (weeks to months), a real contract note, a market-hours kil
 | Powering the PC on | Only with a BIOS power-on alarm (the owner's setting) |
 | Windows sign-in | Only with auto sign-in (the owner's security choice; not set by us) |
 | Upstox login each morning | No: needs the owner's mobile OTP and PIN; never automated or stored by us |
-| Switching to Analyze after login | No: one click; the 09:20 check warns if it is Live |
+| Switching to Analyze after login | Yes: task "OpenAlgo ensure analyze" checks every 5 minutes from 09:15 to 10:15 and switches Live to Analyze, never the other way (`scripts/algo_backtest/ensure_analyze.py`); needs the app running and the API key set |
