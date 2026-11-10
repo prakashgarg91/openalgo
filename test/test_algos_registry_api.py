@@ -110,6 +110,10 @@ def test_the_forward_list_reads_the_nightly_reports_and_is_empty_without_them(
     reports.mkdir()
     monkeypatch.setenv("ALGO_FORWARD_S3N_REPORT", str(reports / "none.json"))
     monkeypatch.setenv("ALGO_FORWARD_EOD_DIR", str(reports / "eod"))
+    # The machine's own ledgers must not leak in: point every other source at nothing.
+    monkeypatch.setenv("ALGO_FORWARD_C1_CSV", str(reports / "none.csv"))
+    monkeypatch.setenv("ALGO_ZEN_FOLLOW_REPORT", str(reports / "none_zen.json"))
+    monkeypatch.setenv("ALGO_ETF_LEDGER_DIR", str(reports / "etf"))
     assert client.get("/algos/api/forward").get_json()["data"] == []
     (reports / "s3n.json").write_text(
         json.dumps({"ledgers": {"L1": {"completed": 3, "realistic_net": 1200,

@@ -29,6 +29,7 @@ from services.algos import (
     custom,
     debugger,
     events,
+    idea_tracker,
     lab,
     maintenance,
     mandate,
@@ -768,6 +769,28 @@ def registry_list():
                     for r in records
                 ],
             }
+        }
+    )
+
+
+@algos_bp.route("/api/idea-tracker", methods=["GET"])
+@check_session_validity
+@_api_limit
+def idea_tracker_view():
+    """The Auto Builder tracker: every idea's stage, the memory of failed gates, the hurdle. Read only."""
+    folder = _registry_dir()
+    records = registry._store(folder)
+    count = registry.running_count(folder)
+    return _ok(
+        {
+            "data": idea_tracker.build(
+                records,
+                {r["id"] for r in records if registry.intact(r)},
+                count,
+                registry.SIGNIFICANCE,
+                registry.next_free_slot(folder, datetime.now()),
+                agent_view.forward_status(),
+            )
         }
     )
 

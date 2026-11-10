@@ -8,6 +8,10 @@ fix, live in [docs/releases](releases/).
 
 ## [Unreleased]
 
+### Added
+
+- Algos page, new tab "Auto builder": a read-only idea tracker (`GET /algos/api/idea-tracker`). It lists every registered idea and where it stands, the gates ideas missed most often (read before proposing the next one), the number of standard errors a result must clear given how many ideas were tried, and the forward shadow tests. The live gate is always shown locked. It proposes nothing, runs nothing and places no order; an automatic idea generator was deliberately not built (see docs/algos/auto-builder-research-2026-11.md). No setting, schema or trading behaviour changed.
+
 ### Fixed
 
 - Research result: the volatility-scaled equity and gold idea (trial 320) was screened once on 2 November 2026 (docs/algos/vol-scaled-etf-results.md) and rejected: it earned about 8.4 percent a year but trailed the same average mix held without trading in 13 of 14 years, and its drawdown (Rs 43,409) exceeded the Rs 20,000 limit. Nothing goes forward. No platform behaviour changed.

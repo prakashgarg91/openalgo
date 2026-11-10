@@ -162,6 +162,7 @@ export const algoQueryKeys = {
   readiness: () => [...algoQueryKeys.all, 'readiness'] as const,
   registry: () => [...algoQueryKeys.all, 'registry'] as const,
   forward: () => [...algoQueryKeys.all, 'forward'] as const,
+  ideaTracker: () => [...algoQueryKeys.all, 'idea-tracker'] as const,
   reconciliation: () => [...algoQueryKeys.all, 'reconciliation'] as const,
   picker: (margins = false) => [...algoQueryKeys.all, 'picker', margins] as const,
   picks: () => [...algoQueryKeys.all, 'picks'] as const,
@@ -515,6 +516,37 @@ export interface ForwardRow {
 
 export async function fetchForwardTests(): Promise<ForwardRow[]> {
   const response = await webClient.get<{ data: ForwardRow[] }>(`${BASE}/forward`)
+  return response.data.data
+}
+
+export interface TrackedIdea {
+  id: string
+  name: string
+  registered: string
+  slot: string
+  trial_numbers: [number, number]
+  stage: string
+  failed_gates: string[]
+  why_it_might_work: string
+  how_it_fails: string
+  intact: boolean
+}
+
+export interface IdeaTracker {
+  trial_count: number
+  pass_bar: number
+  standard_errors_needed: number
+  next_free_month: string
+  ideas: TrackedIdea[]
+  stage_counts: Record<string, number>
+  lessons: { gate: string; ideas_missed: number }[]
+  forward_tests: ForwardRow[]
+  live_gate: 'locked'
+  rules: string[]
+}
+
+export async function fetchIdeaTracker(): Promise<IdeaTracker> {
+  const response = await webClient.get<{ data: IdeaTracker }>(`${BASE}/idea-tracker`)
   return response.data.data
 }
 

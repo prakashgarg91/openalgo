@@ -21,6 +21,7 @@ import {
   fetchRegime,
   type RegimeLabel,
 } from '@/api/algos'
+import { AutoBuilderPanel } from '@/components/algos/AutoBuilderPanel'
 import { BuilderPanel, BuiltAlgoTools } from '@/components/algos/BuilderPanel'
 import { ChooserPanel } from '@/components/algos/ChooserPanel'
 import { DebuggerPanel, ExplainRecent } from '@/components/algos/DebuggerPanel'
@@ -242,6 +243,7 @@ export default function AlgosVibe() {
           <TabsTrigger value="picks">My picks</TabsTrigger>
           <TabsTrigger value="build">Build your own</TabsTrigger>
           <TabsTrigger value="register">Register an idea</TabsTrigger>
+          <TabsTrigger value="auto">Auto builder</TabsTrigger>
           <TabsTrigger value="lab">Test on history</TabsTrigger>
           <TabsTrigger value="debug">Why did it do that?</TabsTrigger>
         </TabsList>
@@ -329,6 +331,10 @@ export default function AlgosVibe() {
 
         <TabsContent value="register" className="pt-3">
           <RegistryPanel />
+        </TabsContent>
+
+        <TabsContent value="auto" className="pt-3">
+          <AutoBuilderPanel />
         </TabsContent>
 
         <TabsContent value="lab" className="pt-3">
