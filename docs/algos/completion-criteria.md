@@ -37,3 +37,15 @@ The forward evidence (weeks to months), a real contract note, a market-hours kil
 3. Fresh Zen trade file, so the follow ledger can see trades after 23 Sep.
 4. Weeks of forward data; weekly public-page reads; verdicts by the written rules.
 5. Only then, a staged live start: one lot, Rs 20,000 cap, supervised first week.
+
+## What is automated and what is still the owner's (10 November 2026)
+
+| Step | Automated? |
+| --- | --- |
+| Start the app after sign-in on weekdays | Yes: a Startup-folder launcher `openalgo-autostart.cmd` (40 second wait) |
+| Snapshots, capture, ledgers, checks | Yes: Task Scheduler Monday to Friday, wakes the PC from sleep |
+| Noticing a missed step | Yes: daily check at 09:20, 10:30, 16:30; Telegram once the bot is on |
+| Powering the PC on | Only with a BIOS power-on alarm (the owner's setting) |
+| Windows sign-in | Only with auto sign-in (the owner's security choice; not set by us) |
+| Upstox login each morning | No: needs the owner's mobile OTP and PIN; never automated or stored by us |
+| Switching to Analyze after login | No: one click; the 09:20 check warns if it is Live |
