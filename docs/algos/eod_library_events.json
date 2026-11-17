@@ -1,0 +1,98 @@
+{
+ "complete": false,
+ "categories": {
+  "union_budget": {
+   "complete": true,
+   "dates": [
+    "2022-02-01",
+    "2023-02-01",
+    "2024-02-01",
+    "2024-07-23",
+    "2025-02-01",
+    "2026-02-01"
+   ],
+   "sources": {
+    "2022-02-01": [
+     "https://prsindia.org/media/media-updates/budget-session-2022-day-2-feb-1-2022",
+     "https://www.freepressjournal.in/business/budget-2022-fm-sitharaman-introduces-finance-bill-2022"
+    ],
+    "2023-02-01": [
+     "https://prsindia.org/budgets/parliament/union-budget-2023-24-analysis-of-major-demands",
+     "https://www.ibef.org/economy/union-budget-2023-24"
+    ],
+    "2024-02-01": [
+     "https://www.pw.live/banking/exams/union-budget-2024",
+     "https://www.outlookindia.com/national/union-budget-of-india-2024-nirmala-sitharaman-date-time-where-to-watch-interim-budget-session"
+    ],
+    "2024-07-23": [
+     "https://prsindia.org/budgets/parliament/union-budget-2024-25-analysis",
+     "https://www.newsonair.gov.in/fm-nirmala-sitharaman-to-present-union-budget-in-ls"
+    ],
+    "2025-02-01": [
+     "https://www.newsonair.gov.in/fm-nirmala-sitharaman-to-present-union-budget-2025-26-in-lok-sabha-today",
+     "https://www.pw.live/upsc/exams/union-budget-2025"
+    ],
+    "2026-02-01": [
+     "https://www.investindia.gov.in/team-india-blogs/indias-union-budget-fy-2026-27-key-highlights",
+     "https://www.newsonair.gov.in/bulletins-detail/evening-news-650/"
+    ]
+   },
+   "note": "Each date has two agreeing opened sources (17 Nov 2026). Weak spots: 2024-02-01 pair is an exam-prep site plus a pre-event preview; 2022-02-01 pair is PRS plus a weekday-only report. Primary PIB and indiabudget.gov.in pages returned HTTP 403."
+  },
+  "rbi_policy": {
+   "complete": true,
+   "dates": [
+    "2021-04-07",
+    "2021-06-04",
+    "2021-08-06",
+    "2021-10-08",
+    "2021-12-08",
+    "2022-02-10",
+    "2022-04-08",
+    "2022-05-04",
+    "2022-06-08",
+    "2022-08-05",
+    "2022-09-30",
+    "2022-12-07",
+    "2023-02-08",
+    "2023-04-06",
+    "2023-06-08",
+    "2023-08-10",
+    "2023-10-06",
+    "2023-12-08",
+    "2024-02-08",
+    "2024-04-05",
+    "2024-06-07",
+    "2024-08-08",
+    "2024-10-09",
+    "2024-12-06",
+    "2025-02-07",
+    "2025-04-09",
+    "2025-06-06",
+    "2025-08-06",
+    "2025-10-01",
+    "2025-12-05",
+    "2026-02-06",
+    "2026-04-08",
+    "2026-06-05",
+    "2026-08-05",
+    "2026-10-07"
+   ],
+   "note": "Each date confirmed on an rbi.org.in press release page (17 Nov 2026); 35 decisions including the off-cycle 2022-05-04."
+  },
+  "lok_sabha_counting": {
+   "complete": true,
+   "dates": [
+    "2024-06-04"
+   ],
+   "sources": {
+    "2024-06-04": [
+     "https://www.thequint.com/elections/lok-sabha-election-2024-result-date-time-and-where-to-watch-election-results",
+     "https://www.newsonair.gov.in/counting-of-votes-for-all-seven-phases-of-lok-sabha-elections-to-begin-from-8-am-tomorrow"
+    ]
+   },
+   "note": "Both sources are pre-count schedule statements dated 3 June 2024. No other general election count in the window (previous 2019, next due 2029)."
+  }
+ },
+ "note": "Top-level complete stays false until the director's freeze review (14 December 2026); the run guard refuses while it is false."
+}

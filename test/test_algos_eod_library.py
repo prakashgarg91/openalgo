@@ -7,8 +7,10 @@ only for its guard, which must refuse in every case here.
 from __future__ import annotations
 
 import datetime as dt
+import gzip
 import importlib.util
 import inspect
+import json
 import os
 import random
 import shutil
@@ -16,6 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -24,14 +27,18 @@ from services.algos.eod_library import (
     ALGOS,
     LIBRARY,
     TRADEABLE_CELLS,
+    best_single_benchmark,
     build_trades,
     build_trades_counted,
     cell_for,
     clamp_spread_value,
+    effective_expiries,
     leg_price_exit,
     legs_for,
+    regime_group,
     settle_value,
     trade_net,
+    usable_event_entries,
 )
 from services.algos.portfolio_select import exit_date_of, trailing_window
 
@@ -515,3 +522,424 @@ def test_guard_refuses_an_ancestor_that_is_not_frozen():
     done = _run(head)
     assert done.returncode == 2
     assert "This run is blocked until the registration is frozen." in done.stdout
+
+
+# ---------------------------------------------------------------------------------------------
+# Expiry-day exit needs a traded close as well as a settlement
+# ---------------------------------------------------------------------------------------------
+
+
+def test_expiry_day_exit_needs_a_traded_close_as_well_as_the_settlement():
+    expiry = pd.Timestamp("2025-03-04")
+    assert leg_price_exit("CE", 22000, None, 22150.0, expiry, expiry) is None
+    assert leg_price_exit("CE", 22000, float("nan"), 22150.0, expiry, expiry) is None
+
+
+def test_a_leg_with_no_close_on_the_expiry_day_drops_the_trade():
+    expiry = "2025-03-04"
+    legs = {"A1": {"entry": [120.0, 40.0], "exit": [None, 25.0]}}
+    trades, counts = build_trades_counted(
+        [_row(entry_date=ENTRY_DAY, exit_date=expiry, legs=legs, usable=True)]
+    )
+    assert not any(t["algo"] == "A1" for t in trades)
+    assert counts["dropped_unusable_leg"] >= 1
+
+
+# ---------------------------------------------------------------------------------------------
+# Best single algo benchmark (warm-up ranks, no gate, evaluation total)
+# ---------------------------------------------------------------------------------------------
+
+
+def _trade(algo, net, exit_date, cell="low"):
+    return {"date": exit_date, "exit_date": exit_date, "algo": algo, "cell": cell, "net": net}
+
+
+def test_benchmark_holds_the_warm_up_winner_on_every_evaluation_trade():
+    trades = [
+        _trade("A1", 300.0, "2021-06-01"),  # warm-up: A1 mean 200, A2 mean -50
+        _trade("A1", 100.0, "2022-02-01"),
+        _trade("A2", -50.0, "2021-06-01"),
+        _trade("A2", -50.0, "2022-02-01"),
+        _trade("A1", 10.0, "2022-05-02"),  # evaluation, held
+        _trade("A1", -4.0, "2023-01-10"),  # evaluation, held
+        _trade("A2", 1000.0, "2023-01-11"),  # evaluation, not held: the hindsight maximum
+        _trade("A3", 999.0, "2022-06-01", cell="mid"),  # other cell: ignored
+    ]
+    bench = best_single_benchmark(trades, "2022-04")
+    assert bench["held_algo"] == "A1"
+    assert bench["net_total"] == pytest.approx(10.0 - 4.0)
+    assert bench["hindsight_algo_not_judged"] == "A2"
+    assert bench["hindsight_net_total_not_judged"] == pytest.approx(1000.0)
+
+
+def test_benchmark_is_zero_when_no_warm_up_algo_is_positive():
+    trades = [
+        _trade("A1", -20.0, "2021-06-01"),
+        _trade("A2", -5.0, "2021-06-01"),
+        _trade("A1", 500.0, "2022-05-02"),
+    ]
+    bench = best_single_benchmark(trades, "2022-04")
+    assert bench["held_algo"] is None
+    assert bench["net_total"] == 0.0
+
+
+def test_benchmark_ignores_warm_up_trades_that_exit_outside_the_warm_up():
+    trades = [
+        _trade("A3", 1000.0, "2022-04-01"),  # exits in evaluation, so it cannot rank the warm-up
+        _trade("A1", 5.0, "2021-06-01"),
+        _trade("A1", 7.0, "2022-05-02"),
+    ]
+    bench = best_single_benchmark(trades, "2022-04")
+    assert bench["held_algo"] == "A1"
+    assert bench["net_total"] == pytest.approx(7.0)
+
+
+# ---------------------------------------------------------------------------------------------
+# Registered regime constants and group
+# ---------------------------------------------------------------------------------------------
+
+
+def test_registered_regime_constants_are_the_frozen_values():
+    assert eod_library.REGIME_COEF_VIX_PREV == 0.945791
+    assert eod_library.REGIME_COEF_RANGE_1 == 9.33738
+    assert eod_library.REGIME_INTERCEPT == -7.35624
+    assert eod_library.REGIME_CUTS == (-4.67981, -4.51945, -4.32102, -3.99889)
+
+
+def test_regime_group_matches_searchsorted_on_the_registered_model():
+    rng = np.random.default_rng(5)
+    for _ in range(500):
+        vix_prev = float(rng.uniform(2.0, 3.5))
+        range_1 = float(rng.uniform(0.0, 0.05))
+        predicted = (
+            eod_library.REGIME_COEF_VIX_PREV * vix_prev
+            + eod_library.REGIME_COEF_RANGE_1 * range_1
+            + eod_library.REGIME_INTERCEPT
+        )
+        expected = int(np.searchsorted(eod_library.REGIME_CUTS, predicted) + 1)
+        assert regime_group(vix_prev, range_1) == expected
+
+
+def test_regime_group_extremes_and_missing_inputs():
+    assert regime_group(-10.0, 0.0) == 1
+    assert regime_group(10.0, 0.0) == 5
+    assert regime_group(None, 0.01) is None
+    assert regime_group(2.5, float("nan")) is None
+
+
+def test_regime_refit_that_differs_from_the_registered_model_is_refused():
+    run = _load_run_script()
+    rng = np.random.default_rng(9)
+    days = pd.bdate_range("2010-01-01", "2017-07-10")
+    frame = pd.DataFrame(
+        {
+            "target": rng.normal(-4.0, 0.5, len(days)),
+            "range_1": rng.uniform(0.0, 0.03, len(days)),
+            "vix_prev": rng.uniform(2.2, 3.2, len(days)),
+        },
+        index=days,
+    )
+    reason = run.regime_mismatch(frame)
+    assert reason is not None and "registered constants" in reason
+
+
+# ---------------------------------------------------------------------------------------------
+# Effective expiry rule
+# ---------------------------------------------------------------------------------------------
+
+
+def test_expiry_keeps_a_label_with_rows_on_its_own_date():
+    eff = effective_expiries({"2025-03-27": ["2025-03-24", "2025-03-27"]})
+    assert eff == {"2025-03-27": "2025-03-27"}
+
+
+def test_holiday_shifted_expiry_uses_its_last_row_date_two_days_before():
+    # 2023-06-29 (Thursday) had no rows on its own date; the last rows are 2023-06-27 (two days before).
+    eff = effective_expiries({"2023-06-29": ["2023-06-22", "2023-06-26", "2023-06-27"]})
+    assert eff == {"2023-06-29": "2023-06-27"}
+
+
+def test_a_label_one_day_after_its_last_row_is_kept_and_a_long_gap_is_dropped():
+    assert effective_expiries({"2025-01-09": ["2025-01-08"]}) == {"2025-01-09": "2025-01-08"}
+    # A month-end label whose last rows are six days earlier is not a holiday shift: dropped.
+    assert effective_expiries({"2024-02-29": ["2024-02-23"]}) == {}
+    # A label with no rows at all is dropped.
+    assert effective_expiries({"2024-03-28": []}) == {}
+
+
+def test_effective_expiry_drives_the_window_and_the_settlement():
+    # The effective date (2023-06-27) is what the 1-to-6-day window sees, and the settlement on that
+    # date is the one used at exit: a leg exiting on 2023-06-27 is worth its intrinsic value.
+    eff = effective_expiries({"2023-06-29": ["2023-06-26", "2023-06-27"]})
+    effective = pd.Timestamp(eff["2023-06-29"])
+    day = pd.Timestamp("2023-06-23")
+    assert 1 <= (effective - day).days <= 6
+    assert leg_price_exit("CE", 22000, 5.0, 22150.0, effective, effective) == 150.0
+
+
+# ---------------------------------------------------------------------------------------------
+# National events file
+# ---------------------------------------------------------------------------------------------
+
+
+def test_only_complete_categories_enter_the_event_rule():
+    doc = {
+        "complete": False,
+        "categories": {
+            "union_budget": {"complete": True, "dates": ["2023-02-01"]},
+            "rbi_policy": {"complete": False, "dates": ["2022-06-08"]},
+            "lok_sabha_counting": {"complete": True, "dates": ["2024-06-04"]},
+        },
+    }
+    entries = usable_event_entries(doc)
+    assert entries == [
+        {"date": "2023-02-01", "label": "union budget"},
+        {"date": "2024-06-04", "label": "lok sabha counting"},
+    ]
+
+
+def test_a_malformed_event_date_is_refused():
+    with pytest.raises(ValueError):
+        usable_event_entries(
+            {"categories": {"rbi_policy": {"complete": True, "dates": ["10/06/2022"]}}}
+        )
+
+
+def test_the_committed_event_file_has_three_sourced_complete_categories_and_stays_unfrozen():
+    doc = json.loads((ROOT / "docs" / "algos" / "eod_library_events.json").read_text())
+    # The top-level flag stays false until the director's freeze review, so the run guard refuses.
+    assert doc["complete"] is False
+    cats = doc["categories"]
+    assert set(cats) == {"union_budget", "rbi_policy", "lok_sabha_counting"}
+    assert all(c["complete"] is True for c in cats.values())
+    assert cats["union_budget"]["dates"] == [
+        "2022-02-01",
+        "2023-02-01",
+        "2024-02-01",
+        "2024-07-23",
+        "2025-02-01",
+        "2026-02-01",
+    ]
+    assert len(cats["rbi_policy"]["dates"]) == 35
+    assert cats["rbi_policy"]["dates"][0] == "2021-04-07"
+    assert cats["rbi_policy"]["dates"][-1] == "2026-10-07"
+    assert cats["lok_sabha_counting"]["dates"] == ["2024-06-04"]
+    # every Budget and counting date carries two sources, as the director required
+    for name in ("union_budget", "lok_sabha_counting"):
+        assert all(len(urls) >= 2 for urls in cats[name]["sources"].values())
+    assert len(usable_event_entries(doc)) == 35 + 6 + 1
+
+
+def test_an_incomplete_category_is_left_out_and_a_complete_one_is_used():
+    doc = {
+        "complete": False,
+        "categories": {
+            "union_budget": {"complete": False, "dates": ["2023-02-01"]},
+            "rbi_policy": {"complete": True, "dates": ["2023-02-08"]},
+        },
+    }
+    assert usable_event_entries(doc) == [{"date": "2023-02-08", "label": "rbi policy"}]
+
+
+def test_the_guard_refuses_an_incomplete_event_file():
+    run = _load_run_script()
+    assert run.events_complete({"complete": False})[0] is False
+    assert run.events_complete(None)[0] is False
+    assert run.events_complete({"complete": True})[0] is True
+
+
+# ---------------------------------------------------------------------------------------------
+# Guard covers the code: a throwaway git repository, never the real one
+# ---------------------------------------------------------------------------------------------
+
+_GIT_ID = [
+    "-c",
+    "user.name=test",
+    "-c",
+    "user.email=test@example.com",
+    "-c",
+    "commit.gpgsign=false",
+]
+
+
+def _git(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", str(root), *_GIT_ID, *args], capture_output=True, text=True, check=True
+    )
+
+
+def _throwaway_repo(root: Path, run) -> str:
+    """A temporary repository holding every guarded file, committed once, with the frozen mark."""
+    root.mkdir(parents=True)
+    _git(root, "init", "-q")
+    for rel in run.GUARDED_PATHS:
+        target = root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(f"{rel} v1\n")
+    doc = root / run.REGISTRATION_DOC
+    doc.write_text("# registration\n\nSTATUS: FROZEN\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "frozen")
+    return _git(root, "rev-parse", "HEAD").stdout.strip()
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is needed for the guard")
+def test_guard_passes_when_nothing_guarded_changed(tmp_path):
+    run = _load_run_script()
+    sha = _throwaway_repo(tmp_path / "frozen", run)
+    assert run.frozen_check(sha, tmp_path / "frozen") == (True, "")
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is needed for the guard")
+def test_guard_refuses_a_change_to_any_guarded_file(tmp_path):
+    run = _load_run_script()
+    for index, rel in enumerate(run.GUARDED_PATHS):
+        root = tmp_path / f"case{index}"
+        sha = _throwaway_repo(root, run)
+        (root / rel).write_text("changed after the freeze\n")
+        _git(root, "commit", "-q", "-am", "change")
+        ok, why = run.frozen_check(sha, root)
+        assert ok is False, rel
+        assert rel in why
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is needed for the guard")
+def test_guard_ignores_an_unguarded_file(tmp_path):
+    run = _load_run_script()
+    root = tmp_path / "unguarded"
+    sha = _throwaway_repo(root, run)
+    (root / "notes.txt").write_text("not part of the test\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "notes")
+    assert run.frozen_check(sha, root) == (True, "")
+
+
+# ---------------------------------------------------------------------------------------------
+# End to end on a synthetic fixture, with the guard bypassed by the test hook
+# ---------------------------------------------------------------------------------------------
+
+FIXTURE_START = dt.date(2021, 3, 1)
+FIXTURE_END = dt.date(2022, 10, 31)
+FIXTURE_EVENTS = {
+    "complete": True,
+    "categories": {
+        "union_budget": {"complete": True, "dates": ["2022-02-01"]},
+        "rbi_policy": {"complete": False, "dates": ["2022-06-08"]},
+    },
+}
+
+
+def _weekdays_between(first: dt.date, last: dt.date) -> list[dt.date]:
+    out, day = [], first
+    while day <= last:
+        if day.weekday() < 5:
+            out.append(day)
+        day += dt.timedelta(days=1)
+    return out
+
+
+def _next_thursday_on_or_after(day: dt.date) -> dt.date:
+    return day + dt.timedelta(days=(3 - day.weekday()) % 7)
+
+
+def _make_fixture(repo: Path, seed: int = 11) -> None:
+    """Made-up Nifty, VIX and option rows. Weekly Thursday expiries, 21 strikes each side of the money.
+
+    Nothing here is real data: prices are a random walk, and every option is intrinsic value plus a
+    small random time value.
+    """
+    rng = random.Random(seed)
+    spot_days = _weekdays_between(FIXTURE_START, FIXTURE_END + dt.timedelta(days=14))
+    spot, level = {}, 17000.0
+    for day in spot_days:
+        level *= 1 + rng.gauss(0.0, 0.006)
+        spot[day] = round(level, 2)
+    days = [d for d in spot_days if d <= FIXTURE_END]
+    daily = repo / "context" / "daily"
+    daily.mkdir(parents=True)
+    nifty_lines = ["index,open,high,low,close"]
+    vix_lines = ["index,open,high,low,close"]
+    for day in days:
+        half = spot[day] * rng.uniform(0.002, 0.03) / 2
+        stamp = f"{day.isoformat()} 03:45:00+00:00"
+        nifty_lines.append(f"{stamp},{spot[day]},{spot[day] + half},{spot[day] - half},{spot[day]}")
+        vix = round(rng.uniform(12.0, 22.0), 2)
+        vix_lines.append(f"{stamp},{vix},{vix},{vix},{vix}")
+    (daily / "_NSEI.csv").write_text("\n".join(nifty_lines) + "\n")
+    (daily / "_INDIAVIX.csv").write_text("\n".join(vix_lines) + "\n")
+    option_dir = repo / "nse_fo_eod"
+    option_dir.mkdir()
+    with gzip.open(option_dir / "nifty_fo_2021_2022.csv.gz", "wt") as handle:
+        handle.write("instrument,date,expiry,kind,strike,close,settle,contracts\n")
+        for day in days:
+            expiry = _next_thursday_on_or_after(day)
+            atm = round(spot[day] / 50) * 50
+            for k in range(-10, 11):
+                strike = atm + 50 * k
+                for kind in ("CE", "PE"):
+                    intrinsic = (
+                        max(spot[day] - strike, 0.0)
+                        if kind == "CE"
+                        else max(strike - spot[day], 0.0)
+                    )
+                    close = round(intrinsic + 15.0 + rng.uniform(0.0, 3.0), 2)
+                    handle.write(
+                        f"OPTIDX,{day.isoformat()},{expiry.isoformat()},{kind},{strike},"
+                        f"{close},{spot[expiry]},100\n"
+                    )
+
+
+def test_end_to_end_fixture_runs_the_whole_pipeline(tmp_path, capsys):
+    run = _load_run_script()
+    repo = tmp_path / "data"
+    repo.mkdir()
+    _make_fixture(repo)
+    events_file = tmp_path / "events.json"
+    events_file.write_text(json.dumps(FIXTURE_EVENTS))
+
+    code = run.main(
+        ["run", str(repo)],
+        events_path=str(events_file),
+        _test_hook_bypass_guard_for_synthetic_fixture=True,
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    for line in (
+        "Counts (candidates, kept, dropped by reason):",
+        "View B, walk-forward, realistic costs",
+        "Verdict from the harness:",
+        "View A, hindsight, in-sample, not evidence:",
+        "Walk-forward net at doubled costs (re-selected):",
+        "Benchmark, best single algo held with no gate:",
+        "(not judged)",
+        "Registration gates:",
+    ):
+        assert line in out, line
+
+    rows = run.build_day_rows(repo, FIXTURE_EVENTS)
+    realistic, counts = build_trades_counted(rows)
+    doubled, _ = build_trades_counted(rows, doubled=True)
+    assert counts["candidates"] == 5 * len(rows)
+    assert (
+        counts["kept"] + counts["dropped_unusable_day"] + counts["dropped_unusable_leg"]
+        == counts["candidates"]
+    )
+    assert realistic, "the fixture must produce trades"
+    by_key = {(t["date"], t["algo"]): t["net"] for t in realistic}
+    for t in doubled:
+        assert t["net"] < by_key[(t["date"], t["algo"])]
+    # The event rule reaches the rows: the day before the 2022-02-01 budget is an event entry.
+    flagged = {r["entry_date"] for r in rows if r["entry_is_event"]}
+    assert {"2022-01-31", "2022-02-01"} <= flagged
+    # Only the low cell is ever traded by the harness.
+    result = run.run_pipeline(repo, FIXTURE_EVENTS)
+    for month_picks in result["run"]["view_b_walk_forward"]["picks"].values():
+        assert set(month_picks) == {"low"}
+    assert result["benchmark"]["hindsight_algo_not_judged"] in ALGOS
+    # The doubled figure is a walk-forward run on doubled-cost trades, so its picks are re-selected.
+    doubled_run = portfolio_wf.run(
+        doubled, cells=list(TRADEABLE_CELLS), algos=list(ALGOS), first_month="2022-04"
+    )
+    assert result["doubled_net"] == pytest.approx(
+        doubled_run["view_b_walk_forward"]["summary"]["net_total"], abs=1e-6
+    )
