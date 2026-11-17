@@ -1,7 +1,7 @@
 """The account's own rules: how much money, and the most it may lose in one day.
 
-A mandate of Rs 1,00,000 capital and Rs 20,000 daily loss turns into one number the sizing uses,
-20 percent of capital, and into a check a replay can run: did any day lose more than the cap.
+A mandate of Rs 1,00,000 capital and a daily loss cap (Rs 27,000 now; it was 20,000) turns into one number the sizing uses,
+a share of capital, and into a check a replay can run: did any day lose more than the cap.
 Pure apart from reading one setting.
 """
 
@@ -29,7 +29,7 @@ class Mandate:
 
 
 #: The mandate this work was asked to test.
-ONE_LAKH = Mandate(capital=100_000.0, max_daily_loss=20_000.0)
+ONE_LAKH = Mandate(capital=100_000.0, max_daily_loss=27_000.0)
 
 
 def daily_cap_from_env() -> float | None:

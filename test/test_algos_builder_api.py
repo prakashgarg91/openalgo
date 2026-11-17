@@ -298,7 +298,7 @@ def test_the_universe_search_starts_a_job_with_the_account_and_refuses_a_bad_one
     )
     ok = client.post("/algos/api/universe/search", json={})
     assert ok.status_code == 202 and started[0]["kind"] == "universe"
-    assert started[0]["account"] == {"capital": 100_000.0, "max_daily_loss": 20_000.0}
+    assert started[0]["account"] == {"capital": 100_000.0, "max_daily_loss": 27_000.0}
     custom_account = client.post(
         "/algos/api/universe/search",
         json={"account": {"capital": 250_000, "max_daily_loss": 30_000}},

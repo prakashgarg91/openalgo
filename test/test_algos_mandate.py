@@ -11,11 +11,13 @@ from services.algos.context import RegimeResult
 from services.algos.templates import build
 from services.strategy_module import engine as sm_engine
 
-M = mandate.ONE_LAKH
+M = mandate.Mandate(capital=100_000.0, max_daily_loss=20_000.0)  # the cap arithmetic is tested at a fixed 20,000
 
 
 def test_one_lakh_with_a_twenty_thousand_cap_is_twenty_percent():
     assert M.capital == 100_000 and M.max_daily_loss == 20_000 and M.max_loss_pct == 20.0
+    # the account's own default, raised by the owner on 17 Nov 2026
+    assert mandate.ONE_LAKH.max_daily_loss == 27_000 and mandate.ONE_LAKH.max_loss_pct == 27.0
 
 
 def test_one_lot_of_a_150_point_spread_fits_and_two_do_not():

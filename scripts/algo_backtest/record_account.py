@@ -12,12 +12,16 @@ Exit 0 when saved, 1 on a problem (the reason is printed).
 import csv
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
 import httpx
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from services.algos import sandbox_round_trips as rt  # noqa: E402
 
 HOST = os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000")
 SUMMARY_COLUMNS = [
@@ -89,6 +93,73 @@ def summarise(now: datetime, mode: str, funds: dict, positions, trades, orders) 
     }
 
 
+TRIP_COLUMNS = [
+    "symbol",
+    "side",
+    "quantity",
+    "entry_date",
+    "entry_time",
+    "exit_date",
+    "exit_time",
+    "entry_price",
+    "exit_price",
+    "gross",
+    "charges",
+    "slippage",
+    "net_after_charges",
+    "net_after_charges_and_slippage",
+]
+DAY_COLUMNS = [
+    "entry_date",
+    "trips",
+    "gross",
+    "charges",
+    "slippage",
+    "net_after_charges",
+    "net_after_charges_and_slippage",
+]
+
+
+def write_round_trips(out: Path) -> str:
+    """Every closed Sandbox position, net of charges and dated by the day it was OPENED.
+
+    Reads the Sandbox database read only (db/sandbox.db, or ALGO_SANDBOX_DB) and rewrites two files:
+    round_trips.csv and by_entry_date.csv. The account's own profit figure is gross, so this is the
+    figure to judge by. Returns one line for the log.
+    """
+    path = Path(
+        os.getenv("ALGO_SANDBOX_DB", str(Path(__file__).resolve().parents[2] / "db" / "sandbox.db"))
+    )
+    if not path.exists():
+        return "No Sandbox database found, so no round trips were written."
+    conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+    try:
+        rows = conn.execute(
+            "select symbol, action, quantity, price, trade_timestamp from sandbox_trades order by trade_timestamp"
+        ).fetchall()
+    finally:
+        conn.close()
+    fills = [
+        {"symbol": r[0], "action": r[1], "quantity": r[2], "price": r[3], "timestamp": str(r[4])}
+        for r in rows
+    ]
+    result = rt.round_trips(fills)
+    days = rt.by_entry_date(result["trips"])
+    for name, columns, data in (
+        ("round_trips.csv", TRIP_COLUMNS, result["trips"]),
+        ("by_entry_date.csv", DAY_COLUMNS, days),
+    ):
+        with (out / name).open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=columns)
+            writer.writeheader()
+            writer.writerows(data)
+    net = round(sum(d["net_after_charges"] for d in days), 2)
+    return (
+        f"Round trips: {len(result['trips'])} closed, {len(result['open'])} open fill(s); "
+        f"net after charges {net} (gross {round(sum(d['gross'] for d in days), 2)})."
+    )
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
@@ -139,6 +210,7 @@ def main() -> int:
         writer = csv.DictWriter(handle, fieldnames=SUMMARY_COLUMNS)
         writer.writeheader()
         writer.writerows(rows)
+    print(write_round_trips(out))
     print(
         f"Saved {row['date']}: cash {row['available_cash']}, profit and loss today {row['total_pnl']}, "
         f"{row['open_positions']} open position(s)."

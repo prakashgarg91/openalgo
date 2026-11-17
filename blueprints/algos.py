@@ -221,7 +221,7 @@ def regime():
 def _picker_data(user: str, api_key: str, expiry: str | None, with_margins: bool) -> dict:
     """The ranked picker, built once per 45 seconds per trader and shared by every caller."""
     capital = _positive_float(os.getenv("ALGO_CAPITAL_INR"), 100_000.0)
-    cap = mandate.daily_cap_from_env() or 20_000.0
+    cap = mandate.daily_cap_from_env() or 27_000.0
 
     def load():
         return picker_inputs.gather(
@@ -1129,7 +1129,7 @@ def universe_search():
     if error:
         return error
     account, message = _account(
-        data.get("account") or {"capital": 100_000, "max_daily_loss": 20_000}
+        data.get("account") or {"capital": 100_000, "max_daily_loss": 27_000}
     )
     if message:
         return _error(message, 400)
