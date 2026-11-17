@@ -41,6 +41,21 @@ TRADES = ROOT / "db" / "sandbox_bot_atm200" / "trades.csv"
 DEFAULT_VIX = Path("D:/Github/openalgo-data/context/daily/_INDIAVIX.csv")
 
 
+class _Api(s3n.Api):
+    """The S3n runner's client, except that a lost reply is ReplyLost and not a refusal.
+
+    The shared client turns a transport failure into Refused, which reads as "nothing was accepted".
+    After a lost reply an order may have reached OpenAlgo, so this bot must not treat it that way.
+    """
+
+    def post(self, path: str, **payload) -> dict:
+        try:
+            reply = self.http.post(self.host + path, json={"apikey": self.key, **payload})
+            return reply.json()
+        except (httpx.HTTPError, ValueError) as err:
+            raise bot_mod.ReplyLost(f"OpenAlgo did not answer {path}") from err
+
+
 def api_key() -> str | None:
     """The key from the environment, or on Windows from the user's environment variables."""
     key = os.getenv("OPENALGO_API_KEY")
@@ -88,7 +103,7 @@ def main() -> int:
             )
             return 2
     with httpx.Client(timeout=15.0) as http:
-        api = s3n.Api(http, os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000"), key)
+        api = _Api(http, os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000"), key)
         bot = bot_mod.ATM200Bot(api, STATE, TRADES, notify=fa.notify, sleep=time.sleep)
         try:
             if command == "flatten":

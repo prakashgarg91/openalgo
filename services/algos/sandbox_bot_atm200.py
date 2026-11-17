@@ -6,6 +6,10 @@ not changed here. The order safety comes from services/algos/sandbox_bot.py: thi
 exit, so no order path is copied. The one difference is the strategy label, which the shared order
 code takes from a module constant; ``_StrategyClient`` rewrites that label and nothing else.
 
+Every order is written to the state as an ``inflight`` record before it is sent, and gets its id
+when the reply arrives. If the reply is lost, the next run settles the record against the order book
+(cancel what is still working, confirm by position) before it decides anything.
+
 The caller supplies the client, the time, the holidays and the latest previous VIX close. Nothing in
 this module reads a file or the clock, so it runs in tests with a fake client.
 """
@@ -17,8 +21,11 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
+import pytz
+
 from services.algos import atm200_rule as rule
 from services.algos import sandbox_bot as sb
+from services.algos.sandbox_round_trips import fill_charges
 
 STRATEGY = "ATM200-sandbox"
 #: A previous VIX close older than this is not used for the gate; the entry goes ahead with the note.
@@ -31,7 +38,7 @@ REASON_EXPIRY_WINDOW = (
 ACTIVE_ATM = ("entering", "open", "orphan_hedge", "short_bought_back")
 #: Fields written before an exit is sent, removed again if that exit is refused or fails.
 EXIT_FIELDS = ("exit_reason", "exit_value_quote", "exit_note", "exit_decided")
-#: Entry is refused once the closed trades in the CSV have lost this much (the frozen ledger stop).
+#: Entry is refused once the closed trades in the CSV have lost this much, net of charges (the frozen stop).
 LEDGER_STOP_MESSAGE = (
     "The ATM 200 sandbox ledger has lost 20,000 rupees or more, so it has stopped. "
     "A person must decide whether to continue."
@@ -43,6 +50,26 @@ FLATTEN_NOTE = "Closed by a person with the flatten command. Not written to trad
 #: The 15:00 check on the session after entry is the last bar. A check up to 15:05 still counts.
 LAST_BAR = time(15, 0)
 LAST_BAR_GRACE_END = time(15, 5)
+IST = pytz.timezone("Asia/Kolkata")
+#: The order book stamps orders with the IST wall clock; sent_at is kept on the same clock.
+TERMINAL_ORDER_STATES = ("complete", "rejected", "cancelled")
+ENTRY_PURPOSES = ("entry_hedge", "entry_short")
+EXIT_PURPOSES = ("buyback", "sell_hedge")
+PURPOSE_NAMES = {
+    "entry_hedge": "bought call (entry)",
+    "entry_short": "sold call (entry)",
+    "buyback": "buy-back of the sold call",
+    "sell_hedge": "sale of the bought call",
+    "flatten_buyback": "flatten buy-back of the sold call",
+    "flatten_sell_hedge": "flatten sale of the bought call",
+}
+#: (trade row column, side of the fill, leg it belongs to) for the four fills a closed trade holds.
+FILL_SIDES = (
+    ("short_fill_price", "SELL", "entry"),
+    ("hedge_fill_price", "BUY", "entry"),
+    ("buyback_fill_price", "BUY", "exit"),
+    ("sell_hedge_fill_price", "SELL", "exit"),
+)
 TRADE_COLUMNS = [
     "entry_date",
     "entry_time",
@@ -69,6 +96,10 @@ TRADE_COLUMNS = [
 ]
 
 
+class ReplyLost(Exception):
+    """OpenAlgo did not answer, so an order may or may not have reached it. Never treated as refused."""
+
+
 class _StrategyClient:
     """Sends the shared order code's requests under this bot's strategy name."""
 
@@ -85,12 +116,56 @@ class _StrategyClient:
         return self.client.post(path, **payload)
 
 
+def now_ist() -> datetime:
+    """The naive IST wall clock, the clock the order book stamps orders with."""
+    return datetime.now(IST).replace(tzinfo=None)
+
+
+def _book_time(text: Any) -> datetime:
+    """An order book timestamp. One that cannot be read counts as after any send, so it is never skipped."""
+    try:
+        return datetime.strptime(str(text), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return datetime.max
+
+
+def _expected_held(purpose: str, quantity: int, filled: int) -> tuple[int, int]:
+    """(sold call, bought call) the sandbox must hold once this order has filled ``filled`` of ``quantity``."""
+    if purpose == "entry_hedge":
+        return 0, filled
+    if purpose == "entry_short":
+        return -filled, quantity
+    if purpose == "buyback":
+        return -(quantity - filled), quantity
+    return 0, quantity - filled  # sell_hedge
+
+
+def row_charges(row: dict) -> float:
+    """Rupees of charges for the fills a closed trade row holds, from the shared charge schedule."""
+    quantity = float(row.get("quantity") or 0)
+    entry_day = str(row.get("entry_date") or "")
+    exit_day = str(row.get("exit_time") or row.get("exit_session") or "")[:10]
+    total = 0.0
+    for column, action, leg in FILL_SIDES:
+        price = row.get(column)
+        if price in (None, ""):
+            continue
+        day = entry_day if leg == "entry" else exit_day
+        total += fill_charges(action, quantity, float(price), day)
+    return total
+
+
 def ledger_total(path: Path) -> float:
-    """Sum of gross_rupees over the closed trades in the CSV. A missing file is an empty ledger."""
+    """Sum of NET rupees over the closed trades: each row's gross less the charges of its four fills.
+
+    A missing file is an empty ledger. A row without a gross figure counts as 0 for the gross.
+    """
     if not path.is_file():
         return 0.0
     with path.open(newline="", encoding="utf-8") as handle:
-        return sum(float(row.get("gross_rupees") or 0) for row in csv.DictReader(handle))
+        return sum(
+            float(row.get("gross_rupees") or 0) - row_charges(row) for row in csv.DictReader(handle)
+        )
 
 
 def is_trading_day(day: date, holidays: set[date]) -> bool:
@@ -171,6 +246,233 @@ class ATM200Bot(sb.Bot):
     ):
         super().__init__(_StrategyClient(client, STRATEGY), state_path, notify, sleep, wait)
         self.trades_path = trades_path
+        self._context: str | None = None  # "flatten" while a flatten by a person is running
+
+    # state ----------------------------------------------------------------------------------
+    def save(self, state: dict) -> None:
+        """Writes the state. A write that says nothing about ``inflight`` keeps the record on disk."""
+        if "inflight" not in state:
+            state = {**state, "inflight": self.state().get("inflight")}
+        super().save(state)
+
+    def _clear_inflight(self) -> None:
+        self.save({**self.state(), "inflight": None})
+
+    # orders ---------------------------------------------------------------------------------
+    def _purpose(self, state: dict, symbol: str, action: str) -> str:
+        if self._context == "flatten":
+            return "flatten_buyback" if action == "BUY" else "flatten_sell_hedge"
+        if action == "BUY":
+            return "buyback" if symbol == state.get("sold") else "entry_hedge"
+        return "entry_short" if symbol == state.get("sold") else "sell_hedge"
+
+    def _place(
+        self, symbol: str, action: str, quantity: int, pricetype: str, price: float = 0.0
+    ) -> str:
+        """Sends one order through the shared code, recording it as inflight before it leaves.
+
+        A refusal from OpenAlgo is an answer that nothing was accepted, so the record is cleared.
+        Any other failure (timeout, lost reply, interrupt) keeps the record for the reconcile.
+        """
+        state = self.state()
+        if state.get("inflight"):
+            raise sb.Unresolved(
+                "An earlier order is still unresolved, so nothing new was placed. It is settled first."
+            )
+        record = {
+            "side": action,
+            "symbol": symbol,
+            "quantity": quantity,
+            "sent_at": now_ist().isoformat(timespec="seconds"),
+            "purpose": self._purpose(state, symbol, action),
+        }
+        self.save({**state, "inflight": record})
+        try:
+            orderid = super()._place(symbol, action, quantity, pricetype, price)
+        except sb.Refused:
+            self._clear_inflight()
+            raise
+        self.save({**self.state(), "inflight": {**record, "orderid": orderid}})
+        return orderid
+
+    def _settle(self, orderid: str, quantity: int) -> sb.Fill | None:
+        """Waits for the fill as the shared code does. Once the order is finished, its record is cleared.
+
+        An unresolved order (raised) keeps the record, so the next run settles it.
+        """
+        fill = super()._settle(orderid, quantity)
+        self._clear_inflight()
+        return fill
+
+    def _order_book(self) -> list[dict]:
+        reply = self.client.post("/api/v1/orderbook")
+        if reply.get("status") != "success":
+            raise ReplyLost("the order book did not answer with a success")
+        return list((reply.get("data") or {}).get("orders") or [])
+
+    def _order_status(self, orderid: str) -> dict:
+        reply = self.client.post("/api/v1/orderstatus", strategy=STRATEGY, orderid=orderid)
+        return reply.get("data") or {}
+
+    # reconcile ------------------------------------------------------------------------------
+    def _match(self, inflight: dict, book: list[dict]) -> list[dict]:
+        """The book rows that are this record's order: by id once the reply gave one, otherwise by
+        symbol, side, this strategy, and a time at or after the send."""
+        if inflight.get("orderid"):
+            return [o for o in book if str(o.get("orderid")) == str(inflight["orderid"])]
+        sent = datetime.fromisoformat(inflight["sent_at"])
+        return [
+            o
+            for o in book
+            if o.get("symbol") == inflight["symbol"]
+            and o.get("action") == inflight["side"]
+            and o.get("strategy") == STRATEGY
+            and _book_time(o.get("timestamp")) >= sent
+        ]
+
+    def _hold(self, state: dict, why: str) -> dict:
+        """Keeps the state as it is, flags it for a person, and alerts once for the same reason."""
+        if state.get("needs_attention") != why:
+            self.notify(
+                f"ATM 200 sandbox bot ALERT: {why} Look at the positions and the order book now."
+            )
+        self.save({**state, "needs_attention": why})
+        return {"status": "needs_attention", "reason": why}
+
+    def _outcome(
+        self, purpose: str, state: dict, fill: sb.Fill, quantity: int
+    ) -> tuple[dict, str | None]:
+        """The state a resolved order leaves, and the problem a person must look at (None when clean)."""
+        filled = fill.quantity
+        if purpose == "entry_hedge":
+            if filled == 0:
+                return {**state, "status": "no_hedge"}, None
+            if filled < quantity:
+                return {**state, "status": "orphan_hedge"}, (
+                    f"Only {filled} of {quantity} of the bought call filled."
+                )
+            return {**state, "status": "orphan_hedge", "hedge_fill": fill.__dict__}, None
+        if purpose == "entry_short":
+            if filled == 0:
+                # Only the bought call is held. The check flags it; flatten closes it.
+                return state, None
+            if filled < quantity:
+                return state, f"Only {filled} of {quantity} of the sold call filled."
+            hedge = state.get("hedge_fill")
+            if not hedge:
+                return state, "The bought call's fill is not recorded, so the credit is unknown."
+            credit = fill.price - hedge["price"]
+            return {
+                **state,
+                "status": "open",
+                "short_fill": fill.__dict__,
+                "credit_points": credit,
+            }, None
+        if purpose == "buyback":
+            if filled == quantity:
+                return {**state, "buyback_fill": fill.__dict__, "status": "short_bought_back"}, None
+            if filled == 0:
+                return (
+                    state,
+                    "The buy-back did not fill after the cancel, so the sold call is still held.",
+                )
+            return state, f"Only {filled} of {quantity} of the sold call was bought back."
+        if purpose == "sell_hedge":
+            if filled == quantity:
+                return {**state, "sell_hedge_fill": fill.__dict__, "status": "closed"}, None
+            if filled == 0:
+                return state, "The sale of the bought call did not fill after the cancel."
+            return state, f"Only {filled} of {quantity} of the bought call was sold."
+        key = "flatten_buyback_fill" if purpose == "flatten_buyback" else "flatten_sell_hedge_fill"
+        if filled == quantity:
+            return {**state, key: fill.__dict__}, None
+        if filled == 0:
+            return state, None
+        return state, f"Only {filled} of {quantity} filled for the {PURPOSE_NAMES[purpose]}."
+
+    def _reconcile(self, now: datetime, stop: bool) -> dict | None:
+        """Settles an order whose reply was lost, before any new decision is made.
+
+        Finds the order in the order book, cancels it if it is still working, confirms the result
+        against the account's positions, and records the outcome and the held quantities. Returns
+        None when there is nothing to settle, or when a clean result may be used by the caller
+        (``stop=False``). Otherwise returns a result for the caller to return. With ``stop=True``
+        (checks and entries) every resolution returns, so the next run acts on the recovered state.
+        """
+        state = self.state()
+        inflight = state.get("inflight")
+        if not inflight:
+            return None
+        purpose, quantity = inflight["purpose"], int(inflight["quantity"])
+        name = PURPOSE_NAMES[purpose]
+        try:
+            matches = self._match(inflight, self._order_book())
+            if len(matches) > 1:
+                return self._hold(
+                    state, f"More than one order matches the {name} sent at {inflight['sent_at']}."
+                )
+            if not matches:
+                # The order never reached OpenAlgo: nothing is held for it and nothing was placed.
+                cleared = {**state, "inflight": None}
+                if purpose == "entry_hedge":
+                    cleared["status"] = "not_placed"
+                return self._hold(
+                    cleared,
+                    f"The {name} order never reached OpenAlgo, so nothing was placed for it.",
+                )
+            order = matches[0]
+            orderid = str(order["orderid"])
+            if str(order.get("order_status", "")).lower() not in TERMINAL_ORDER_STATES:
+                self._cancel(orderid)
+                order = self._order_status(orderid)
+                if str(order.get("order_status", "")).lower() not in TERMINAL_ORDER_STATES:
+                    return self._hold(
+                        state, f"Order {orderid} for the {name} is still working after a cancel."
+                    )
+            status = str(order.get("order_status", "")).lower()
+            fill = sb.Fill(
+                orderid,
+                float(order.get("average_price") or 0),
+                int(float(order.get("filled_quantity") or 0)),
+            )
+            held_sold = self._held(state["sold"], STRATEGY)
+            held_long = self._held(state["long"], STRATEGY)
+            if purpose in ENTRY_PURPOSES or purpose in EXIT_PURPOSES:
+                want = _expected_held(purpose, quantity, fill.quantity)
+                if (held_sold, held_long) != want:
+                    return self._hold(
+                        state,
+                        f"After order {orderid} ({name}) the sandbox holds the sold call at {held_sold} "
+                        f"and the bought call at {held_long}, not the {want[0]} and {want[1]} expected.",
+                    )
+            new, problem = self._outcome(purpose, state, fill, quantity)
+            new = {k: v for k, v in new.items() if k != "needs_attention"}
+            summary = (
+                f"Reconciled the {name} (order {orderid}): {status}, {fill.quantity} of {quantity} "
+                f"filled at {fill.price:.2f}. Held: sold call {held_sold}, bought call {held_long}."
+            )
+            new["inflight"] = None
+            new["reconcile_note"] = f"{summary} At {now:%Y-%m-%d %H:%M}."
+            if problem:
+                return self._hold(new, problem)
+            if purpose == "sell_hedge" and new.get("status") == "closed":
+                self._book(new, now)
+            else:
+                self.save(new)
+            self.notify(f"ATM 200 sandbox bot ALERT: {summary} Check the positions now.")
+            if not stop:
+                return None
+            return {
+                "status": "mismatch" if purpose in EXIT_PURPOSES else "needs_attention",
+                "reconciled": purpose,
+                "orderid": orderid,
+            }
+        except Exception:
+            return self._hold(
+                state,
+                f"Could not settle the {name} order because the order book or the cancel did not answer. "
+                "The record is kept, and nothing new is placed until it is settled.",
+            )
 
     # entry ----------------------------------------------------------------------------------
     def enter_spread(
@@ -183,6 +485,12 @@ class ATM200Bot(sb.Bot):
     ) -> dict:
         """Open the spread at about 10:15 on a trading day when the gates pass and nothing is recorded."""
         self.require_sandbox()
+        if self.state().get("inflight"):
+            if dry_run:
+                return {"status": "dry_run", "would": "settle the unresolved order first"}
+            pending = self._reconcile(now, stop=True)
+            if pending is not None:
+                return pending
         if rule.ledger_should_stop(ledger_total(self.trades_path)):
             self.notify(f"ATM 200 sandbox bot: {LEDGER_STOP_MESSAGE}")
             raise sb.Refused(LEDGER_STOP_MESSAGE)
@@ -319,11 +627,26 @@ class ATM200Bot(sb.Bot):
         return int(float(reply.get("quantity") or 0))
 
     def _refuse_if_held(self, sold_sym: str, long_sym: str) -> None:
-        """Refuse an entry when either contract already has a position, under the S3n label or this bot's.
+        """Refuse an entry when either contract already has a position under any strategy label.
 
-        Two different bots must not both hold the same contract: the S3n bot's position would be
-        mistaken for this bot's, and a flatten by either would close the other's leg.
+        Two bots must not both hold the same contract: the other bot's position would be mistaken for
+        this bot's, and a flatten by either would close the other's leg. The account's positionbook
+        covers every label; the two labels named here are also asked, as the earlier check did.
         """
+        reply = self.client.post_as_is("/api/v1/positionbook")
+        if reply.get("status") != "success":
+            why = "The positions could not be read, so no order was placed."
+            self.notify(f"ATM 200 sandbox bot: {why}")
+            raise sb.Refused(why)
+        for position in reply.get("data") or []:
+            symbol = position.get("symbol")
+            if symbol in (sold_sym, long_sym) and int(float(position.get("quantity") or 0)):
+                why = (
+                    f"{symbol} already has a position of {position.get('quantity')} in the sandbox "
+                    "account, so nothing new was placed. Look at the positions first."
+                )
+                self.notify(f"ATM 200 sandbox bot: {why}")
+                raise sb.Refused(why)
         for symbol in (sold_sym, long_sym):
             for label in (sb.STRATEGY, STRATEGY):
                 qty = self._held(symbol, label)
@@ -337,12 +660,18 @@ class ATM200Bot(sb.Bot):
 
     # check and exit -------------------------------------------------------------------------
     def check_spread(self, now: datetime, holidays: set[date], dry_run: bool = False) -> dict:
-        """Run every 5 minutes from 10:20 to 15:00. Confirms the legs are held, then applies the rule.
+        """Run every 5 minutes from 10:20 to 15:00. Settles any lost order, confirms the legs are held, then applies the rule.
 
         A check never opens anything. A position that is not reconciled is left alone and alerted,
         because closing a leg against a book that does not match could open a new naked position.
         """
         self.require_sandbox()
+        if self.state().get("inflight"):
+            if dry_run:
+                return {"status": "dry_run", "would": "settle the unresolved order first"}
+            pending = self._reconcile(now, stop=True)
+            if pending is not None:
+                return pending
         state = self.state()
         status = state.get("status")
         if status == "closed":
@@ -355,6 +684,9 @@ class ATM200Bot(sb.Bot):
                 self._attention(
                     state, sb.Unresolved(f"the trade is recorded as {status} and not finished")
                 )
+            return {"status": "needs_attention", "recorded": status}
+        if state.get("needs_attention"):
+            # Set by a reconcile that could not finish. Nothing is sent until a person clears it.
             return {"status": "needs_attention", "recorded": status}
 
         today = now.date()
@@ -400,6 +732,19 @@ class ATM200Bot(sb.Bot):
         if current.get("status") == "open":
             self.save({k: v for k, v in current.items() if k not in EXIT_FIELDS})
 
+    def _book(self, done: dict, now: datetime) -> dict:
+        """Writes a closed trade to the state and to the CSV, once, from its entry credit and exit fills."""
+        exit_value = done["buyback_fill"]["price"] - done["sell_hedge_fill"]["price"]
+        record = {
+            **done,
+            "exit_value_points": exit_value,
+            "gross_rupees": rule.pnl_rupees(done["credit_points"], exit_value, done["quantity"]),
+            "exit_time": f"{now:%Y-%m-%d %H:%M}",
+        }
+        self.save(record)
+        append_trade(self.trades_path, record)
+        return record
+
     def _close(self, state: dict, now: datetime) -> dict:
         """Buy the call back, then sell the hedge, through the shared exit. Records a closed trade."""
         try:
@@ -413,15 +758,7 @@ class ATM200Bot(sb.Bot):
             if done.get("status") == "exit_failed":
                 self._release_exit()
             return done
-        exit_value = done["buyback_fill"]["price"] - done["sell_hedge_fill"]["price"]
-        record = {
-            **done,
-            "exit_value_points": exit_value,
-            "gross_rupees": rule.pnl_rupees(done["credit_points"], exit_value, done["quantity"]),
-            "exit_time": f"{now:%Y-%m-%d %H:%M}",
-        }
-        self.save(record)
-        append_trade(self.trades_path, record)
+        record = self._book(done, now)
         late = " (late)" if record.get("exit_note") == "late" else ""
         self.notify(
             f"ATM 200 sandbox bot: closed {record['sold']} / {record['long']} on "
@@ -433,16 +770,26 @@ class ATM200Bot(sb.Bot):
     def flatten(self, yes: bool = False) -> dict:
         """Close whatever this bot's two contracts hold, for a trade left stuck by a failure.
 
-        Reads the account rather than the recorded fills: buys back the call if it is held short,
-        then sells the hedge if it is held long, both at market through the shared order code. Records
-        FLATTENED and writes no row to trades.csv, so the result is not booked. A second run finds
-        nothing in a flatten state and places nothing.
+        Settles any lost order first, then reads the account rather than the recorded fills: buys back
+        the call if it is held short, then sells the hedge if it is held long, both at market through
+        the shared order code. Records FLATTENED and writes no row to trades.csv, so the result is not
+        booked. A second run finds nothing in a flatten state and places nothing.
         """
         self.require_sandbox()
         if not yes:
             raise sb.Refused(
                 "Flatten closes positions at market. Run it again with --yes to confirm."
             )
+        self._context = "flatten"
+        try:
+            pending = self._reconcile(now_ist(), stop=False)
+            if pending is not None:
+                return pending
+            return self._flatten_now()
+        finally:
+            self._context = None
+
+    def _flatten_now(self) -> dict:
         state = self.state()
         if state.get("status") not in FLATTEN_STATES:
             return {"status": state.get("status", "flat")}
@@ -470,6 +817,10 @@ class ATM200Bot(sb.Bot):
                 )
                 raise sb.Refused(f"The buy-back of {sold} was not filled, so nothing was sold.")
         if held_long > 0:
+            if self.state().get("inflight"):
+                raise sb.Refused(
+                    "A short sell for this spread is still unresolved, so the hedge was not sold."
+                )
             sell_id = self._place(long, "SELL", held_long, "MARKET")
             try:
                 sell = self._settle(sell_id, held_long)
@@ -480,7 +831,7 @@ class ATM200Bot(sb.Bot):
                 self.notify(f"ATM 200 sandbox bot ALERT: could not sell {long}. Close it by hand.")
                 raise sb.Refused(f"The sale of {long} was not filled.")
 
-        done = {k: v for k, v in state.items() if k != "needs_attention"}
+        done = {k: v for k, v in state.items() if k not in ("needs_attention", "inflight")}
         done.update(
             status=FLATTENED,
             note=FLATTEN_NOTE,

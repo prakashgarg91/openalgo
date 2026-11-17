@@ -37,6 +37,7 @@ class FakeApi:
         self.ltp = {SOLD: 20.0, LONG: 6.0}
         self.quotes = {SOLD: (19.5, 20.5), LONG: (5.5, 6.0)}
         self.looks, self.orders, self.cancelled, self.net, self.counted = 0, {}, [], {}, set()
+        self.stamp = {}
         self.calls = []
 
     def post(self, path, **p):
@@ -57,11 +58,22 @@ class FakeApi:
                 return {"status": "error", "message": "analyzer mode is off"}
             oid = f"id{len(self.orders) + 1}"
             self.orders[oid] = p
+            self.stamp[oid] = atm.now_ist()
             if self.flip_after_orders == len(self.orders):
                 self.analyze = False  # Live is switched on right after this order
             return {"status": "success", "orderid": oid}
         if path == "/api/v1/orderstatus":
             return {"data": self._status(p["orderid"])}
+        if path == "/api/v1/orderbook":
+            return {
+                "status": "success",
+                "data": {"orders": [self._row(oid) for oid in self.orders]},
+            }
+        if path == "/api/v1/positionbook":
+            for oid in self.orders:
+                self._status(oid)  # a fill reaches the positions once it has been read
+            rows = [{"symbol": s, "quantity": q} for s, q in self.net.items() if q]
+            return {"status": "success", "data": rows}
         if path == "/api/v1/cancelorder":
             self.cancelled.append(p["orderid"])
             return {"status": "success"}
@@ -75,14 +87,39 @@ class FakeApi:
         qty = order["quantity"]
         if (sym, action) in self.no_fill:
             status = "cancelled" if oid in self.cancelled else "open"
-            return {"order_status": status, "average_price": 0, "quantity": qty}
+            return {
+                "order_status": status,
+                "average_price": 0,
+                "quantity": qty,
+                "filled_quantity": 0,
+            }
         if self.partial_hedge is not None and sym == LONG and action == "BUY":
             qty = self.partial_hedge
         if oid not in self.counted:
             self.counted.add(oid)
             self.net[sym] = self.net.get(sym, 0) + (qty if action == "BUY" else -qty)
         price = order["price"] or self.ltp[sym]  # a market order fills at the last price
-        return {"order_status": "complete", "average_price": price, "quantity": qty}
+        return {
+            "order_status": "complete",
+            "average_price": price,
+            "quantity": qty,
+            "filled_quantity": qty,
+        }
+
+    def _row(self, oid):
+        """One order as the order book lists it."""
+        order, data = self.orders[oid], self._status(oid)
+        return {
+            "orderid": oid,
+            "symbol": order["symbol"],
+            "action": order["action"],
+            "quantity": order["quantity"],
+            "order_status": data["order_status"],
+            "average_price": data["average_price"],
+            "filled_quantity": data["filled_quantity"],
+            "strategy": order["strategy"],
+            "timestamp": self.stamp[oid].strftime("%Y-%m-%d %H:%M:%S"),
+        }
 
 
 def placed(api):
@@ -351,6 +388,7 @@ class BrokerFake:
         self.quotes = {SOLD: (19.5, 20.5), LONG: (5.5, 6.0)}
         self.pending, self.crash = set(pending), None
         self.orders, self.calls, self.extra = {}, [], {}
+        self.book_down = False
 
     def arm(self, when, action, symbol, exc):
         self.crash = (when, action, symbol, exc)
@@ -389,19 +427,31 @@ class BrokerFake:
             oid = f"id{len(self.orders) + 1}"
             status = "open" if (p["action"], p["symbol"]) in self.pending else "complete"
             price = p["price"] or self.ltp[p["symbol"]]  # a market order fills at the last price
-            self.orders[oid] = {"p": p, "status": status, "price": price}
+            # The order is booked before the reply leaves, so a lost reply still leaves it in the book.
+            self.orders[oid] = {"p": p, "status": status, "price": price, "stamp": atm.now_ist()}
             self._maybe_crash("sent", p["action"], p["symbol"])
             return {"status": "success", "orderid": oid}
         if path == "/api/v1/orderstatus":
             order = self.orders[p["orderid"]]
             self._maybe_crash("poll", order["p"]["action"], order["p"]["symbol"])
-            return {
-                "data": {
-                    "order_status": order["status"],
-                    "average_price": order["price"],
-                    "quantity": order["p"]["quantity"],
-                }
-            }
+            return self._status_reply(order)
+        if path == "/api/v1/orderbook":
+            if self.book_down:
+                return {"status": "error", "message": "the order book is down"}
+            rows = []
+            for oid, order in self.orders.items():
+                rows.append(
+                    {
+                        "orderid": oid,
+                        "symbol": order["p"]["symbol"],
+                        "action": order["p"]["action"],
+                        "quantity": order["p"]["quantity"],
+                        "strategy": order["p"]["strategy"],
+                        "timestamp": order["stamp"].strftime("%Y-%m-%d %H:%M:%S"),
+                        **self._status_reply(order)["data"],
+                    }
+                )
+            return {"status": "success", "data": {"orders": rows}}
         if path == "/api/v1/cancelorder":
             order = self.orders[p["orderid"]]
             if order["status"] == "open":
@@ -411,7 +461,31 @@ class BrokerFake:
             label_held = self.held(p["symbol"]) if p["strategy"] == atm.STRATEGY else 0
             other = self.extra.get((p["strategy"], p["symbol"]), 0)
             return {"status": "success", "quantity": str(label_held + other)}
+        if path == "/api/v1/positionbook":
+            symbols = {o["p"]["symbol"] for o in self.orders.values()}
+            symbols |= {symbol for (_label, symbol) in self.extra}
+            rows = []
+            for symbol in sorted(symbols):
+                qty = self.held(symbol) + sum(
+                    v for (_label, s), v in self.extra.items() if s == symbol
+                )
+                if qty:
+                    rows.append({"symbol": symbol, "quantity": qty})
+            return {"status": "success", "data": rows}
         raise AssertionError(path)
+
+    @staticmethod
+    def _status_reply(order):
+        filled = order["p"]["quantity"] if order["status"] == "complete" else 0
+        return {
+            "status": "success",
+            "data": {
+                "order_status": order["status"],
+                "average_price": order["price"],
+                "quantity": order["p"]["quantity"],
+                "filled_quantity": filled,
+            },
+        }
 
 
 def naked_short(api):
@@ -469,12 +543,6 @@ def test_a_failure_during_exit_leaves_a_safe_state_and_no_new_order(tmp_path, po
     assert no_repeats(api) and not naked_short(api)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="GAP: a buy-back or sell-hedge accepted but not yet filled when the reply is lost is not "
-    "seen by the follow-up check, which then sends the same order again. Needs an in-flight order "
-    "check before the exit is re-sent.",
-)
 @pytest.mark.parametrize("point", list(EXIT_POINTS))
 def test_an_exit_order_still_working_is_not_sent_again(tmp_path, point):
     when, action, symbol = EXIT_POINTS[point]
@@ -487,11 +555,6 @@ def test_an_exit_order_still_working_is_not_sent_again(tmp_path, point):
     assert no_repeats(api)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="GAP: a short sell lost in flight can still be working. Flatten sells the hedge and cannot "
-    "see or cancel the short, so when it fills the spread is a naked short. The order id is not kept.",
-)
 def test_a_working_short_sell_cannot_fill_naked_after_a_flatten(tmp_path):
     api = BrokerFake(pending={("SELL", SOLD)})
     api.arm("sent", "SELL", SOLD, httpx.TimeoutException("the broker did not answer"))
@@ -609,3 +672,77 @@ def test_the_s3n_lookup_is_sent_with_the_s3n_label_and_this_bots_label_too(tmp_p
         (SOLD, atm.STRATEGY),
         (LONG, atm.STRATEGY),
     } <= lookups
+
+
+def test_the_ledger_stop_is_net_of_the_charges_of_each_fill(tmp_path):
+    """A gross just short of the line is past it once the four fills' charges are taken off."""
+    trades = tmp_path / "db" / "trades.csv"
+    fills = {
+        "short_fill": {"price": 10.0},
+        "hedge_fill": {"price": 5.0},
+        "buyback_fill": {"price": 5.0},
+        "sell_hedge_fill": {"price": 1.0},
+    }
+    atm.append_trade(
+        trades,
+        {
+            "entry_date": "2026-10-01",
+            "entry_time": "2026-10-01 10:15",
+            "sold": "A",
+            "quantity": QTY,
+            "exit_time": "2026-10-02 15:00",
+            "gross_rupees": -19_950,
+            **fills,
+        },
+    )
+    assert atm.ledger_total(trades) < -20_000
+    api, notes = FakeApi(), []
+    with pytest.raises(sb.Refused) as why:
+        bot(tmp_path, api, notes).enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    assert str(why.value) == atm.LEDGER_STOP_MESSAGE and not placed(api)
+
+
+def test_a_position_under_any_other_strategy_label_refuses_entry(tmp_path):
+    api, notes = BrokerFake(), []
+    api.extra[("manual-sandbox", LONG)] = QTY
+    with pytest.raises(sb.Refused, match=LONG):
+        bot(tmp_path, api, notes).enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    assert not placed(api) and LONG in notes[0]
+
+
+def test_an_unreadable_order_book_keeps_the_record_and_alerts_once(tmp_path):
+    api, notes = BrokerFake(), []
+    api.arm("sent", "BUY", LONG, httpx.TimeoutException("the broker did not answer"))
+    b = bot(tmp_path, api, notes)
+    with pytest.raises(httpx.TimeoutException):
+        b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    api.book_down = True
+    assert b.check_spread(FOLLOW_UP, set())["status"] == "needs_attention"
+    assert b.check_spread(FOLLOW_UP, set())["status"] == "needs_attention"
+    assert len(notes) == 1 and b.state()["inflight"]["side"] == "BUY"
+    assert len(placed(api)) == 1
+
+
+def test_a_record_whose_order_never_reached_openalgo_is_cleared_and_flagged(tmp_path):
+    api, notes = BrokerFake(), []
+    b = bot(tmp_path, api, notes)
+    b.save(
+        {
+            "entry_date": ENTRY.isoformat(),
+            "status": "entering",
+            "sold": SOLD,
+            "long": LONG,
+            "quantity": QTY,
+            "inflight": {
+                "side": "BUY",
+                "symbol": LONG,
+                "quantity": QTY,
+                "sent_at": FOLLOW_UP.replace(microsecond=0).isoformat(),
+                "purpose": "entry_hedge",
+            },
+        }
+    )
+    out = b.check_spread(FOLLOW_UP, set())
+    state = b.state()
+    assert out["status"] == "needs_attention" and not state["inflight"]
+    assert state["status"] == "not_placed" and len(notes) == 1 and not placed(api)
