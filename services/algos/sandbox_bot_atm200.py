@@ -31,6 +31,15 @@ REASON_EXPIRY_WINDOW = (
 ACTIVE_ATM = ("entering", "open", "orphan_hedge", "short_bought_back")
 #: Fields written before an exit is sent, removed again if that exit is refused or fails.
 EXIT_FIELDS = ("exit_reason", "exit_value_quote", "exit_note", "exit_decided")
+#: Entry is refused once the closed trades in the CSV have lost this much (the frozen ledger stop).
+LEDGER_STOP_MESSAGE = (
+    "The ATM 200 sandbox ledger has lost 20,000 rupees or more, so it has stopped. "
+    "A person must decide whether to continue."
+)
+#: States a flatten by a person acts on. Anything else is already flat or was never opened.
+FLATTEN_STATES = ("entering", "orphan_hedge", "short_bought_back", "open")
+FLATTENED = "flattened_by_person"
+FLATTEN_NOTE = "Closed by a person with the flatten command. Not written to trades.csv, so its result is not booked."
 #: The 15:00 check on the session after entry is the last bar. A check up to 15:05 still counts.
 LAST_BAR = time(15, 0)
 LAST_BAR_GRACE_END = time(15, 5)
@@ -70,6 +79,18 @@ class _StrategyClient:
         if "strategy" in payload:
             payload["strategy"] = self.strategy
         return self.client.post(path, **payload)
+
+    def post_as_is(self, path: str, **payload) -> dict:
+        """Sends a request with its strategy field untouched. Used only for reading another label's holdings."""
+        return self.client.post(path, **payload)
+
+
+def ledger_total(path: Path) -> float:
+    """Sum of gross_rupees over the closed trades in the CSV. A missing file is an empty ledger."""
+    if not path.is_file():
+        return 0.0
+    with path.open(newline="", encoding="utf-8") as handle:
+        return sum(float(row.get("gross_rupees") or 0) for row in csv.DictReader(handle))
 
 
 def is_trading_day(day: date, holidays: set[date]) -> bool:
@@ -162,6 +183,9 @@ class ATM200Bot(sb.Bot):
     ) -> dict:
         """Open the spread at about 10:15 on a trading day when the gates pass and nothing is recorded."""
         self.require_sandbox()
+        if rule.ledger_should_stop(ledger_total(self.trades_path)):
+            self.notify(f"ATM 200 sandbox bot: {LEDGER_STOP_MESSAGE}")
+            raise sb.Refused(LEDGER_STOP_MESSAGE)
         today = now.date()
         if not is_trading_day(today, holidays):
             raise sb.Refused("Today is not a trading day, so no entry was placed.")
@@ -187,6 +211,7 @@ class ATM200Bot(sb.Bot):
         decision = rule.plan_entry(spot, vix_prev, _ltp(sold_quote), _ltp(long_quote))
         if decision.skipped_reason:
             return self._skip(today, expiry, decision.skipped_reason, note, dry_run)
+        self._refuse_if_held(sold_sym, long_sym)
         sell_at, buy_at = sb.limit_prices(sold_quote, long_quote)
 
         qty = sb.lot_quantity(now)
@@ -282,6 +307,34 @@ class ATM200Bot(sb.Bot):
     def _day(today: date, status: str) -> dict:
         return {"entry_date": today.isoformat(), "status": status}
 
+    def _held(self, symbol: str, label: str) -> int:
+        """Net quantity the account holds in the contract under one strategy label (negative = short)."""
+        reply = self.client.post_as_is(
+            "/api/v1/openposition",
+            strategy=label,
+            symbol=symbol,
+            exchange=sb.EXCHANGE,
+            product=sb.PRODUCT,
+        )
+        return int(float(reply.get("quantity") or 0))
+
+    def _refuse_if_held(self, sold_sym: str, long_sym: str) -> None:
+        """Refuse an entry when either contract already has a position, under the S3n label or this bot's.
+
+        Two different bots must not both hold the same contract: the S3n bot's position would be
+        mistaken for this bot's, and a flatten by either would close the other's leg.
+        """
+        for symbol in (sold_sym, long_sym):
+            for label in (sb.STRATEGY, STRATEGY):
+                qty = self._held(symbol, label)
+                if qty:
+                    why = (
+                        f"{symbol} already has a position of {qty} in the sandbox account, so "
+                        "nothing new was placed. Look at the positions first."
+                    )
+                    self.notify(f"ATM 200 sandbox bot: {why}")
+                    raise sb.Refused(why)
+
     # check and exit -------------------------------------------------------------------------
     def check_spread(self, now: datetime, holidays: set[date], dry_run: bool = False) -> dict:
         """Run every 5 minutes from 10:20 to 15:00. Confirms the legs are held, then applies the rule.
@@ -375,3 +428,71 @@ class ATM200Bot(sb.Bot):
             f"{record['exit_reason']}{late}, gross {record['gross_rupees']:.0f} rupees."
         )
         return record
+
+    # flatten by a person --------------------------------------------------------------------
+    def flatten(self, yes: bool = False) -> dict:
+        """Close whatever this bot's two contracts hold, for a trade left stuck by a failure.
+
+        Reads the account rather than the recorded fills: buys back the call if it is held short,
+        then sells the hedge if it is held long, both at market through the shared order code. Records
+        FLATTENED and writes no row to trades.csv, so the result is not booked. A second run finds
+        nothing in a flatten state and places nothing.
+        """
+        self.require_sandbox()
+        if not yes:
+            raise sb.Refused(
+                "Flatten closes positions at market. Run it again with --yes to confirm."
+            )
+        state = self.state()
+        if state.get("status") not in FLATTEN_STATES:
+            return {"status": state.get("status", "flat")}
+        sold, long = state["sold"], state["long"]
+        held_sold, held_long = self._held(sold, STRATEGY), self._held(long, STRATEGY)
+        if held_sold > 0 or held_long < 0:
+            why = (
+                f"{sold} or {long} is held the wrong way round for this spread, so nothing was closed. "
+                "Look at the positions by hand."
+            )
+            self.notify(f"ATM 200 sandbox bot ALERT: {why}")
+            raise sb.Refused(why)
+
+        buy = sell = None
+        if held_sold < 0:
+            buy_id = self._place(sold, "BUY", -held_sold, "MARKET")
+            try:
+                buy = self._settle(buy_id, -held_sold)
+            except sb.Unresolved as why:
+                self._attention(state, why)
+                raise
+            if buy is None:
+                self.notify(
+                    f"ATM 200 sandbox bot ALERT: could not buy back {sold}. Close it by hand."
+                )
+                raise sb.Refused(f"The buy-back of {sold} was not filled, so nothing was sold.")
+        if held_long > 0:
+            sell_id = self._place(long, "SELL", held_long, "MARKET")
+            try:
+                sell = self._settle(sell_id, held_long)
+            except sb.Unresolved as why:
+                self._attention(state, why)
+                raise
+            if sell is None:
+                self.notify(f"ATM 200 sandbox bot ALERT: could not sell {long}. Close it by hand.")
+                raise sb.Refused(f"The sale of {long} was not filled.")
+
+        done = {k: v for k, v in state.items() if k != "needs_attention"}
+        done.update(
+            status=FLATTENED,
+            note=FLATTEN_NOTE,
+            flattened_at=f"{datetime.now():%Y-%m-%d %H:%M}",
+            flatten_held={"sold": held_sold, "long": held_long},
+        )
+        if buy is not None:
+            done["flatten_buyback_fill"] = buy.__dict__
+        if sell is not None:
+            done["flatten_sell_hedge_fill"] = sell.__dict__
+        self.save(done)
+        self.notify(
+            f"ATM 200 sandbox bot: flattened {sold} / {long} by hand. Nothing was booked to trades.csv."
+        )
+        return done

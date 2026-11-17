@@ -10,6 +10,10 @@ Usage:
     uv run python scripts/algo_backtest/sandbox_bot_atm200.py entry [--dry-run]   # about 10:15 on a trading day
     uv run python scripts/algo_backtest/sandbox_bot_atm200.py check [--dry-run]   # every 5 minutes, 10:20 to 15:00
     uv run python scripts/algo_backtest/sandbox_bot_atm200.py status              # the recorded trade
+    uv run python scripts/algo_backtest/sandbox_bot_atm200.py flatten --yes       # by hand, after a stuck trade
+
+flatten reads the account, buys back the call if it is held short and sells the hedge if it is held
+long, at market, in analyzer mode only. It books nothing to trades.csv.
 """
 
 import json
@@ -68,7 +72,7 @@ def main() -> int:
         recorded = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
         print(json.dumps(recorded, indent=2, default=str))
         return 0
-    if command not in ("entry", "check"):
+    if command not in ("entry", "check", "flatten"):
         print(__doc__)
         return 1
     key = api_key()
@@ -87,11 +91,14 @@ def main() -> int:
         api = s3n.Api(http, os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000"), key)
         bot = bot_mod.ATM200Bot(api, STATE, TRADES, notify=fa.notify, sleep=time.sleep)
         try:
-            holidays = s3n.holidays(api, now.year)
-            if command == "entry":
+            if command == "flatten":
+                result = bot.flatten(yes="--yes" in sys.argv)
+            elif command == "entry":
+                holidays = s3n.holidays(api, now.year)
                 expiry = s3n.nearest_expiry(api, now.date())
                 result = bot.enter_spread(expiry, now, holidays, latest_vix(now.date()), dry)
             else:
+                holidays = s3n.holidays(api, now.year)
                 result = bot.check_spread(now, holidays, dry)
         except sb.Refused as why:
             print(str(why))

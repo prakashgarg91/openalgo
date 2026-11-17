@@ -29,3 +29,15 @@ Set `OPENALGO_API_KEY` (and `OPENALGO_HOST` if OpenAlgo is not on `http://127.0.
 ## Limits
 
 Sandbox fills are produced by the sandbox engine, not by a real order book, so the shortfall it shows is an indication only; real bid/ask snapshots ([bid-ask-snapshots.md](bid-ask-snapshots.md)) remain the measure of slippage. Tested on a fake API only; it has not yet been run against a live OpenAlgo in analyzer mode.
+
+## ATM 200-wide executor (17 November 2026)
+
+`services/algos/sandbox_bot_atm200.py` with the runner `scripts/algo_backtest/sandbox_bot_atm200.py` (commands `entry`, `check`, `status`, `flatten --yes`) runs the frozen rule in `services/algos/atm200_rule.py` in Sandbox mode only, on the S3n bot's order safety. Scheduled by the tasks "OpenAlgo ATM200 sandbox entry" (10:16) and "OpenAlgo ATM200 sandbox check" (every 5 minutes 09:20 to 15:25, weekdays). Thresholds use the LTP credit at entry; profit and loss is booked on fills; the entry is refused outside 10:10 to 10:45 unless forced.
+
+Known gaps, written down on purpose. They block any real order until fixed and re-tested:
+- If the buy-back or the sell-hedge was accepted but not yet filled when the reply was lost, the next check re-sends the same order (strict expected-failure test).
+- A short sell lost in flight can still be working; `flatten` then sells the hedge and the short may fill naked. The bot does not keep the order id, so it cannot cancel it (strict expected-failure test).
+- After a lost short reply the next check alerts but does not confirm the short's position; a person must look.
+- A working hedge limit from a lost entry reply is not cancelled by `flatten` (untested).
+- The ledger stop sums gross rupees; the rule describes it as net. The S3n collision check covers the two labels named only.
+Gate before real money: kill the process or time out the client after each order; the next check must end flat or fully hedged with one alert and no duplicate order, with every case above passing, not expected-failing.

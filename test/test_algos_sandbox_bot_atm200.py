@@ -3,6 +3,7 @@
 import csv
 from datetime import date, datetime
 
+import httpx
 import pytest
 
 from services.algos import atm200_rule as rule
@@ -316,3 +317,295 @@ def test_the_exit_thresholds_use_the_ltp_credit_at_entry_not_the_fill_credit(tmp
     api.ltp = {SOLD: value + 4.0, LONG: 4.0}
     done = b.check_spread(ENTRY_SESSION_1100, set())
     assert done["status"] == "closed" and done["exit_reason"] == "stop"
+
+
+# ledger stop, S3n collision, flatten, and failures at each order ------------------------------
+FOLLOW_UP = datetime(2026, 11, 9, 10, 20)  # the first 5-minute check after the entry
+ENTRY_POINTS = {  # (when in the call, action, symbol): the failure is raised there
+    "hedge_sent": ("sent", "BUY", LONG),
+    "hedge_fill_awaited": ("poll", "BUY", LONG),
+    "short_sent": ("sent", "SELL", SOLD),
+    "short_fill_awaited": ("poll", "SELL", SOLD),
+}
+EXIT_POINTS = {
+    "buyback_sent": ("sent", "BUY", SOLD),
+    "sellhedge_sent": ("sent", "SELL", LONG),
+}
+FAILURES = ["timeout", "interrupt"]
+
+
+def failure(kind):
+    """A timeout as the HTTP client raises it, or a Ctrl-C or kill that lands in the same place."""
+    if kind == "timeout":
+        return httpx.TimeoutException("the broker did not answer")
+    return KeyboardInterrupt()
+
+
+class BrokerFake:
+    """A broker book: a sent order fills at once unless its (action, symbol) is pending, and positions
+    follow the fills. One failure can be armed at a point in the sequence and fires once."""
+
+    def __init__(self, pending=()):
+        self.analyze = True
+        self.ltp = {SOLD: 20.0, LONG: 6.0}
+        self.quotes = {SOLD: (19.5, 20.5), LONG: (5.5, 6.0)}
+        self.pending, self.crash = set(pending), None
+        self.orders, self.calls, self.extra = {}, [], {}
+
+    def arm(self, when, action, symbol, exc):
+        self.crash = (when, action, symbol, exc)
+
+    def _maybe_crash(self, when, action, symbol):
+        if self.crash and self.crash[:3] == (when, action, symbol):
+            exc, self.crash = self.crash[3], None
+            raise exc
+
+    def held(self, symbol):
+        total = 0
+        for order in self.orders.values():
+            p = order["p"]
+            if order["status"] == "complete" and p["symbol"] == symbol:
+                total += p["quantity"] if p["action"] == "BUY" else -p["quantity"]
+        return total
+
+    def fill_pending(self, action, symbol):
+        for order in self.orders.values():
+            p = order["p"]
+            if order["status"] == "open" and (p["action"], p["symbol"]) == (action, symbol):
+                order["status"] = "complete"
+
+    def post(self, path, **p):
+        self.calls.append((path, p))
+        if path == "/api/v1/analyzer":
+            return {"status": "success", "data": {"analyze_mode": self.analyze}}
+        if path == "/api/v1/quotes":
+            if p["symbol"] == sb.UNDERLYING:
+                return {"data": {"ltp": 25010.0}}
+            bid, ask = self.quotes[p["symbol"]]
+            return {"data": {"ltp": self.ltp[p["symbol"]], "bid": bid, "ask": ask}}
+        if path == "/api/v1/placeorder":
+            if p.get("sandbox_only") and not self.analyze:
+                return {"status": "error", "message": "analyzer mode is off"}
+            oid = f"id{len(self.orders) + 1}"
+            status = "open" if (p["action"], p["symbol"]) in self.pending else "complete"
+            price = p["price"] or self.ltp[p["symbol"]]  # a market order fills at the last price
+            self.orders[oid] = {"p": p, "status": status, "price": price}
+            self._maybe_crash("sent", p["action"], p["symbol"])
+            return {"status": "success", "orderid": oid}
+        if path == "/api/v1/orderstatus":
+            order = self.orders[p["orderid"]]
+            self._maybe_crash("poll", order["p"]["action"], order["p"]["symbol"])
+            return {
+                "data": {
+                    "order_status": order["status"],
+                    "average_price": order["price"],
+                    "quantity": order["p"]["quantity"],
+                }
+            }
+        if path == "/api/v1/cancelorder":
+            order = self.orders[p["orderid"]]
+            if order["status"] == "open":
+                order["status"] = "cancelled"
+            return {"status": "success"}
+        if path == "/api/v1/openposition":
+            label_held = self.held(p["symbol"]) if p["strategy"] == atm.STRATEGY else 0
+            other = self.extra.get((p["strategy"], p["symbol"]), 0)
+            return {"status": "success", "quantity": str(label_held + other)}
+        raise AssertionError(path)
+
+
+def naked_short(api):
+    """A short call with less long call held against it than the short."""
+    short = api.held(SOLD)
+    return short < 0 and api.held(LONG) < -short
+
+
+def no_repeats(api):
+    """No two orders in the run share a side and a symbol."""
+    sent = [(o["action"], o["symbol"]) for o in placed(api)]
+    return len(sent) == len(set(sent))
+
+
+def open_spread(root, api, notes):
+    b = bot(root, api, notes)
+    b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    api.ltp = {SOLD: 5.0, LONG: 4.0}  # spread value 1.0 is at or below the target: an exit is due
+    return b
+
+
+@pytest.mark.parametrize("kind", FAILURES)
+@pytest.mark.parametrize("point", list(ENTRY_POINTS))
+def test_a_failure_during_entry_leaves_a_state_that_needs_a_person(tmp_path, point, kind):
+    api, notes = BrokerFake(), []
+    when, action, symbol = ENTRY_POINTS[point]
+    api.arm(when, action, symbol, failure(kind))
+    b = bot(tmp_path, api, notes)
+    with pytest.raises(type(failure(kind))):
+        b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    sent_before, notes = len(placed(api)), []
+    b.notify = notes.append
+    out = b.check_spread(FOLLOW_UP, set())
+    assert out["status"] == "needs_attention"
+    assert len(notes) == 1 and "ALERT" in notes[0]  # exactly one alert for the unclear state
+    assert len(placed(api)) == sent_before  # the follow-up sends nothing
+    assert no_repeats(api) and not naked_short(api)
+
+
+@pytest.mark.parametrize("kind", FAILURES)
+@pytest.mark.parametrize("point", list(EXIT_POINTS))
+def test_a_failure_during_exit_leaves_a_safe_state_and_no_new_order(tmp_path, point, kind):
+    api, notes = BrokerFake(), []
+    b = open_spread(tmp_path, api, notes)
+    when, action, symbol = EXIT_POINTS[point]
+    api.arm(when, action, symbol, failure(kind))
+    with pytest.raises(type(failure(kind))):
+        b.check_spread(ENTRY_SESSION_1100, set())
+    sent_before, notes = len(placed(api)), []
+    b.notify = notes.append
+    out = b.check_spread(ENTRY_SESSION_1100, set())
+    assert out["status"] == "mismatch"  # the book no longer matches the recorded legs
+    assert len(notes) == 1 and "ALERT" in notes[0]
+    assert len(placed(api)) == sent_before
+    assert no_repeats(api) and not naked_short(api)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="GAP: a buy-back or sell-hedge accepted but not yet filled when the reply is lost is not "
+    "seen by the follow-up check, which then sends the same order again. Needs an in-flight order "
+    "check before the exit is re-sent.",
+)
+@pytest.mark.parametrize("point", list(EXIT_POINTS))
+def test_an_exit_order_still_working_is_not_sent_again(tmp_path, point):
+    when, action, symbol = EXIT_POINTS[point]
+    api, notes = BrokerFake(pending={(action, symbol)}), []
+    b = open_spread(tmp_path, api, notes)
+    api.arm(when, action, symbol, httpx.TimeoutException("the broker did not answer"))
+    with pytest.raises(httpx.TimeoutException):
+        b.check_spread(ENTRY_SESSION_1100, set())
+    b.check_spread(ENTRY_SESSION_1100, set())
+    assert no_repeats(api)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="GAP: a short sell lost in flight can still be working. Flatten sells the hedge and cannot "
+    "see or cancel the short, so when it fills the spread is a naked short. The order id is not kept.",
+)
+def test_a_working_short_sell_cannot_fill_naked_after_a_flatten(tmp_path):
+    api = BrokerFake(pending={("SELL", SOLD)})
+    api.arm("sent", "SELL", SOLD, httpx.TimeoutException("the broker did not answer"))
+    b = bot(tmp_path, api, [])
+    with pytest.raises(httpx.TimeoutException):
+        b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    b.flatten(yes=True)
+    api.fill_pending("SELL", SOLD)
+    assert not naked_short(api)
+
+
+def test_a_lost_hedge_reply_then_flatten_sells_only_the_hedge(tmp_path):
+    api = BrokerFake()
+    api.arm("sent", "BUY", LONG, httpx.TimeoutException("the broker did not answer"))
+    b = bot(tmp_path, api, [])
+    with pytest.raises(httpx.TimeoutException):
+        b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    sent = len(placed(api))
+    b.flatten(yes=True)
+    assert [(o["action"], o["symbol"]) for o in placed(api)[sent:]] == [("SELL", LONG)]
+    assert b.state()["status"] == atm.FLATTENED
+
+
+def test_flatten_refuses_without_yes_and_places_nothing(tmp_path):
+    api = BrokerFake()
+    b = open_spread(tmp_path, api, [])
+    sent = len(placed(api))
+    with pytest.raises(sb.Refused, match="--yes"):
+        b.flatten(yes=False)
+    assert len(placed(api)) == sent and b.state()["status"] == "open"
+
+
+def test_flatten_refuses_in_live_mode(tmp_path):
+    api = BrokerFake()
+    b = open_spread(tmp_path, api, [])
+    api.analyze = False
+    sent = len(placed(api))
+    with pytest.raises(sb.Refused, match="not on"):
+        b.flatten(yes=True)
+    assert len(placed(api)) == sent
+
+
+def test_flatten_buys_back_the_call_then_sells_the_hedge_and_books_nothing(tmp_path):
+    api = BrokerFake()
+    b = open_spread(tmp_path, api, [])
+    sent = len(placed(api))
+    done = b.flatten(yes=True)
+    closing = placed(api)[sent:]
+    assert [(o["action"], o["symbol"], o["pricetype"]) for o in closing] == [
+        ("BUY", SOLD, "MARKET"),
+        ("SELL", LONG, "MARKET"),
+    ]
+    assert all(o["sandbox_only"] is True for o in closing)
+    assert done["status"] == atm.FLATTENED and b.state()["status"] == atm.FLATTENED
+    assert api.held(SOLD) == 0 and api.held(LONG) == 0
+    assert not (tmp_path / "db" / "trades.csv").exists()
+
+
+def test_flatten_a_second_time_does_nothing(tmp_path):
+    api = BrokerFake()
+    b = open_spread(tmp_path, api, [])
+    b.flatten(yes=True)
+    sent = len(placed(api))
+    again = b.flatten(yes=True)
+    assert again["status"] == atm.FLATTENED and len(placed(api)) == sent
+
+
+def test_flatten_of_a_recorded_entry_with_nothing_held_places_nothing(tmp_path):
+    api = BrokerFake()
+    b = bot(tmp_path, api, [])
+    b.save({"status": "entering", "sold": SOLD, "long": LONG, "quantity": QTY})
+    b.flatten(yes=True)
+    assert not placed(api) and b.state()["status"] == atm.FLATTENED
+
+
+def test_entry_is_refused_once_the_ledger_has_lost_20000(tmp_path):
+    trades = tmp_path / "db" / "trades.csv"
+    atm.append_trade(trades, {"entry_date": "2026-10-01", "sold": "A", "gross_rupees": -12000})
+    atm.append_trade(trades, {"entry_date": "2026-10-02", "sold": "B", "gross_rupees": -8000})
+    api, notes = FakeApi(), []
+    with pytest.raises(sb.Refused) as why:
+        bot(tmp_path, api, notes).enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    assert str(why.value) == atm.LEDGER_STOP_MESSAGE
+    assert "lost 20,000" in notes[0] and not placed(api)
+
+
+def test_entry_goes_ahead_at_19999_lost_and_ignores_blank_rows(tmp_path):
+    trades = tmp_path / "db" / "trades.csv"
+    atm.append_trade(trades, {"entry_date": "2026-10-01", "sold": "A", "gross_rupees": -12000})
+    atm.append_trade(trades, {"entry_date": "2026-10-02", "sold": "B", "gross_rupees": -7999})
+    atm.append_trade(trades, {"entry_date": "2026-10-03", "sold": "C"})  # no figure: counts as 0
+    state = bot(tmp_path, FakeApi(), []).enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    assert state["status"] == "open"
+
+
+@pytest.mark.parametrize("label", [sb.STRATEGY, atm.STRATEGY])
+@pytest.mark.parametrize("symbol", [SOLD, LONG])
+def test_a_contract_already_held_refuses_entry_and_names_it(tmp_path, label, symbol):
+    api, notes = BrokerFake(), []
+    api.extra[(label, symbol)] = QTY
+    with pytest.raises(sb.Refused, match=symbol):
+        bot(tmp_path, api, notes).enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    assert not placed(api) and symbol in notes[0]
+
+
+def test_the_s3n_lookup_is_sent_with_the_s3n_label_and_this_bots_label_too(tmp_path):
+    api = BrokerFake()
+    bot(tmp_path, api, []).enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    lookups = {
+        (p["symbol"], p["strategy"]) for path, p in api.calls if path == "/api/v1/openposition"
+    }
+    assert {
+        (SOLD, sb.STRATEGY),
+        (LONG, sb.STRATEGY),
+        (SOLD, atm.STRATEGY),
+        (LONG, atm.STRATEGY),
+    } <= lookups
