@@ -120,6 +120,25 @@ DAY_COLUMNS = [
 ]
 
 
+#: Trades made to test the machinery, not to trade: kept out of the account's own record.
+REHEARSAL_STRATEGIES = ("kill-switch-test",)
+REHEARSAL_BOT = "ATM200-sandbox"
+REHEARSAL_BOT_FIRST_REAL_DAY = "2026-11-18"
+
+
+#: The kill-switch test of 17 Nov 2026 closed its position as AUTO_SQUARE_OFF on this one contract.
+KILL_SWITCH_CLOSE = ("NIFTY17NOV2626000CE", "2026-11-17")
+
+
+def is_rehearsal(strategy: str | None, timestamp: str, symbol: str = "") -> bool:
+    """A kill-switch test, or an ATM 200 Sandbox bot trade before its first scheduled day."""
+    if strategy in REHEARSAL_STRATEGIES:
+        return True
+    if (symbol, timestamp[:10]) == KILL_SWITCH_CLOSE and strategy == "AUTO_SQUARE_OFF":
+        return True
+    return strategy == REHEARSAL_BOT and timestamp[:10] < REHEARSAL_BOT_FIRST_REAL_DAY
+
+
 def write_round_trips(out: Path) -> str:
     """Every closed Sandbox position, net of charges and dated by the day it was OPENED.
 
@@ -135,16 +154,27 @@ def write_round_trips(out: Path) -> str:
     conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
     try:
         rows = conn.execute(
-            "select symbol, action, quantity, price, trade_timestamp from sandbox_trades order by trade_timestamp"
+            "select symbol, action, quantity, price, trade_timestamp, strategy from sandbox_trades order by trade_timestamp"
         ).fetchall()
     finally:
         conn.close()
-    fills = [
-        {"symbol": r[0], "action": r[1], "quantity": r[2], "price": r[3], "timestamp": str(r[4])}
-        for r in rows
-    ]
-    result = rt.round_trips(fills)
+    clean_fills, test_fills = [], []
+    for r in rows:
+        fill = {
+            "symbol": r[0],
+            "action": r[1],
+            "quantity": r[2],
+            "price": r[3],
+            "timestamp": str(r[4]),
+        }
+        (test_fills if is_rehearsal(r[5], str(r[4]), r[0]) else clean_fills).append(fill)
+    result = rt.round_trips(clean_fills)
+    test_result = rt.round_trips(test_fills)
     days = rt.by_entry_date(result["trips"])
+    with (out / "rehearsal_round_trips.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=TRIP_COLUMNS)
+        writer.writeheader()
+        writer.writerows(test_result["trips"])
     for name, columns, data in (
         ("round_trips.csv", TRIP_COLUMNS, result["trips"]),
         ("by_entry_date.csv", DAY_COLUMNS, days),
@@ -155,7 +185,8 @@ def write_round_trips(out: Path) -> str:
             writer.writerows(data)
     net = round(sum(d["net_after_charges"] for d in days), 2)
     return (
-        f"Round trips: {len(result['trips'])} closed, {len(result['open'])} open fill(s); "
+        f"Round trips: {len(result['trips'])} closed, {len(result['open'])} open fill(s) "
+        f"(machinery-test trades kept apart: {len(test_result['trips'])}); "
         f"net after charges {net} (gross {round(sum(d['gross'] for d in days), 2)})."
     )
 
