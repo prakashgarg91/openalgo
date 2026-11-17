@@ -323,7 +323,10 @@ class ATM200Bot(sb.Bot):
         value = rule.spread_value(sold_ltp, long_ltp)
         due = today > exit_session or (today == exit_session and now.time() >= LAST_BAR)
         on_time = today == exit_session and LAST_BAR <= now.time() < LAST_BAR_GRACE_END
-        reason = rule.exit_decision(state["credit_points"], value, due)
+        # Thresholds use the LTP credit at entry, the same basis as the replay and as the LTP value they are
+        # compared with. Profit and loss is still booked on the fills: the gap between the two is the
+        # execution cost this run exists to measure.
+        reason = rule.exit_decision(state["entry_ltp_credit"], value, due)
         if reason is None:
             return {"status": "held", "value": value}
         late = due and not on_time

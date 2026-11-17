@@ -17,6 +17,7 @@ import os
 import sys
 import time
 from datetime import date, datetime
+from datetime import time as clock
 from pathlib import Path
 
 import httpx
@@ -76,6 +77,12 @@ def main() -> int:
         return 1
     dry = "--dry-run" in sys.argv
     now = datetime.now()
+    if command == "entry" and not dry and "--force" not in sys.argv:
+        if not (clock(10, 10) <= now.time() <= clock(10, 45)):
+            print(
+                "The entry runs only between 10:10 and 10:45. Use --force to override on purpose."
+            )
+            return 2
     with httpx.Client(timeout=15.0) as http:
         api = s3n.Api(http, os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000"), key)
         bot = bot_mod.ATM200Bot(api, STATE, TRADES, notify=fa.notify, sleep=time.sleep)
@@ -89,6 +96,13 @@ def main() -> int:
         except sb.Refused as why:
             print(str(why))
             return 2
+        except Exception as why:  # noqa: BLE001 - a network or other failure must alert, never end silently
+            fa.notify(
+                f"ATM 200 sandbox bot ERROR ({command}): {type(why).__name__}. Nothing further was done; "
+                r"look at the positions and log\sandbox_bot_atm200.log."
+            )
+            print(f"{type(why).__name__}: {why}")
+            return 3
     print(json.dumps(result, indent=2, default=str))
     return 0
 

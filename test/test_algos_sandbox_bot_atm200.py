@@ -299,3 +299,20 @@ def test_a_closed_trade_is_written_once_to_the_csv(tmp_path):
     with (tmp_path / "db" / "trades.csv").open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 1 and rows[0]["exit_reason"] == "target" and rows[0]["sold"] == SOLD
+
+
+def test_the_exit_thresholds_use_the_ltp_credit_at_entry_not_the_fill_credit(tmp_path):
+    """The replay and the compared LTP value share one basis; fills only decide the booked result."""
+    api = FakeApi()
+    b = bot(tmp_path, api)
+    b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    state = b.state()
+    ltp_credit = state["entry_ltp_credit"]
+    # make the fill credit very different from the LTP credit, as a bad fill would
+    state["credit_points"] = ltp_credit + 30.0
+    b.save(state)
+    # a value just over 250 percent of the LTP credit but far under 250 percent of the inflated fill credit
+    value = rule.STOP * ltp_credit + 0.5
+    api.ltp = {SOLD: value + 4.0, LONG: 4.0}
+    done = b.check_spread(ENTRY_SESSION_1100, set())
+    assert done["status"] == "closed" and done["exit_reason"] == "stop"
