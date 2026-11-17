@@ -10,6 +10,7 @@ fix, live in [docs/releases](releases/).
 
 ### Added
 
+- Research harness (internal, not used by the app yet): `services/algos/portfolio_labels.py`, `portfolio_select.py`, `portfolio_report.py` and `portfolio_wf.py` build a walk-forward regime-aware portfolio of algos from a list of trades, and report an honest walk-forward view next to a labelled in-sample hindsight view. Tested only on made-up data: on pure noise the hindsight view is positive in 99 percent of runs while the walk-forward view averages a t statistic near zero. It is not wired into the picker, runner, register or any ledger, adds no trial, and was not run on real option data (14 evaluation months cannot detect an edge of useful size; the better-powered run needs its own registration). No setting, schema or trading behaviour changed.
 - Algos page, new tab "Auto builder": a read-only idea tracker (`GET /algos/api/idea-tracker`). It lists every registered idea and where it stands, the gates ideas missed most often (read before proposing the next one), the number of standard errors a result must clear given how many ideas were tried, and the forward shadow tests. The live gate is always shown locked. It proposes nothing, runs nothing and places no order; an automatic idea generator was deliberately not built (see docs/algos/auto-builder-research-2026-11.md). No setting, schema or trading behaviour changed.
 
 ### Fixed
