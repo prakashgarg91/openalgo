@@ -23,7 +23,7 @@ rem Forward ledgers of registered end-of-day structures (does nothing if no idea
 uv run python scripts\algo_backtest\run_forward_eod.py >> log\capture.log 2>&1
 uv run python scripts\algo_backtest\run_etf_ledgers.py >> log\capture.log 2>&1
 rem Refresh the India VIX daily series in the data repository (merge only, never shrinks) so the 10:15 VIX gate is not stale.
-uv run python scriptslgo_backtestefresh_vix.py D:\Github\openalgo-data >> log\capture.log 2>&1
+uv run python scripts\algo_backtest\refresh_vix.py D:\Github\openalgo-data >> log\capture.log 2>&1
 rem Then check that the day's candles, VIX, ETF closes and report files really arrived (Telegram alert if not).
 rem The Zen shadow follow ledger (reads a file, places no order; skips quietly if the file is missing).
 uv run python scripts\algo_backtest\run_zen_follow.py >> log\capture.log 2>&1
