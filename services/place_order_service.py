@@ -182,7 +182,24 @@ def place_order_with_auth(
             },
             403,
         )
-    order_data = {k: v for k, v in order_data.items() if k != "sandbox_only"}
+    # live_only is the mirror of sandbox_only: a caller that must never reach the sandbox (a live
+    # executor that has been told to place a REAL order) says so, and the order is refused when analyze
+    # mode is on, because the sandbox would report success while nothing reached the broker. Read from the
+    # same single read of the mode above, so the refusal and the routing cannot disagree. It only ever
+    # refuses; an order that does not carry it is routed exactly as before.
+    if original_data.get("live_only") and analyze_mode:
+        return (
+            False,
+            {
+                "status": "error",
+                "message": (
+                    "This order was marked live only, but analyzer mode is on, so nothing was "
+                    "placed in the sandbox and nothing was sent to the broker."
+                ),
+            },
+            403,
+        )
+    order_data = {k: v for k, v in order_data.items() if k not in ("sandbox_only", "live_only")}
     if analyze_mode and not force_live:
         from services.sandbox_service import sandbox_place_order
 

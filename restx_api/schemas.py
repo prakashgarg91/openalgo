@@ -34,6 +34,8 @@ class OrderSchema(Schema):
     product = fields.Str(missing="MIS", validate=validate.OneOf(["MIS", "NRML", "CNC"]))
     # Optional. True means "refuse this order unless analyzer mode is on"; it never routes anywhere.
     sandbox_only = fields.Bool(missing=False)
+    # Optional. True means "refuse this order if analyzer mode is on"; it never routes anywhere.
+    live_only = fields.Bool(missing=False)
     price = fields.Float(
         missing=0.0, validate=validate.Range(min=0, error="Price must be a non-negative number.")
     )
