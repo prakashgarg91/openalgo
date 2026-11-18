@@ -23,6 +23,7 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from services.algos import forward_alerts as fa  # noqa: E402
 from services.algos import sandbox_bot as sb  # noqa: E402
+from utils.logging import get_logger  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / "db" / "sandbox_bot" / "state.json"
@@ -30,18 +31,42 @@ COMPARE = ROOT / "db" / "sandbox_bot" / "compare.csv"
 LEDGER = ROOT / "db" / "forward_s3n" / "report.json"
 
 
+#: Exit code for an unexpected failure (a lost reply, a crash, a bad reply). The alert names the command.
+UNEXPECTED_EXIT = 3
+
+
+def failure_alert(command: str) -> str:
+    """The Telegram text for an unexpected failure. It names the command and says what to look at."""
+    return (
+        f"Sandbox bot ALERT: S3n {command} stopped on an unexpected error; nothing further was done; "
+        "look at the positions and the order book now."
+    )
+
+
+def report_unexpected(command: str, why: BaseException, notify) -> int:
+    """Send one alert for a failure that is not a refusal, print its type and return the exit code.
+
+    A notify that raises is logged and does not hide the original failure.
+    """
+    try:
+        notify(failure_alert(command))
+    except Exception:
+        logger.exception("Could not send the S3n failure alert")
+    print(f"{type(why).__name__}: {why}")
+    return UNEXPECTED_EXIT
+
+
 class Api:
     def __init__(self, http: httpx.Client, host: str, key: str):
         self.http, self.host, self.key = http, host.rstrip("/"), key
 
     def post(self, path: str, **payload) -> dict:
-        try:
-            reply = self.http.post(self.host + path, json={"apikey": self.key, **payload})
-            return reply.json()
-        except (httpx.HTTPError, ValueError) as err:
-            raise sb.Refused(
-                "OpenAlgo did not answer. Check that it is running and that OPENALGO_HOST is right."
-            ) from err
+        """Transport failures and undecodable replies propagate unchanged, so main can alert on them.
+
+        They are not refusals: after a lost reply an order may still have reached OpenAlgo.
+        """
+        reply = self.http.post(self.host + path, json={"apikey": self.key, **payload})
+        return reply.json()
 
 
 def holidays(api: Api, year: int) -> set[date]:
@@ -89,11 +114,17 @@ def compare_rows() -> int:
     return 0
 
 
+logger = get_logger(__name__)
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     command = args[0] if args else ""
     if command == "compare":
-        return compare_rows()
+        try:
+            return compare_rows()
+        except Exception as why:  # noqa: BLE001 - an unexpected failure must alert, never end silently
+            return report_unexpected(command, why, fa.notify)
     if command not in ("entry", "check", "exit"):
         print(__doc__)
         return 1
@@ -102,10 +133,10 @@ def main() -> int:
         print("Set OPENALGO_API_KEY to your OpenAlgo API key first.")
         return 1
     dry = "--dry-run" in sys.argv
-    with httpx.Client(timeout=15.0) as http:
-        api = Api(http, os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000"), key)
-        bot = sb.Bot(api, STATE, notify=fa.notify, sleep=time.sleep)
-        try:
+    try:
+        with httpx.Client(timeout=15.0) as http:
+            api = Api(http, os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000"), key)
+            bot = sb.Bot(api, STATE, notify=fa.notify, sleep=time.sleep)
             if command == "entry":
                 now = datetime.now()
                 result = bot.enter(
@@ -115,9 +146,11 @@ def main() -> int:
                 result = bot.check()
             else:
                 result = bot.exit(dry, today=date.today(), force="--force" in sys.argv)
-        except sb.Refused as why:
-            print(str(why))
-            return 2
+    except sb.Refused as why:
+        print(str(why))
+        return 2
+    except Exception as why:  # noqa: BLE001 - an unexpected failure must alert, never end silently
+        return report_unexpected(command, why, fa.notify)
     print(json.dumps(result, indent=2, default=str))
     return 0
 
