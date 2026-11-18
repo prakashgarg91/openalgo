@@ -11,7 +11,7 @@ Owner's goal: a system ready for algo trading that is better than Zen from Strat
 | 3 | Always-on machine so days are not missed | Owner chose to keep the PC on 8 Nov. Server runbook is ready if that changes ([always-on-server.md](always-on-server.md)). Tasks now wake the PC from sleep, and the capture catches up if the PC starts late the same day | PC on, never asleep or off on trading days, signed in by 09:15 |
 | 4 | Static IP for order writes | Done: proxy renewed to 11 Feb 2027, tested, Readiness checks it | Renew before 11 Feb 2027 |
 | 5 | Live gate: no Live order without a recorded forward pass and a written post-mortem | Built, on by default | Leave on |
-| 6 | Risk limits: Rs 1,00,000 capital, Rs 20,000 daily cap, one lot, defined risk only | In the picker and the live gate | Keep |
+| 6 | Risk limits: Rs 1,00,000 capital, Rs 27,000 daily cap (raised by the owner on 17 Nov 2026; frozen forward-test gates keep their written Rs 20,000 lines), real Upstox cash about Rs 32,041, one lot, defined risk only | In the picker and the live gate | Keep |
 | 7 | Cost model checked against a real Upstox contract note | Not done | One real contract note from the owner |
 | 8 | Kill switch tested end to end | Not done | Market hours, sandbox mode |
 | 9 | Why the two live orders were rejected | Parked as a funds issue | Upstox rejection text, or a funded account |
@@ -36,7 +36,7 @@ The forward evidence (weeks to months), a real contract note, a market-hours kil
 2. Always-on server decision.
 3. Fresh Zen trade file, so the follow ledger can see trades after 23 Sep.
 4. Weeks of forward data; weekly public-page reads; verdicts by the written rules.
-5. Only then, a staged live start: one lot, Rs 20,000 cap, supervised first week.
+5. Only then, a staged live start: one lot, Rs 27,000 cap with a Rs 10,000 pilot pause, supervised first week.
 
 ## What is automated and what is still the owner's (10 November 2026)
 

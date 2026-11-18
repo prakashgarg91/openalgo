@@ -1,6 +1,6 @@
 # Live executor for the ATM 200-wide rule: build plan (draft for owner approval, 17 November 2026)
 
-Not approved, nothing built. Roles: Fable 5.2 directs and reviews, Haiku 5.5 builds in scratch copies, Sonnet 5.5 coordinates and verifies, the owner approves and switches Live on. The Sandbox executor (`services/algos/sandbox_bot_atm200.py`) stays Sandbox only and is not changed into a live one.
+Approved by the owner on 17 Nov 2026 to START after the first scheduled Sandbox entry (18 Nov); nothing built yet; nothing may run until the owner approves the module. Roles: Fable 5.2 directs and reviews, Haiku 5.5 builds in scratch copies, Sonnet 5.5 coordinates and verifies, the owner approves and switches Live on. The Sandbox executor (`services/algos/sandbox_bot_atm200.py`) stays Sandbox only and is not changed into a live one.
 
 ## Why a separate build
 
@@ -34,3 +34,7 @@ Run without the owner's daily approval, size above one lot, hold more than one p
 ## Cost and risk
 
 Cost: one week of Haiku and Sonnet time and Fable reviews. Risk: real money at stake only after step 5, and the pause line bounds the pilot's loss at about Rs 10,000 plus the open trade.
+
+## Relation to the Live gate (open owner decision, written down so it is not routed around)
+
+The Live gate (`ALGO_LIVE_REQUIRES_FORWARD_PASS`, on by default) refuses a Live algo order without a recorded forward pass and a written post-mortem; for the ATM 200-wide rule that cannot exist before about May 2027. The owner chose (17 Nov 2026) a MANUAL pilot from 1 Dec with the gate left on: the owner places each trade by hand in the app, which the gate does not cover. The live executor therefore must not quietly bypass the gate: it either honours it (and stays unused until a forward pass exists), or refuses to start unless the owner has switched the gate off in writing for this one rule, and says so loudly in its first alert. Nothing automatic runs live before that written decision.
