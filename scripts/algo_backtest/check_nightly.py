@@ -54,6 +54,16 @@ SESSION_LOOKBACK_DAYS = 10  # how far back the daily closes are read; covers a l
 MARKET_CLOSE = dt_time(15, 30)
 
 
+def newest_mtime(path: Path) -> float:
+    """When a report was last written. For a folder this is its newest file, not the folder itself:
+    rewriting a file in place does not touch the folder's own time, so a ledger folder updated every
+    night would otherwise look weeks old."""
+    if path.is_dir():
+        times = [p.stat().st_mtime for p in path.iterdir() if p.is_file()]
+        return max(times) if times else path.stat().st_mtime
+    return path.stat().st_mtime
+
+
 def option_symbols_in(catalog_rows: list[dict]) -> list[str]:
     """Nifty option contracts with stored one-minute candles, from the Historify catalog."""
     return sorted(
@@ -242,7 +252,7 @@ def collect(day: date, before_close: bool) -> tuple[list[dict], dict]:
         ("db/etf_ledger", ROOT / "db" / "etf_ledger", "Run run_etf_ledgers.py tonight"),
     ):
         exists = path.exists()
-        age = (time.time() - path.stat().st_mtime) / 3600 if exists else None
+        age = (time.time() - newest_mtime(path)) / 3600 if exists else None
         artifacts.append({"name": name, "exists": exists, "age_hours": age, "fix": fix})
 
     return catalog_rows, {

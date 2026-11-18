@@ -301,3 +301,26 @@ def test_cli_notify_sends_the_text_through_forward_alerts(tmp_path, capsys, monk
     assert len(sent) == 1
     assert sent[0].startswith("Sandbox 15:30 summary:")
     assert "Not sent to Telegram" in capsys.readouterr().out
+
+
+def test_a_morning_hour_written_without_a_leading_zero_is_read_as_that_hour():
+    """Windows logs ' 9:25:00.89' before ten; reading it as 25:00 reported eight false gaps on 18 Nov 2026."""
+    from services.algos import sandbox_summary as ss
+
+    lines = [
+        f"==== 18-11-2026 {h:>2}:{m:02d}:00.89 check "
+        for h in range(9, 16)
+        for m in range(0, 60, 5)
+    ]
+    lines = [
+        x
+        for x in lines
+        if "9:00" not in x and "9:05" not in x and "9:10" not in x and "9:15" not in x
+    ]
+    lines = [
+        x for x in lines if not any(f"15:{m}" in x for m in ("30", "35", "40", "45", "50", "55"))
+    ]
+    out = ss.build_summary({"status": "skipped"}, [], lines, 74, "2026-11-18")
+    text = ss.render_text(out)
+    assert "09:20" not in text.split("Checks:")[1].split("\n")[0] or "0 missed" in text
+    assert "gaps" not in out["verdict"]

@@ -28,12 +28,13 @@ EXIT_WINDOW = (14 * 60 + 55, 15 * 60 + 5)
 #: Statuses that are normal at 15:30. "open" is normal only before its exit session (see _attention).
 OK_STATUSES = frozenset({"none", "closed", "skipped", "flat", "not_placed"})
 
-_TIME = re.compile(r"(\d{2}):(\d{2})")
+#: Windows writes the hour without a leading zero before 10:00 (" 9:20:00.89"), so one or two digits.
+_TIME = re.compile(r"\s*(\d{1,2}):(\d{2})")
 
 
 def _minute(line: str, stamp: str) -> int | None:
     """Minutes after midnight of a check run's start time, or None when the header has no time."""
-    found = _TIME.search(line.strip()[len(f"==== {stamp}") :])
+    found = _TIME.match(line.strip()[len(f"==== {stamp}") :])
     if not found:
         return None
     return int(found.group(1)) * 60 + int(found.group(2))
