@@ -4,6 +4,8 @@ Written by Fable 5.2 (director), saved by Sonnet 5.5. NOT registered, NOT frozen
 
 ## Data
 
+Data repository commit at the time of this draft: `455c25b` (private repo `openalgo-data`; to be re-recorded at the freeze).
+
 NSE end-of-day Nifty weekly options in `openalgo-data/nse_fo_eod`, April 2021 to October 2026. February 2019 to March 2021 stays untouched.
 
 ## What "seen" means
@@ -26,7 +28,7 @@ Common terms: nearest weekly expiry 1 to 6 calendar days away; enter at today's 
 
 ## (b) Cells
 
-Volatility band from the frozen model in `services/algos/regime_gate.py` using the previous session's VIX close and range: groups 1-2 low, 3 mid, 4-5 high. If the entry or exit day is in the committed list `docs/algos/eod_library_events.json` (national events only: Union Budget, RBI policy decision days, Lok Sabha counting; each category is used only when complete), no trade. Mid and high are labelled but are forced no-trade: only the low band is learned (director's ruling of 17 Nov 2026 on counts alone: 853 low, 160 mid, 79 high usable trades per algo).
+Volatility band from the frozen model in `services/algos/regime_gate.py` using the previous session's VIX close and range: groups 1-2 low, 3 mid, 4-5 high. Registered numbers (fit by `regime_gate.fit` on 2008-03-04 to 2017-07-10, 2,279 rows; the run asserts a refit equals them): coefficients for previous VIX close, previous range and intercept 0.945791, 9.33738, -7.35624; cut points -4.67981, -4.51945, -4.32102, -3.99889; group = searchsorted(cuts, predicted) + 1. Disclosure: the lagged inputs were built over the whole public index daily history, which includes 2019-02 to 2021-03 index bars; no option data from that window was read and nothing from it entered the fit. If the entry or exit day is in the committed list `docs/algos/eod_library_events.json` (national events only: Union Budget, RBI policy decision days, Lok Sabha counting; each category is used only when complete), no trade. Mid and high are labelled but are forced no-trade: only the low band is learned (director's ruling of 17 Nov 2026 on counts alone: 853 low, 160 mid, 79 high usable trades per algo).
 
 ## (c) Selection and valuation
 
@@ -43,19 +45,19 @@ A pass needs all of these on view B at realistic costs: net t of at least 2.0; b
 
 ## (e) Trials
 
-Adds six (five algos, one selector): about 334 to 340, counting the exploratory looks of 6 and 17 November now written in TRIAL_REGISTER.md (rows 322 to 334, approximate). A t of 2.0 is well below the register bar of about 3.8. Only a forward ledger can meet that bar.
+Adds six (five algos, one selector): about 334 to 340, counting the exploratory looks of 6 and 17 November now written in TRIAL_REGISTER.md (rows 321 to 334; 322 to 334 are approximate). A t of 2.0 is well below the register bar of about 3.8. Only a forward ledger can meet that bar.
 
 ## (f) Haiku jobs, in order (Sonnet verifies each; Fable reviews)
 
 1. Counts only, no profit computed: sessions, expiries, usable legs and trades per cell per algo. Accept if at least 40 trades exist in each TRADEABLE cell (low only) in 90 percent of evaluation months; otherwise stop and return to the director. Done on 17 Nov 2026: low 100 percent (mid 27 percent and high 15 percent, hence forced no-trade).
 2. Valuation functions: settlement clamp, lots by date and costs, tested on made-up rows.
 3. Wire into the existing harness (`services/algos/portfolio_*.py`): the noise test and planted-edge test must pass, and exit-day dating must be tested.
-4. Freeze: record the code and document commit, and register. No change after this.
-5. The single run. Sonnet rechecks 20 random trades by hand.
+4. Freeze: reviewed on Monday 14 December 2026; record the code and document commit, and register. No change after this.
+5. The single run, in the January 2027 slot. Sonnet rechecks 20 random trades by hand.
 
 A defect against this document found after the run may be fixed, but the re-run counts as a new trial.
 
 ## (g) What each outcome permits
 
-- Pass: eligibility for the January slot and a pre-registered forward ledger, judged alone at the register bar; possibly one separate confirmation on the untouched window under its own registration. Never Live.
+- Pass: eligibility for the February 2027 slot (the run itself uses January) and a pre-registered forward ledger, judged alone at the register bar; possibly one separate confirmation on the untouched window under its own registration. Never Live.
 - Fail: the library is retired as tested. Nothing is tuned and re-run. The harness is kept.
