@@ -109,7 +109,7 @@ A defect found after the run may be fixed, but the re-run counts as a new trial.
 
 **Conflicts found while writing (for the drafting agent):**
 
-- Trial count: `TRIAL_REGISTER.md` reaches 321 with the Zen calls-only trial, so six more gives about 327, not the 334 to 340 in the draft and the brief.
+- Trial count: settled on 18 Nov 2026. The exploratory looks of 6 and 17 November are now written in `TRIAL_REGISTER.md` (rows 322 to 334, approximate), so six more gives about 340.
 - Step (f)1 of the draft requires 40 trades per cell in 90 percent of months. Mid (27 percent) and high (15 percent) fail that, so the gate needs to apply to tradeable cells only.
 - The draft cites `services/algos/events.py` as the event list. The code reads `eod_library_events.json` and applies `events.blocking()`.
 - The draft cites `services/algos/costs.py`. The code's `trade_net` uses `eod_screen.leg_cost`.
