@@ -71,6 +71,18 @@ def api_key() -> str | None:
     return str(value) or None
 
 
+#: Exit code for a failure that is not a refusal (a lost reply, a crash). The alert names the command.
+TRANSPORT_EXIT = 3
+
+
+def failure_alert(command: str, why: BaseException) -> str:
+    """The Telegram text for an unexpected failure. It names the command and says what to look at."""
+    return (
+        f"Sandbox: ATM 200 ERROR during {command} ({type(why).__name__}). The run stopped there. "
+        r"Look at the positions and log\errors.jsonl before running again."
+    )
+
+
 def latest_vix(today: date) -> tuple[date, float] | None:
     """The previous session's India VIX close as (its date, close), or None if the file is missing."""
     path = Path(os.getenv("ATM200_VIX_CSV") or DEFAULT_VIX)
@@ -119,12 +131,9 @@ def main() -> int:
             print(str(why))
             return 2
         except Exception as why:  # noqa: BLE001 - a network or other failure must alert, never end silently
-            fa.notify(
-                f"ATM 200 sandbox bot ERROR ({command}): {type(why).__name__}. Nothing further was done; "
-                r"look at the positions and log\sandbox_bot_atm200.log."
-            )
+            bot_mod.safe_send(fa.notify, failure_alert(command, why))
             print(f"{type(why).__name__}: {why}")
-            return 3
+            return TRANSPORT_EXIT
     print(json.dumps(result, indent=2, default=str))
     return 0
 

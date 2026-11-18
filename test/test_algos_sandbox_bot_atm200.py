@@ -1,7 +1,7 @@
 """The ATM 200 sandbox executor on a fake API: entry, gates, exits, failures and the trade record."""
 
 import csv
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import httpx
 import pytest
@@ -746,3 +746,148 @@ def test_a_record_whose_order_never_reached_openalgo_is_cleared_and_flagged(tmp_
     state = b.state()
     assert out["status"] == "needs_attention" and not state["inflight"]
     assert state["status"] == "not_placed" and len(notes) == 1 and not placed(api)
+
+
+# sign-off items: alert text, safe notify, strict VIX age, India clock, cancelled exits ----------
+@pytest.fixture(autouse=True)
+def india_clock(monkeypatch):
+    """Every test runs on an India clock; the clock tests replace it with a wrong offset."""
+    monkeypatch.setattr(atm, "machine_utc_offset", lambda: atm.INDIA_OFFSET, raising=False)
+
+
+def sb_fill(sign, price, day):
+    """Charges of one fill from the shared schedule; sign -1 is a sale."""
+    from services.algos.sandbox_round_trips import fill_charges
+
+    return fill_charges("SELL" if sign < 0 else "BUY", QTY, price, day)
+
+
+def test_every_alert_of_a_full_cycle_starts_with_sandbox(tmp_path):
+    api, notes = FakeApi(), []
+    b = bot(tmp_path, api, notes)
+    b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    api.ltp = {SOLD: 5.0, LONG: 4.0}
+    b.check_spread(ENTRY_SESSION_1100, set())
+    assert len(notes) >= 2 and all(n.startswith("Sandbox:") for n in notes)
+
+
+def test_the_entry_alert_names_strikes_expiry_quantity_credits_vix_date_and_exit(tmp_path):
+    api, notes = FakeApi(), []
+    bot(tmp_path, api, notes).enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    for piece in (
+        SOLD,
+        LONG,
+        "expiry 12 Nov 2026",
+        f"quantity {QTY}",
+        "LTP credit 14.00",
+        "fill credit 13.50",
+        "India VIX 14.00 on 06 Nov 2026",
+        "Exit session 10 Nov 2026",
+    ):
+        assert piece in notes[0], piece
+
+
+def test_the_entry_alert_says_the_vix_is_stale_when_it_was_not_applied(tmp_path):
+    api, notes = FakeApi(), []
+    bot(tmp_path, api, notes).enter_spread(EXPIRY, NOW, set(), None)
+    assert notes[0].startswith("Sandbox:") and atm.VIX_STALE_NOTE in notes[0]
+    assert "India VIX" not in notes[0]
+
+
+def test_the_skip_alert_gives_the_reason(tmp_path):
+    api, notes = FakeApi(), []
+    bot(tmp_path, api, notes).enter_spread(EXPIRY, NOW, set(), (date(2026, 11, 6), 25.0))
+    assert notes[0].startswith("Sandbox:") and rule.REASON_VIX_HIGH in notes[0]
+
+
+def test_the_exit_alert_gives_reason_values_net_after_charges_and_cumulative(tmp_path):
+    api, notes = FakeApi(), []
+    b = bot(tmp_path, api, notes)
+    b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    api.ltp = {SOLD: 5.0, LONG: 4.0}  # buy back at 5.0, sell the hedge at 4.0: exit value 1.0
+    done = b.check_spread(ENTRY_SESSION_1100, set())
+    charges = (
+        sb_fill(-1, 19.5, "2026-11-09")  # sold call at the touch
+        + sb_fill(+1, 6.0, "2026-11-09")  # bought call at the touch
+        + sb_fill(+1, 5.0, "2026-11-10")  # buy-back at the last price
+        + sb_fill(-1, 4.0, "2026-11-10")  # hedge sale at the last price
+    )
+    gross = rule.pnl_rupees(13.5, 1.0, QTY)
+    net = gross - charges
+    assert done["gross_rupees"] == pytest.approx(gross)
+    text = notes[-1]
+    assert text.startswith("Sandbox:") and "target" in text and "1.00 points" in text
+    assert f"gross Rs {gross:,.0f}" in text
+    assert f"net Rs {net:,.0f}" in text
+    assert f"Cumulative net Rs {net:,.0f}" in text
+    assert "Late exit: no" in text
+
+
+def test_a_late_exit_is_flagged_in_its_alert(tmp_path):
+    api, notes = FakeApi(), []
+    b = bot(tmp_path, api, notes)
+    b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    b.check_spread(datetime(2026, 11, 11, 10, 20), set())
+    assert notes[-1].startswith("Sandbox:") and "Late exit: yes" in notes[-1]
+
+
+def test_a_notify_that_raises_never_blocks_an_order_path(tmp_path):
+    api = FakeApi()
+
+    def broken(text):
+        raise RuntimeError("the Telegram service is down")
+
+    b = atm.ATM200Bot(
+        api, tmp_path / "db" / "state.json", tmp_path / "db" / "trades.csv", notify=broken, wait=10
+    )
+    state = b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    assert state["status"] == "open" and len(placed(api)) == 2
+    api.ltp = {SOLD: 5.0, LONG: 4.0}
+    assert b.check_spread(ENTRY_SESSION_1100, set())["status"] == "closed"
+
+
+def test_a_previous_vix_close_four_days_old_is_used_and_five_days_old_is_stale(tmp_path):
+    four = bot(tmp_path / "four", FakeApi(), []).enter_spread(
+        EXPIRY, NOW, set(), (date(2026, 11, 5), 14.0)
+    )
+    assert four["status"] == "open" and four["vix_prev"] == 14.0 and four["note"] == ""
+    five = bot(tmp_path / "five", FakeApi(), []).enter_spread(
+        EXPIRY, NOW, set(), (date(2026, 11, 4), 14.0)
+    )
+    assert five["status"] == "open" and five["note"] == atm.VIX_STALE_NOTE
+    assert five["vix_prev"] is None
+
+
+def test_a_wrong_machine_clock_refuses_entry_and_places_nothing(tmp_path, monkeypatch):
+    monkeypatch.setattr(atm, "machine_utc_offset", lambda: timedelta(hours=-5), raising=False)
+    api = FakeApi()
+    with pytest.raises(sb.Refused, match="India time"):
+        bot(tmp_path, api).enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    assert not placed(api)
+
+
+def test_a_wrong_machine_clock_refuses_check_and_flatten(tmp_path, monkeypatch):
+    api = FakeApi()
+    b = bot(tmp_path, api)
+    b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    before = len(placed(api))
+    monkeypatch.setattr(atm, "machine_utc_offset", lambda: timedelta(hours=-5), raising=False)
+    with pytest.raises(sb.Refused, match="India time"):
+        b.check_spread(ENTRY_SESSION_1100, set())
+    with pytest.raises(sb.Refused, match="India time"):
+        b.flatten(yes=True)
+    assert len(placed(api)) == before
+
+
+@pytest.mark.parametrize("stuck", [(SOLD, "BUY"), (LONG, "SELL")])
+def test_an_exit_order_found_cancelled_and_unfilled_stops_and_is_not_sent_again(tmp_path, stuck):
+    api, notes = FakeApi(no_fill=[stuck]), []
+    b = bot(tmp_path, api, notes)
+    b.enter_spread(EXPIRY, NOW, set(), FRESH_VIX)
+    api.ltp = {SOLD: 5.0, LONG: 4.0}
+    b.check_spread(ENTRY_SESSION_1100, set())
+    assert "ALERT" in notes[-1] and b.state()["needs_attention"]
+    sent, alerts = len(placed(api)), len(notes)
+    assert b.check_spread(datetime(2026, 11, 9, 11, 20), set())["status"] == "needs_attention"
+    assert b.check_spread(datetime(2026, 11, 9, 11, 25), set())["status"] == "needs_attention"
+    assert len(placed(api)) == sent and len(notes) == alerts

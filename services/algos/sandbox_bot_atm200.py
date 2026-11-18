@@ -11,12 +11,14 @@ when the reply arrives. If the reply is lost, the next run settles the record ag
 (cancel what is still working, confirm by position) before it decides anything.
 
 The caller supplies the client, the time, the holidays and the latest previous VIX close. Nothing in
-this module reads a file or the clock, so it runs in tests with a fake client.
+this module reads a file. The one clock read is the machine's UTC offset, checked against India time
+before every entry, check and flatten; a test replaces it with ``machine_utc_offset``.
 """
 
 from __future__ import annotations
 
 import csv
+from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -26,10 +28,25 @@ import pytz
 from services.algos import atm200_rule as rule
 from services.algos import sandbox_bot as sb
 from services.algos.sandbox_round_trips import fill_charges
+from utils.logging import get_logger
 
+logger = get_logger(__name__)
 STRATEGY = "ATM200-sandbox"
+#: Every message a trader reads starts with this label, so a Sandbox alert is never mistaken for Live.
+PREFIX = "Sandbox:"
+#: The base bot's wording, rewritten to the label above. Its "closed" line is dropped: the full exit alert replaces it.
+BASE_LABELS = (
+    ("Sandbox bot ALERT:", "Sandbox: ATM 200 ALERT:"),
+    ("Sandbox bot:", "Sandbox: ATM 200:"),
+)
+BASE_SUPPRESSED = ("Sandbox bot: closed",)
+INDIA_OFFSET = timedelta(hours=5, minutes=30)
+CLOCK_MESSAGE = (
+    "The computer's clock is not on India time (UTC+05:30), so the bot placed nothing. "
+    "Set the Windows time zone to India Standard Time, then run the command again."
+)
 #: A previous VIX close older than this is not used for the gate; the entry goes ahead with the note.
-STALE_VIX_DAYS = 5
+STALE_VIX_DAYS = 4
 VIX_STALE_NOTE = "VIX series is stale: gate not applied."
 REASON_EXPIRY_WINDOW = (
     "The nearest weekly expiry is not 1 to 6 days away, or no session is left before it."
@@ -119,6 +136,63 @@ class _StrategyClient:
 def now_ist() -> datetime:
     """The naive IST wall clock, the clock the order book stamps orders with."""
     return datetime.now(IST).replace(tzinfo=None)
+
+
+def machine_utc_offset() -> timedelta:
+    """This computer's UTC offset now. The only clock read in this module; tests replace it."""
+    return datetime.now().astimezone().utcoffset()
+
+
+def assert_india_clock() -> None:
+    """Refuses unless this computer is on India time, because order matching assumes that clock.
+
+    A wrong clock would mis-match an order to the wrong record, so nothing is sent in that case.
+    """
+    if machine_utc_offset() != INDIA_OFFSET:
+        raise sb.Refused(CLOCK_MESSAGE)
+
+
+def _labelled(text: str) -> str | None:
+    """The text with the Sandbox label; None for a base message that the full exit alert replaces."""
+    if text.startswith(BASE_SUPPRESSED):
+        return None
+    for old, new in BASE_LABELS:
+        if text.startswith(old):
+            return new + text[len(old) :]
+    return text if text.startswith(PREFIX) else f"{PREFIX} ATM 200 {text}"
+
+
+def safe_send(notify: Callable[[str], Any], text: str) -> None:
+    """Sends one alert. A failure is logged and never raised, so an alert can not stop an order path."""
+    label = _labelled(str(text))
+    if label is None:
+        return
+    try:
+        notify(label)
+    except Exception:
+        logger.exception("Could not send a sandbox alert; the order step carries on")
+
+
+def _day(text: str) -> str:
+    return date.fromisoformat(text).strftime("%d %b %Y")
+
+
+def entry_message(record: dict, sell_at: float, buy_at: float) -> str:
+    """The entry alert: strikes, expiry, quantity, both credits, the VIX value and date, the exit session."""
+    if record.get("vix_prev") is None:
+        vix = VIX_STALE_NOTE
+    else:
+        vix = f"India VIX {record['vix_prev']:.2f} on {_day(record['vix_prev_date'])}."
+    return (
+        f"Sandbox: ATM 200 opened. Sold {record['sold']}, bought {record['long']}, "
+        f"expiry {_day(record['expiry'])}, quantity {record['quantity']}. "
+        f"LTP credit {record['entry_ltp_credit']:.2f} points, fill credit {record['credit_points']:.2f} "
+        f"points (limits {sell_at:.2f} sell, {buy_at:.2f} buy). {vix} "
+        f"Exit session {_day(record['exit_session'])}."
+    )
+
+
+EXIT_NAMES = {"target": "the target", "stop": "the stop", "time": "the time exit"}
 
 
 def _book_time(text: Any) -> datetime:
@@ -244,7 +318,13 @@ class ATM200Bot(sb.Bot):
         sleep=lambda seconds: None,
         wait: int = sb.FILL_WAIT_SECONDS,
     ):
-        super().__init__(_StrategyClient(client, STRATEGY), state_path, notify, sleep, wait)
+        super().__init__(
+            _StrategyClient(client, STRATEGY),
+            state_path,
+            lambda text: safe_send(notify, text),
+            sleep,
+            wait,
+        )
         self.trades_path = trades_path
         self._context: str | None = None  # "flatten" while a flatten by a person is running
 
@@ -334,7 +414,7 @@ class ATM200Bot(sb.Bot):
         """Keeps the state as it is, flags it for a person, and alerts once for the same reason."""
         if state.get("needs_attention") != why:
             self.notify(
-                f"ATM 200 sandbox bot ALERT: {why} Look at the positions and the order book now."
+                f"Sandbox: ATM 200 ALERT: {why} Look at the positions and the order book now."
             )
         self.save({**state, "needs_attention": why})
         return {"status": "needs_attention", "reason": why}
@@ -459,7 +539,7 @@ class ATM200Bot(sb.Bot):
                 self._book(new, now)
             else:
                 self.save(new)
-            self.notify(f"ATM 200 sandbox bot ALERT: {summary} Check the positions now.")
+            self.notify(f"Sandbox: ATM 200 ALERT: {summary} Check the positions now.")
             if not stop:
                 return None
             return {
@@ -484,6 +564,7 @@ class ATM200Bot(sb.Bot):
         dry_run: bool = False,
     ) -> dict:
         """Open the spread at about 10:15 on a trading day when the gates pass and nothing is recorded."""
+        assert_india_clock()
         self.require_sandbox()
         if self.state().get("inflight"):
             if dry_run:
@@ -492,7 +573,7 @@ class ATM200Bot(sb.Bot):
             if pending is not None:
                 return pending
         if rule.ledger_should_stop(ledger_total(self.trades_path)):
-            self.notify(f"ATM 200 sandbox bot: {LEDGER_STOP_MESSAGE}")
+            self.notify(f"Sandbox: ATM 200: {LEDGER_STOP_MESSAGE}")
             raise sb.Refused(LEDGER_STOP_MESSAGE)
         today = now.date()
         if not is_trading_day(today, holidays):
@@ -535,6 +616,7 @@ class ATM200Bot(sb.Bot):
             "quantity": qty,
             "entry_ltp_credit": decision.credit_points,
             "vix_prev": vix_prev,
+            "vix_prev_date": vix_latest[0].isoformat() if vix_prev is not None else "",
             "note": note,
             "sell_at": sell_at,
             "buy_at": buy_at,
@@ -559,7 +641,7 @@ class ATM200Bot(sb.Bot):
             state = {**plan, "status": "no_hedge"}
             self.save(state)
             self.notify(
-                f"ATM 200 sandbox bot: the bought call {long_sym} did not fill, so the sold call was not placed. Nothing is open."
+                f"Sandbox: ATM 200: the bought call {long_sym} did not fill, so the sold call was not placed. Nothing is open."
             )
             return state
 
@@ -589,11 +671,7 @@ class ATM200Bot(sb.Bot):
             "credit_points": credit,
         }
         self.save(state)
-        suffix = f" {note}" if note else ""
-        self.notify(
-            f"ATM 200 sandbox bot: opened {sold_sym} / {long_sym}, {qty} qty, credit {credit:.2f} "
-            f"points (limits {sell_at:.2f} / {buy_at:.2f}), exit session {plan['exit_session']}.{suffix}"
-        )
+        self.notify(entry_message(state, sell_at, buy_at))
         return state
 
     def _skip(self, today: date, expiry: date, why: str, note: str, dry_run: bool) -> dict:
@@ -608,7 +686,7 @@ class ATM200Bot(sb.Bot):
                 }
             )
         suffix = f" {note}" if note else ""
-        self.notify(f"ATM 200 sandbox bot: no entry today. {why}{suffix}")
+        self.notify(f"Sandbox: ATM 200: no entry today. {why}{suffix}")
         return {"status": "skipped", "reason": why, "note": note}
 
     @staticmethod
@@ -636,7 +714,7 @@ class ATM200Bot(sb.Bot):
         reply = self.client.post_as_is("/api/v1/positionbook")
         if reply.get("status") != "success":
             why = "The positions could not be read, so no order was placed."
-            self.notify(f"ATM 200 sandbox bot: {why}")
+            self.notify(f"Sandbox: ATM 200: {why}")
             raise sb.Refused(why)
         for position in reply.get("data") or []:
             symbol = position.get("symbol")
@@ -645,7 +723,7 @@ class ATM200Bot(sb.Bot):
                     f"{symbol} already has a position of {position.get('quantity')} in the sandbox "
                     "account, so nothing new was placed. Look at the positions first."
                 )
-                self.notify(f"ATM 200 sandbox bot: {why}")
+                self.notify(f"Sandbox: ATM 200: {why}")
                 raise sb.Refused(why)
         for symbol in (sold_sym, long_sym):
             for label in (sb.STRATEGY, STRATEGY):
@@ -655,7 +733,7 @@ class ATM200Bot(sb.Bot):
                         f"{symbol} already has a position of {qty} in the sandbox account, so "
                         "nothing new was placed. Look at the positions first."
                     )
-                    self.notify(f"ATM 200 sandbox bot: {why}")
+                    self.notify(f"Sandbox: ATM 200: {why}")
                     raise sb.Refused(why)
 
     # check and exit -------------------------------------------------------------------------
@@ -665,6 +743,7 @@ class ATM200Bot(sb.Bot):
         A check never opens anything. A position that is not reconciled is left alone and alerted,
         because closing a leg against a book that does not match could open a new naked position.
         """
+        assert_india_clock()
         self.require_sandbox()
         if self.state().get("inflight"):
             if dry_run:
@@ -754,17 +833,42 @@ class ATM200Bot(sb.Bot):
         except sb.Refused:
             self._release_exit()
             raise
-        if done.get("status") != "closed":
-            if done.get("status") == "exit_failed":
-                self._release_exit()
+        status = done.get("status")
+        if status == "exit_failed":
+            # The buy-back was cancelled or rejected and nothing filled: the call is still held.
+            return self._hold(
+                self.state(),
+                f"The buy-back of {state['sold']} was cancelled or rejected and nothing filled, "
+                "so the sold call is still held. Nothing has been sent again.",
+            )
+        if status != "closed":
+            if status == "short_bought_back":
+                # The call is bought back, but the hedge sale was cancelled or rejected: a person decides.
+                return self._hold(
+                    self.state(),
+                    f"The sale of {state['long']} was cancelled or rejected and nothing filled, "
+                    "so the bought call is still held. Nothing has been sent again.",
+                )
             return done
         record = self._book(done, now)
-        late = " (late)" if record.get("exit_note") == "late" else ""
-        self.notify(
-            f"ATM 200 sandbox bot: closed {record['sold']} / {record['long']} on "
-            f"{record['exit_reason']}{late}, gross {record['gross_rupees']:.0f} rupees."
-        )
+        self.notify(self._exit_message(record))
         return record
+
+    def _exit_message(self, record: dict) -> str:
+        """The exit alert: reason, exit value, gross, net after the charges of the four fills, cumulative net."""
+        charges = row_charges(trade_row(record))
+        net = record["gross_rupees"] - charges
+        cumulative = ledger_total(self.trades_path)
+        late = (
+            "yes, it ran after the scheduled check" if record.get("exit_note") == "late" else "no"
+        )
+        return (
+            f"Sandbox: ATM 200 closed {record['sold']} / {record['long']} on "
+            f"{EXIT_NAMES.get(record['exit_reason'], record['exit_reason'])}. "
+            f"Exit value {record['exit_value_points']:.2f} points, gross Rs {record['gross_rupees']:,.0f}, "
+            f"net Rs {net:,.0f} after charges. Cumulative net Rs {cumulative:,.0f} from the trades file. "
+            f"Late exit: {late}."
+        )
 
     # flatten by a person --------------------------------------------------------------------
     def flatten(self, yes: bool = False) -> dict:
@@ -775,11 +879,13 @@ class ATM200Bot(sb.Bot):
         the shared order code. Records FLATTENED and writes no row to trades.csv, so the result is not
         booked. A second run finds nothing in a flatten state and places nothing.
         """
+        assert_india_clock()
         self.require_sandbox()
         if not yes:
             raise sb.Refused(
                 "Flatten closes positions at market. Run it again with --yes to confirm."
             )
+        assert_india_clock()
         self._context = "flatten"
         try:
             pending = self._reconcile(now_ist(), stop=False)
@@ -800,7 +906,7 @@ class ATM200Bot(sb.Bot):
                 f"{sold} or {long} is held the wrong way round for this spread, so nothing was closed. "
                 "Look at the positions by hand."
             )
-            self.notify(f"ATM 200 sandbox bot ALERT: {why}")
+            self.notify(f"Sandbox: ATM 200 ALERT: {why}")
             raise sb.Refused(why)
 
         buy = sell = None
@@ -812,9 +918,7 @@ class ATM200Bot(sb.Bot):
                 self._attention(state, why)
                 raise
             if buy is None:
-                self.notify(
-                    f"ATM 200 sandbox bot ALERT: could not buy back {sold}. Close it by hand."
-                )
+                self.notify(f"Sandbox: ATM 200 ALERT: could not buy back {sold}. Close it by hand.")
                 raise sb.Refused(f"The buy-back of {sold} was not filled, so nothing was sold.")
         if held_long > 0:
             if self.state().get("inflight"):
@@ -828,7 +932,7 @@ class ATM200Bot(sb.Bot):
                 self._attention(state, why)
                 raise
             if sell is None:
-                self.notify(f"ATM 200 sandbox bot ALERT: could not sell {long}. Close it by hand.")
+                self.notify(f"Sandbox: ATM 200 ALERT: could not sell {long}. Close it by hand.")
                 raise sb.Refused(f"The sale of {long} was not filled.")
 
         done = {k: v for k, v in state.items() if k not in ("needs_attention", "inflight")}
@@ -844,6 +948,6 @@ class ATM200Bot(sb.Bot):
             done["flatten_sell_hedge_fill"] = sell.__dict__
         self.save(done)
         self.notify(
-            f"ATM 200 sandbox bot: flattened {sold} / {long} by hand. Nothing was booked to trades.csv."
+            f"Sandbox: ATM 200: flattened {sold} / {long} by hand. Nothing was booked to trades.csv."
         )
         return done
