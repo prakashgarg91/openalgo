@@ -38,3 +38,10 @@ Cost: one week of Haiku and Sonnet time and Fable reviews. Risk: real money at s
 ## Relation to the Live gate (open owner decision, written down so it is not routed around)
 
 The Live gate (`ALGO_LIVE_REQUIRES_FORWARD_PASS`, on by default) refuses a Live algo order without a recorded forward pass and a written post-mortem; for the ATM 200-wide rule that cannot exist before about May 2027. The owner chose (17 Nov 2026) a MANUAL pilot from 1 Dec with the gate left on: the owner places each trade by hand in the app, which the gate does not cover. The live executor therefore must not quietly bypass the gate: it either honours it (and stays unused until a forward pass exists), or refuses to start unless the owner has switched the gate off in writing for this one rule, and says so loudly in its first alert. Nothing automatic runs live before that written decision.
+
+## Owner decisions of 18 November 2026
+
+- Margin buffer: the larger of Rs 3,000 or 10 percent of the required margin (Fable's rule), replacing the Rs 2,000 placeholder. To be implemented when the executor is merged.
+- Live gate: confirmed ON with a MANUAL pilot from 1 December and NO waiver. The executor stays unused until a forward pass exists or the owner writes a waiver in the approval file later.
+- gthread suite: an exception is recorded for the `live_only` order-API change until a Linux environment exists (see the changelog).
+- Daily cap: the structural check (width x lot x lots must not exceed Rs 27,000) replaces any profit-and-loss tracking for the pilot; one lot and one position bound a day's loss at about Rs 13,000.
