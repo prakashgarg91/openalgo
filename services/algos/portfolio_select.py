@@ -61,12 +61,18 @@ def choose(
     month: str,
     cells: list[str],
     algos: list[str],
+    trailing_months: int = TRAILING_MONTHS,
+    min_trades: int = MIN_TRADES_PER_CELL,
+    min_eligible: int = 1,
 ) -> dict[str, str]:
     """Pick one algo per cell for 'month' from trailing trades only.
 
     Returns a dict mapping each cell in 'cells' to an algo name from 'algos', or to NO_TRADE.
+    'trailing_months' and 'min_trades' default to the registered values above. A cell is traded
+    only when at least 'min_eligible' algos are eligible in it; the default of 1 leaves the rule
+    as it was (no eligible algo means NO_TRADE).
     """
-    window = trailing_window(history, month)
+    window = trailing_window(history, month, trailing_months)
     result: dict[str, str] = {}
     for cell in cells:
         if cell in ALWAYS_NO_TRADE:
@@ -74,16 +80,18 @@ def choose(
             continue
         best_name: str | None = None
         best_mean = 0.0
+        eligible = 0
         for algo in sorted(algos):
             nets = [t["net"] for t in window if t["cell"] == cell and t["algo"] == algo]
-            if len(nets) < MIN_TRADES_PER_CELL:
+            if len(nets) < min_trades:
                 continue
+            eligible += 1
             mean = sum(nets) / len(nets)
             # Strictly greater keeps the alphabetically first algo on an exact tie.
             if best_name is None or mean > best_mean:
                 best_name = algo
                 best_mean = mean
-        if best_name is None or best_mean <= 0:
+        if eligible < min_eligible or best_name is None or best_mean <= 0:
             result[cell] = NO_TRADE
         else:
             result[cell] = best_name
@@ -95,6 +103,12 @@ def walk_forward_choices(
     months: list[str],
     cells: list[str],
     algos: list[str],
+    trailing_months: int = TRAILING_MONTHS,
+    min_trades: int = MIN_TRADES_PER_CELL,
+    min_eligible: int = 1,
 ) -> dict[str, dict[str, str]]:
     """Map each month in 'months' (sorted 'YYYY-MM') to its frozen per-cell choices."""
-    return {month: choose(history, month, cells, algos) for month in months}
+    return {
+        month: choose(history, month, cells, algos, trailing_months, min_trades, min_eligible)
+        for month in months
+    }

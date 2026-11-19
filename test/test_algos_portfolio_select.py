@@ -166,3 +166,47 @@ def test_evidence_expires_after_twelve_months():
     assert result["2026-06"] == {"x": "a"}
     # 2026-07 window is 2025-07..2026-06, so the June 2025 trades have expired.
     assert result["2026-07"] == {"x": NO_TRADE}
+
+
+def test_optional_arguments_default_to_registered_values():
+    history = trades("a", "x", 100, 39, date="2026-01-10") + trades(
+        "b", "x", 1, 40, date="2026-01-10"
+    )
+    assert choose(history, "2026-03", ["x"], ["a", "b"]) == {"x": "b"}
+    explicit = choose(history, "2026-03", ["x"], ["a", "b"], TRAILING_MONTHS, MIN_TRADES_PER_CELL)
+    assert explicit == {"x": "b"}
+
+
+def test_minimum_trades_argument_changes_eligibility():
+    history = trades("a", "x", 100, 39, date="2026-01-10")
+    assert choose(history, "2026-03", ["x"], ["a"], min_trades=20) == {"x": "a"}
+    assert choose(history, "2026-03", ["x"], ["a"]) == {"x": NO_TRADE}
+
+
+def test_trailing_months_argument_shortens_the_window():
+    history = trades("a", "x", 100, 40, date="2025-12-10")
+    # For March 2026 a 4-month window is Nov 2025 to Feb 2026, which holds December.
+    assert choose(history, "2026-03", ["x"], ["a"], trailing_months=4) == {"x": "a"}
+    # A 2-month window is Jan 2026 to Feb 2026, which does not.
+    assert choose(history, "2026-03", ["x"], ["a"], trailing_months=2) == {"x": NO_TRADE}
+
+
+def test_walk_forward_passes_its_options_through():
+    history = trades("a", "x", 100, 20, date="2026-01-10")
+    assert walk_forward_choices(history, ["2026-03"], ["x"], ["a"], 4, 20) == {
+        "2026-03": {"x": "a"}
+    }
+    assert walk_forward_choices(history, ["2026-03"], ["x"], ["a"]) == {"2026-03": {"x": NO_TRADE}}
+
+
+def test_a_cell_needs_the_minimum_number_of_eligible_algos():
+    history = trades("a", "x", 100, 40, date="2026-01-10") + trades(
+        "b", "x", 50, 40, date="2026-01-10"
+    )
+    # Two algos are eligible: fewer than the six required, so the cell is no trade.
+    assert choose(history, "2026-03", ["x"], ["a", "b"], min_eligible=3) == {"x": NO_TRADE}
+    # With the requirement met the best algo is picked as before.
+    assert choose(history, "2026-03", ["x"], ["a", "b"], min_eligible=2) == {"x": "a"}
+    assert walk_forward_choices(history, ["2026-03"], ["x"], ["a", "b"], min_eligible=3) == {
+        "2026-03": {"x": NO_TRADE}
+    }

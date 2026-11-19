@@ -132,3 +132,40 @@ def test_module_has_no_io():
     source = inspect.getsource(portfolio_wf)
     for word in ("open(", "requests", "sqlite", "datetime.now", "time.time"):
         assert word not in source, f"portfolio_wf must not mention {word!r}"
+
+
+def _small_history():
+    """16 months of 45 winning trades for algo 'a' in cell 'x', dated the 10th of each month."""
+    months = [f"{2025 + k // 12}-{k % 12 + 1:02d}" for k in range(16)]
+    return [
+        {"date": f"{month}-10", "algo": "a", "cell": "x", "net": 10.0}
+        for month in months
+        for _ in range(45)
+    ]
+
+
+def test_run_defaults_match_the_explicit_registered_values():
+    history = _small_history()
+    default = run(history, ["x"], ["a"])
+    explicit = run(
+        history,
+        ["x"],
+        ["a"],
+        trailing_months=portfolio_wf.TRAILING_MONTHS,
+        min_trades=portfolio_wf.MIN_TRADES_PER_CELL,
+        warmup_months=None,
+    )
+    assert default == explicit
+    assert default["eval_months"] == ["2026-01", "2026-02", "2026-03", "2026-04"]
+
+
+def test_warmup_months_moves_the_first_evaluation_month():
+    result = run(_small_history(), ["x"], ["a"], warmup_months=2)
+    assert result["eval_months"][0] == "2025-03"
+    assert len(result["eval_months"]) == 14
+
+
+def test_min_trades_and_trailing_months_reach_the_selector():
+    strict = run(_small_history(), ["x"], ["a"], trailing_months=1, min_trades=500)
+    picks = strict["view_b_walk_forward"]["picks"]
+    assert all(cells == {"x": "no_trade"} for cells in picks.values())
