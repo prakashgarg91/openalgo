@@ -1,6 +1,8 @@
 # Vendor algo decider: pre-registration (written 19 November 2026, before any result of the pool was read)
 
-**Not frozen yet. Nothing has been run.** The owner freezes it by saying so; the line that marks the freeze is added then, in its own commit, and the run script refuses until that commit exists and nothing has changed since.
+STATUS: FROZEN (by the owner's word "Freeze and run" on 19 November 2026; nothing had been run and no pool result had been read at this commit).
+
+**Frozen. The single run follows this commit.** The owner freezes it by saying so; the line that marks the freeze is added then, in its own commit, and the run script refuses until that commit exists and nothing has changed since.
 
 POOL_SHA256: 371077a495db3480ecc030fc80a13352dd17f4870445f0a9ea95a6482b4a039c
 
