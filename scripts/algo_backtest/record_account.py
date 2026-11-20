@@ -139,12 +139,19 @@ def is_rehearsal(strategy: str | None, timestamp: str, symbol: str = "") -> bool
     return strategy == REHEARSAL_BOT and timestamp[:10] < REHEARSAL_BOT_FIRST_REAL_DAY
 
 
+#: Strategy name written for a clean fill that carries none.
+NO_STRATEGY = "(none)"
+STRATEGY_DAY_COLUMNS = ["strategy", *DAY_COLUMNS]
+
+
 def write_round_trips(out: Path) -> str:
     """Every closed Sandbox position, net of charges and dated by the day it was OPENED.
 
-    Reads the Sandbox database read only (db/sandbox.db, or ALGO_SANDBOX_DB) and rewrites two files:
-    round_trips.csv and by_entry_date.csv. The account's own profit figure is gross, so this is the
-    figure to judge by. Returns one line for the log.
+    Reads the Sandbox database read only (db/sandbox.db, or ALGO_SANDBOX_DB) and rewrites three files:
+    round_trips.csv and by_entry_date.csv (every clean fill together, as before), and
+    by_strategy_entry_date.csv (the same day rows split per strategy, each strategy matched on its
+    own fills). The account's own profit figure is gross, so this is the figure to judge by. Returns
+    one line for the log.
     """
     path = Path(
         os.getenv("ALGO_SANDBOX_DB", str(Path(__file__).resolve().parents[2] / "db" / "sandbox.db"))
@@ -159,6 +166,7 @@ def write_round_trips(out: Path) -> str:
     finally:
         conn.close()
     clean_fills, test_fills = [], []
+    clean_by_strategy: dict[str, list[dict]] = {}
     for r in rows:
         fill = {
             "symbol": r[0],
@@ -167,10 +175,19 @@ def write_round_trips(out: Path) -> str:
             "price": r[3],
             "timestamp": str(r[4]),
         }
-        (test_fills if is_rehearsal(r[5], str(r[4]), r[0]) else clean_fills).append(fill)
+        if is_rehearsal(r[5], str(r[4]), r[0]):
+            test_fills.append(fill)
+        else:
+            clean_fills.append(fill)
+            clean_by_strategy.setdefault(r[5] or NO_STRATEGY, []).append(fill)
     result = rt.round_trips(clean_fills)
     test_result = rt.round_trips(test_fills)
     days = rt.by_entry_date(result["trips"])
+    strategy_days, strategy_net = [], {}
+    for name in sorted(clean_by_strategy):
+        own = rt.round_trips(clean_by_strategy[name])["trips"]
+        strategy_days.extend({"strategy": name, **d} for d in rt.by_entry_date(own))
+        strategy_net[name] = round(sum(t["net_after_charges"] for t in own), 2)
     with (out / "rehearsal_round_trips.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=TRIP_COLUMNS)
         writer.writeheader()
@@ -178,16 +195,20 @@ def write_round_trips(out: Path) -> str:
     for name, columns, data in (
         ("round_trips.csv", TRIP_COLUMNS, result["trips"]),
         ("by_entry_date.csv", DAY_COLUMNS, days),
+        ("by_strategy_entry_date.csv", STRATEGY_DAY_COLUMNS, strategy_days),
     ):
         with (out / name).open("w", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=columns)
             writer.writeheader()
             writer.writerows(data)
     net = round(sum(d["net_after_charges"] for d in days), 2)
+    per_algo = ", ".join(f"{name} net {strategy_net[name]}" for name in strategy_net)
+    clause = f"; per algo: {per_algo}" if per_algo else ""
     return (
         f"Round trips: {len(result['trips'])} closed, {len(result['open'])} open fill(s) "
         f"(machinery-test trades kept apart: {len(test_result['trips'])}); "
-        f"net after charges {net} (gross {round(sum(d['gross'] for d in days), 2)})."
+        f"net after charges {net} (gross {round(sum(d['gross'] for d in days), 2)})"
+        f"{clause}."
     )
 
 
