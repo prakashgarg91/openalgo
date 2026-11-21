@@ -29,6 +29,9 @@ Plain notes that carry context between Claude sessions. No secrets, ever: report
 - 2026-11-20: Entry 18 Nov 10:16: bought 25500CE at 86.90, sold 25300CE at 163.50. Fill credit 76.60 points (LTP 77.05, signal log 76.00).
 - 2026-11-20: Exit by the time rule 19 Nov 15:00: bought back 25300CE at 240.90, sold 25500CE at 121.00. Exit value 119.90 points (quote 119.70).
 - 2026-11-20: Result: gross Rs -2,814.50 at lot 65; net after charges Rs -2,954. Target (value at or below 23.75) and stop (at or above 191.5) were not reached. Slippage about Rs 42 in total.
+- 2026-11-21: The PC was restarted by hand at 09:28 on Fri 20 Nov and did not come back on until Sat 21 Nov 08:11, so nothing ran on 20 Nov: no bot checks, no entry, no 15:31 summary, no 15:40 recorder, no capture, no 16:00 end-of-day. No Sandbox position was open, so nothing was left unwatched. The 20 Nov ATM200 cycle is lost (not a fault of the bot).
+- 2026-11-21: Caught up on 21 Nov: 20 Nov option candles backfilled (77 contracts stored, nightly data check for 20 Nov all OK), forward ledgers, VIX (last date 20 Nov), snapshot. The 10:15 and 15:00 bid-ask snapshots of 20 Nov cannot be recovered, so the signal log has no 20 Nov row and its 19 Nov row stays open. Capture task re-enabled on 21 Nov (next run Mon 23 Nov 16:00).
+- 2026-11-21: Coding work goes to 4-5 ZCode GLM 5.3 Flash workers (owner, 20 Nov); Haiku 5.5 for other bulk; Sonnet 5.5 directs while Fable has no credits.
 - 2026-11-20: Director: Sonnet 5.5 directs while Fable 5.2 has no usage credits (owner, 20 Nov); Haiku does the bulk work.
 - 2026-11-20: 19 Nov 10:16 entry correctly refused because a trade was open. 75 checks logged against 74 scheduled (one extra by hand), none missed. Telegram exit alert and the 15:31 summary reached the owner.
 - 2026-11-20: Ledger: 1 trade, cumulative net Rs -2,954.
