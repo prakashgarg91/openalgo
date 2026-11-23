@@ -311,9 +311,14 @@ class PricedLeg:
 
 
 def price_legs(
-    tpl: Template, spot: float, step: int, chain: dict[tuple[str, float], dict[str, Any]]
+    tpl: Template,
+    spot: float,
+    step: int,
+    chain: dict[tuple[str, float], dict[str, Any]],
+    *,
+    use_last_price: bool = False,
 ) -> list[PricedLeg] | None:
-    """Price every leg from the chain, or None when a strike is missing or has no two-sided quote."""
+    """Price every leg from the chain, or None when a strike has no usable quote."""
     atm = round(spot / step) * step
     legs: list[PricedLeg] = []
     for leg in tpl.legs:
@@ -321,6 +326,15 @@ def price_legs(
         quote = chain.get((leg.kind, strike))
         if not quote:
             return None
+        if use_last_price:
+            try:
+                ltp = float(quote.get("ltp"))
+            except (TypeError, ValueError):
+                return None
+            if not ltp > 0:
+                return None
+            legs.append(PricedLeg(leg.kind, strike, leg.side, leg.qty, ltp, ltp))
+            continue
         bid, ask = float(quote.get("bid") or 0), float(quote.get("ask") or 0)
         if bid <= 0 or ask <= 0 or ask < bid:
             return None
@@ -540,9 +554,10 @@ def rank(
     ranked: list[dict[str, Any]] = []
     blocked: list[dict[str, Any]] = []
     notes: list[str] = []
-    if cond.minutes_since_open < 0 or cond.minutes_since_open > OPEN_MINUTES:
+    closed = cond.minutes_since_open < 0 or cond.minutes_since_open > OPEN_MINUTES
+    if closed:
         notes.append(
-            "The market is closed, so prices are the last traded ones and the time score is zero."
+            "The market is closed, so prices are the last traded ones: indicative only, not what an order would get now. The time score is zero."
         )
     if cond.vix is None:
         notes.append("No data for: India VIX. Volatility fit is neutral.")
@@ -550,7 +565,7 @@ def rank(
         notes.append("Few market inputs were available, so the trend reading is a weak one.")
 
     for tpl in TEMPLATES:
-        legs = price_legs(tpl, cond.spot, cond.step, chain)
+        legs = price_legs(tpl, cond.spot, cond.step, chain, use_last_price=closed)
         row: dict[str, Any] = {
             "id": tpl.id,
             "name": tpl.name,
@@ -565,7 +580,11 @@ def rank(
             "blocked_because": [],
         }
         if legs is None:
-            row["blocked_because"].append("No two-sided live quote for one of its strikes.")
+            row["blocked_because"].append(
+                "No last traded price for one of its strikes."
+                if closed
+                else "No two-sided live quote for one of its strikes."
+            )
             blocked.append(row)
             continue
         stats = payoff_stats(legs, cond.lot)

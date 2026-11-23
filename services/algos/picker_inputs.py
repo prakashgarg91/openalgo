@@ -191,7 +191,8 @@ def fetch_margins(
         if time.monotonic() - started > budget_seconds:
             logger.warning("Picker margin budget used up after %d structures", len(margins))
             break
-        legs = picker.price_legs(tpl, cond.spot, cond.step, chain)
+        closed = cond.minutes_since_open < 0 or cond.minutes_since_open > picker.OPEN_MINUTES
+        legs = picker.price_legs(tpl, cond.spot, cond.step, chain, use_last_price=closed)
         if legs is None:
             continue
         positions = margin_positions(tpl, legs, chain, cond.lot)
@@ -204,9 +205,14 @@ def fetch_margins(
         except Exception:
             logger.exception("Margin for %s failed", tpl.id)
             continue
-        required = (response.get("data") or {}).get("total_margin_required") if ok else None
-        if isinstance(required, (int, float)):
-            margins[tpl.id] = float(required)
+        final_margin = (response.get("data") or {}).get("final_margin") if ok else None
+        if (
+            isinstance(final_margin, (int, float))
+            and not isinstance(final_margin, bool)
+            and final_margin > 0
+        ):
+            premium_paid = sum(leg.price * leg.qty * cond.lot for leg in legs if leg.side == "B")
+            margins[tpl.id] = float(final_margin) + premium_paid
     return margins
 
 
