@@ -11,7 +11,7 @@ if errorlevel 1 (
   echo Day not complete: computer left on. >> log\finish_day.log
   exit /b 1
 )
-git -C %DATAREPO% add bidask recorder news >> log\finish_day.log 2>&1
+git -C %DATAREPO% add bidask recorder news context >> log\finish_day.log 2>&1
 git -C %DATAREPO% commit -m "data: bid-ask snapshots %TODAY%" >> log\finish_day.log 2>&1
 git -C %DATAREPO% pull --rebase >> log\finish_day.log 2>&1
 git -C %DATAREPO% push >> log\finish_day.log 2>&1
