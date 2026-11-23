@@ -24,7 +24,7 @@ volume, overnight markets, expiry behaviour) told us something about the next se
 - Held back: January 2025 to October 2026. Touched once, only by ideas that survive discovery, with the rule frozen.
 - Untouched: February 2019 to March 2021 stays reserved for the end-of-day library (its own registration).
 
-## The first batch: 18 ideas, one fixed setting each
+## The first batch: 16 ideas, one fixed setting each (numbers 10 and 11 are unused)
 
 Open interest and expiry
 1. Nifty futures build-up type (price and open interest both up, price up open interest down, and so on) and the next session.
@@ -34,12 +34,18 @@ Open interest and expiry
 5. One strike's open interest jumping to 3 times its 20-day average and the next session's high or low near it.
 6. Futures volume spike (top tenth) with a small price change (under 0.2 percent): absorption, then the next session.
 
-Overnight and global
-7. US index futures overnight move over 1 percent and the Nifty opening gap and its fill by 11:00.
-8. Crude oil move over 3 percent and the next Nifty session.
-9. Dollar index move over 0.7 percent and the next Nifty session.
-10. Asian indices up or down together in the morning and the Nifty first hour.
-11. Gold up and US futures down together (risk-off) and the next Nifty session.
+Overnight and global: already studied, not re-tested
+The in-app Research page (/research, updated 1 Nov 2026) already tested 292 links between foreign markets,
+sectors, stocks and Nifty: 87 found on 2008 to 2017, 42 held up on 2017 to 2026, 23 reversed. Its headline:
+the US close explains about 24 percent of the opening gap but not the move after the open. Ideas 7 to 11 below
+are therefore NOT screened again (that would spend trials on a settled question); only one new question is kept:
+7. Opening gap explained by the US close (the Research page's fitted gap) against the actual gap: does a gap
+   much larger than explained fade by 11:00?
+
+From the app's options tools (computed from end-of-day open interest for history)
+8. Gamma wall (largest gamma times open interest strike, as the GEX Dashboard draws it) and the next session's
+   high or low near it.
+9. Open-interest profile shift: the call or put open-interest centre moving by 100 points or more in a day, and the next session.
 
 Inside Nifty
 12. The two largest banks moving against Nifty on the day and the next session.
@@ -69,6 +75,19 @@ Later batches, once the data exists: FII and DII flows (after the recorder runs)
 - A nightly job after the 16:00 capture screens any idea whose code is new, writes the batch report to the data repo,
   and keeps the forward ledgers of survivors up to date. Ideas are added in batches, not one by one.
 - Morning report: what ran, how many ideas so far, what survived, what failed.
+
+## Platform pieces worth using (openalgo.in, read 23 Nov 2026)
+
+- Research page: the cross-market link study above; its "held up" links are reused, not re-tested.
+- OI Tracker, Max Pain, GEX Dashboard, OI Profile: the live versions of ideas 2 to 5, 8 and 9; once an idea
+  survives, the same tool is where the owner can watch it live.
+- Action Center (order approval): every signal waits for the owner to approve, change or reject before it
+  reaches the broker. A candidate route for the pilot: the executor proposes, the owner approves in one click,
+  instead of placing each trade by hand. Owner's decision; not built.
+- OpenScript (studies and strategies, backtests in the browser, alerts, sandbox first): good for drawing a
+  surviving signal on the chart and raising an alert when it fires. Its browser backtests are not used for the
+  screen itself, because they have no held-back window or trial count.
+- Open Varsity "Quantitative Trading" and "Statistical Arbitrage" courses: background reading on honest backtesting.
 
 ## What it will not do
 
