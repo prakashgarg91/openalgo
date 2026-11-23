@@ -120,12 +120,16 @@ def _margin_or_stop(
     ok, reply, _ = calculate_margin(
         {"apikey": "", "positions": positions}, auth_token=auth_token, broker=broker
     )
-    total = float(((reply.get("data") or {}).get("total_margin_required")) or 0) if ok else 0.0
-    if not ok or not total:
+    # The margin after the hedge benefit, premium excluded (Upstox's final_margin). The broker's
+    # total_margin_required is BEFORE the benefit: measured 23 Nov 2026 on 25600/25800 at one lot,
+    # 2,15,227 before against 40,675 after. A broker that does not report it is refused rather
+    # than shown the unhedged figure, which would overstate the need about five times.
+    hedged = (reply.get("data") or {}).get("final_margin") if ok else None
+    if not hedged or float(hedged) <= 0:
         raise _ReadError(
             f"Could not read the margin from {shown}. Sign in to {shown} and try again."
         )
-    return total
+    return float(hedged)
 
 
 def _cash_or_stop(auth_token: str, broker: str, shown: str) -> float:
@@ -164,7 +168,10 @@ def gather(auth_token: str, broker: str, today: date | None = None) -> dict:
         premium_each = _ltp_or_stop(
             "bought call's price", long_symbol, oc.EXCHANGE, auth_token, broker, shown
         )
-        margin_total = _margin_or_stop(sold_symbol, long_symbol, auth_token, broker, shown)
+        hedged_margin = _margin_or_stop(sold_symbol, long_symbol, auth_token, broker, shown)
+        margin_total = (
+            hedged_margin + premium_each * rule.LOT
+        )  # the report takes the premium out again
         available_cash = _cash_or_stop(auth_token, broker, shown)
         report = funds_report(
             sold_symbol=sold_symbol,

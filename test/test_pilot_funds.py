@@ -89,7 +89,14 @@ def test_gather_reads_the_broker_internally_and_builds_today_spread(monkeypatch)
 
     def margin(margin_data, api_key=None, auth_token=None, broker=None):
         calls["margin"] = (margin_data, auth_token, broker, api_key)
-        return True, {"status": "success", "data": {"total_margin_required": 49898.0}}, 200
+        return (
+            True,
+            {
+                "status": "success",
+                "data": {"total_margin_required": 215226.83, "final_margin": 45771.0},
+            },
+            200,
+        )
 
     def funds(api_key=None, auth_token=None, broker=None):
         calls["funds"] = (auth_token, broker, api_key)
@@ -170,3 +177,22 @@ def test_on_an_expiry_day_the_next_weekly_is_sized_not_the_one_expiring_today(mo
     monkeypatch.setattr(pf, "get_distinct_expiries", lambda *a: ["23-Nov-26", "30-Nov-26"])
     assert pf._expiry_or_stop(date(2026, 11, 23), "Upstox") == "30-Nov-26"
     assert pf._expiry_or_stop(date(2026, 11, 20), "Upstox") == "23-Nov-26"
+
+
+def test_the_unhedged_total_alone_is_refused_not_shown(monkeypatch):
+    """Without the after-benefit figure the check refuses: the unhedged total overstates about five times."""
+    monkeypatch.setattr(
+        pf,
+        "calculate_margin",
+        lambda *a, **k: (
+            True,
+            {"status": "success", "data": {"total_margin_required": 215226.83}},
+            200,
+        ),
+    )
+    try:
+        pf._margin_or_stop("A", "B", "token-1", "upstox", "Upstox")
+    except pf._ReadError as why:
+        assert "margin" in why.message
+    else:
+        raise AssertionError("the unhedged total was accepted")

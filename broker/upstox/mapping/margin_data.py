@@ -139,6 +139,9 @@ def parse_margin_response(response_data):
                 "total_margin_required": required_margin,
                 "span_margin": total_span,
                 "exposure_margin": total_exposure,
+                # Margin after the hedge benefit, the bought option's premium not included. The
+                # total above is before the benefit, so a hedged spread reads far higher there.
+                "final_margin": final_margin,
             },
         }
 
