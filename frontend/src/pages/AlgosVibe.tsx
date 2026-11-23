@@ -29,6 +29,7 @@ import { EventDaysPanel } from '@/components/algos/EventDaysPanel'
 import { LabPanel } from '@/components/algos/LabPanel'
 import { PickerPanel } from '@/components/algos/PickerPanel'
 import { PicksPanel } from '@/components/algos/PicksPanel'
+import { PilotFundsCard } from '@/components/algos/PilotFundsCard'
 import { ReadinessPanel, StartHere } from '@/components/algos/ReadinessPanel'
 import { RegistryPanel } from '@/components/algos/RegistryPanel'
 import { UniversePanel } from '@/components/algos/UniversePanel'
@@ -232,6 +233,8 @@ export default function AlgosVibe() {
       </div>
 
       <MoodStrip />
+
+      <PilotFundsCard />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">

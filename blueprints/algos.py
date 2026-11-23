@@ -36,6 +36,7 @@ from services.algos import (
     netinfo,
     pick_log,
     picker_inputs,
+    pilot_funds,
     readiness,
     registry,
     runner,
@@ -259,6 +260,32 @@ def picker_today():
     if "error" in result:
         return _error(result["error"], 502)
     return _ok({"data": result})
+
+
+@algos_bp.route("/api/pilot-funds", methods=["GET"])
+@check_session_validity
+@_api_limit
+def pilot_funds_today():
+    """Cash one lot of today's ATM 200 spread needs, account cash, and the shortfall. Read only.
+
+    Nothing here places, modifies or cancels an order, and no risk cap or mode is touched:
+    the report is built from quotes, margin and funds reads alone.
+    """
+    user = _user()
+    if not user:
+        return _error("Not authenticated", 401)
+    from database.auth_db import get_auth_token
+
+    auth_token = get_auth_token(user)
+    broker = session.get("broker")
+    if not (auth_token and broker):
+        return _error("No broker is signed in. Sign in to the broker and try again.", 400)
+    result = pilot_funds.gather(auth_token, broker)
+    if not result.get("ok"):
+        return _error(result["message"], 502)
+    return _ok(
+        {"data": {**result["report"], "expiry": result["expiry"], "as_of": result["as_of"]}}
+    )
 
 
 def _pick_marks(api_key: str, picks: list[dict]) -> dict[str, float | None]:
