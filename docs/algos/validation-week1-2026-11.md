@@ -1,0 +1,40 @@
+# Validation week 1 findings (24 November 2026 onward)
+
+Part of GPT-6-Astra's 4-week validation (docs/algos/astra-review-2026-11-23.md). Read-only checks; nothing tuned, nothing re-run as a new result.
+
+## 1. Replay reproduction and 20-trade hand check (Haiku 5.5, 24 Nov)
+
+- The replay reproduces: 388 trades, net Rs 1,67,102 realistic, Rs 1,05,861 at double cost, mean Rs 431, t 2.39,
+  worst trade Rs -8,935, deepest fall Rs 43,723. Exits: target 146, stop 9, time 233. Costs about Rs 61,000 of
+  Rs 2,28,343 gross.
+- 20 trades (seed 20261124, including best and worst) recomputed by hand from the raw candles: no mismatch in credit,
+  exit reason, exit value or gross. Lots 25, 65 and 75 by expiry date (from nse_lots.py; not yet checked against the circulars).
+- The VIX gate held (largest previous VIX in the trade set 19.88); the credit floor never bound (smallest 30.45 points).
+
+## 2. Timing found by the check (to be measured, not fixed by retuning)
+
+- Bars are labelled by their START time. The replay enters on the CLOSE of the 10:15 bar, which is the 10:20 price,
+  and decides and fills on that same close. The replay's own text says "open of the 10:15 bar". The live Sandbox bot
+  enters at 10:16. So the replay is about 4 minutes later than the bot, and its decision and fill share one price.
+- Stops and targets are checked on 5-minute bar CLOSES, and the exit is booked at that close. A real stop fills during
+  the bar, and the decision can only act at the next bar. Close-based stops flatter the stop results.
+- The time exit is booked at the 15:00 bar close, which is the 15:05 price; the bot exits at 15:00.
+
+Consequence: these are execution gaps between the replay and the live bot. Week 3's stress test measures them with
+settings fixed now (below). They are measurements of the same frozen rule, not new variants, and no setting is chosen
+from their results.
+
+## 3. Week-3 sensitivity runs, fixed before any is run
+
+a. Entry at the 10:15 bar OPEN (the 10:15 price) instead of its close.
+b. Entry at the 10:20 bar close (decide on the 10:15 close, fill one bar later).
+c. Stops and targets checked on bar highs and lows (the worse side for the position), filled at the stop level.
+d. Every exit filled one bar later than its decision.
+e. All of the above together, at realistic and at double costs.
+Report each beside the base result. The base result stays the frozen reference; none of these replaces it.
+
+## 4. Still open in week 1
+
+- Cost table against today's official rates (Haiku agent running).
+- Lot sizes against the NSE circulars.
+- Sizing note: size by the largest possible loss (200 points less credit, times lot), not by margin.
