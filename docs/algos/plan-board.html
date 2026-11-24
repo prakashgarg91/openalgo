@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Algo plan board</title>
+<style>
+  :root { --bg:#14161c; --card:#1d2029; --line:#2c3040; --text:#e6e8ee; --muted:#9aa1b2;
+          --ok:#3fbf7f; --wait:#e0b44c; --stop:#e26a6a; --now:#7c8cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, Segoe UI, sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  h2 { font-size:17px; margin:0 0 12px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .big { font-size:28px; font-weight:700; }
+  .muted { color:var(--muted); }
+  .road { display:flex; gap:0; flex-wrap:wrap; margin:6px 0 18px; }
+  .step { flex:1 1 150px; padding:12px; border:1px solid var(--line); background:var(--card); position:relative; }
+  .step:first-child { border-radius:12px 0 0 12px; } .step:last-child { border-radius:0 12px 12px 0; }
+  .step b { display:block; } .step small { color:var(--muted); }
+  .done { border-top:4px solid var(--ok); } .now { border-top:4px solid var(--now); background:#22263a; }
+  .next { border-top:4px solid var(--wait); } .later { border-top:4px solid var(--line); }
+  .tag { display:inline-block; font-size:12px; padding:1px 8px; border-radius:99px; border:1px solid var(--line); margin-left:6px; }
+  .t-ok { color:var(--ok); border-color:var(--ok); } .t-wait { color:var(--wait); border-color:var(--wait); }
+  .t-stop { color:var(--stop); border-color:var(--stop); } .t-now { color:var(--now); border-color:var(--now); }
+  table { width:100%; border-collapse:collapse; } td, th { text-align:left; padding:6px 4px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:500; font-size:13px; }
+  ul { margin:6px 0 0; padding-left:18px; } li { margin:3px 0; }
+  .two { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); margin-top:14px; }
+  .bar { height:10px; background:var(--line); border-radius:99px; overflow:hidden; margin-top:8px; }
+  .bar span { display:block; height:100%; background:var(--now); }
+  footer { color:var(--muted); font-size:13px; margin-top:24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Algo plan board</h1>
+  <p class="sub">For the owner (vibe trader) and Claude (vibe coder). Updated 24 Nov 2026, 09:30. Sandbox mode only for everything automatic; the AI never places a real order.</p>
+
+  <section class="grid">
+    <div class="card"><div class="muted">Target (owner, 23 Nov)</div><div class="big">40% a year</div>
+      <div class="muted">after losses and costs: about Rs 770 a week on Rs 1 lakh. Rs 6,000 a week is the same 40% on about Rs 7.8 lakh.</div></div>
+    <div class="card"><div class="muted">Main rule, Sandbox ledger</div><div class="big">Rs -2,954</div>
+      <div class="muted">1 trade closed (18 to 19 Nov, time exit). Machinery worked end to end.</div></div>
+    <div class="card"><div class="muted">Funds for one real lot</div><div class="big">Rs 57,250</div>
+      <div class="muted">cash Rs 32,041, short by Rs 25,209 (Algos page card, 23 Nov).</div></div>
+    <div class="card"><div class="muted">Ideas tried so far</div><div class="big">about 359</div>
+      <div class="muted">every one counted; the bar to call a find real is about 3.8 standard errors.</div></div>
+  </section>
+
+  <h2 style="margin-top:22px">The road</h2>
+  <div class="road">
+    <div class="step done"><b>1. Research</b><small>Ideas tested on past data. Best: ATM 200-wide call credit spread.</small></div>
+    <div class="step now"><b>2. Sandbox</b><small>The bot trades simulated money daily. 1 of 4 clean cycles done.</small></div>
+    <div class="step next"><b>3. Validation</b><small>Astra's 4 weeks: prove the numbers and the execution. Starts today.</small></div>
+    <div class="step later"><b>4. Pilot</b><small>One real lot, you approve each trade. Needs funds and your word.</small></div>
+    <div class="step later"><b>5. Grow</b><small>More lots only if real results after costs beat 40% a year.</small></div>
+  </div>
+
+  <section class="card">
+    <h2>4-week validation (GPT-6-Astra's direction, adopted 23 Nov)</h2>
+    <table>
+      <tr><th>Week</th><th>What</th><th>Who</th><th>State</th></tr>
+      <tr><td>1 (24 to 28 Nov)</td><td>Re-check every past trade of the main rule, the cost table and the margins; write the sizing note (size by the largest possible loss, not by margin).</td><td>Claude, Luna or Haiku for bulk</td><td><span class="tag t-now">now</span></td></tr>
+      <tr><td>2 (1 to 5 Dec)</td><td>Finish 3 more clean Sandbox cycles; failure drills: restart mid-trade, stale price, hedge order fails, emergency exit.</td><td>Bot, Claude</td><td><span class="tag t-wait">next</span></td></tr>
+      <tr><td>3 (8 to 12 Dec)</td><td>Stress test with worse fills; compare the rule with the same spread traded without its filters. No retuning.</td><td>Claude, workers</td><td><span class="tag">later</span></td></tr>
+      <tr><td>4 (15 to 19 Dec)</td><td>Go or no-go file: capital, largest loss, costs, failures, forward ledger.</td><td>Claude, then you decide</td><td><span class="tag">later</span></td></tr>
+    </table>
+  </section>
+
+  <div class="two">
+    <section class="card">
+      <h2>Today, Tue 24 Nov</h2>
+      <ul>
+        <li>09:16 app up, Upstox signed in, Analyze mode on <span class="tag t-ok">done</span></li>
+        <li>10:16 Sandbox entry (01 Dec expiry, first chance since 19 Nov) <span class="tag t-wait">waiting</span></li>
+        <li>10:30 margin check: picker and funds card against the Upstox calculator <span class="tag t-wait">waiting</span></li>
+        <li>Validation week 1 starts <span class="tag t-now">now</span></li>
+        <li>16:00 capture, save and shutdown (weekday task) <span class="tag">set</span></li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>Your side (only you can do these)</h2>
+      <ul>
+        <li>Sign in to Upstox each morning before 10:15</li>
+        <li>Add about Rs 26,000 for one pilot lot (when you choose)</li>
+        <li>Install the Stratzy app on the phone; sign in yourself (I never type passwords or codes)</li>
+        <li>Fresh Zen trade file (41 days old)</li>
+        <li>New OpenCode key in a terminal (free workers), if wanted</li>
+        <li>Decide: pilot trades approved in Action Center, or placed by hand</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="two">
+    <section class="card">
+      <h2>Safety lines</h2>
+      <ul>
+        <li>Everything automatic runs in Sandbox mode; Live gate on.</li>
+        <li>One lot, one position; pilot pause at Rs 10,000 cumulative loss (Astra: one spread can exceed this, so size by largest loss).</li>
+        <li>Daily cap Rs 27,000 (Astra calls it too large for Rs 1 lakh; changes only on your word).</li>
+        <li>Nothing tuned and re-run; every idea counted.</li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>Paused or waiting</h2>
+      <ul>
+        <li>Bulk screen of new ideas: cut to 5 ideas plus 2 better-founded questions; not started (Astra: validate first).</li>
+        <li>End-of-day library test: frozen review 14 Dec, single run in January 2027.</li>
+        <li>GLM workers: Z.AI weekly limit until 26 Nov 10:31. Luna (ChatGPT) builds meanwhile.</li>
+        <li>News tone: archive started November; testable around May 2027.</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:14px">
+    <h2>What the evidence says (so we stay honest)</h2>
+    <ul>
+      <li>Main rule on past data: 388 trades, about Rs 430 a trade after costs, deepest fall Rs 43,723; data already studied, so not proof.</li>
+      <li>Picking the recent best vendor algo (vendor decider): failed, t = -0.10.</li>
+      <li>Public studies: option sellers are paid a premium on most days, but costs eat much of it and it vanished in calm markets; no verified retail record of 30 to 40% a year found.</li>
+    </ul>
+  </section>
+
+  <footer>Source of truth: docs/algos/SESSION_MEMORY.md. This page is a picture of it and is refreshed when the plan moves.</footer>
+</main>
+</body>
+</html>
