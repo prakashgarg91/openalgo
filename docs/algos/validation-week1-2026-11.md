@@ -67,7 +67,18 @@ The largest possible loss of one lot is the spread width less the credit, times 
 - Margin (about Rs 40,700 plus the bought premium) is what Upstox blocks; it is not the risk. The risk is the
   largest loss above.
 
-## 6. Still open in week 1
+## 6. Lot sizes against the NSE circulars (Haiku 5.5, 24 Nov)
+
+- 2021 (75, then 50 from the July 2021 monthly), May 2024 (25), January 2025 (75 for weeklies) and January 2026 (65)
+  match the circulars as quoted by broker bulletins (the NSE PDFs could not be parsed).
+- One error: the 30 January 2025 expiry (January 2025 monthly, also that week's weekly) kept the old lot of 25; the
+  table gave 75. Four replay trades (entries 24 to 29 Jan 2025) were sized three times too large.
+- Fixed in services/algos/nse_lots.py (KEPT_OLD_LOT) with a test. The main rule's replay, same 388 trades, same rule:
+  net Rs 1,71,325 realistic (was 1,67,102), Rs 1,10,290 at double cost (was 1,05,861), mean Rs 442, t 2.47 (was 2.39);
+  worst trade and deepest fall unchanged. This is a data correction, not a new trial or a tuned result.
+- The end-of-day library harness uses the same table, so its draft registration (freeze review 14 Dec) inherits the fix.
+
+## 7. Still open in week 1
 
 - Lot sizes against the NSE circulars.
 - Sizing note: size by the largest possible loss (200 points less credit, times lot), not by margin.

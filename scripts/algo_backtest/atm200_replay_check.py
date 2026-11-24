@@ -30,13 +30,16 @@ _spec = importlib.util.spec_from_file_location("zen_structure_replay", REPLAY_FI
 zsr = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(zsr)  # defines load_expiry, daily, stats; does not run main()
 
+# Corrected 24 Nov 2026: the four trades on the 30 Jan 2025 expiry used lot 75 instead of 25 (the January
+# 2025 monthly kept the old lot; services/algos/nse_lots.py KEPT_OLD_LOT). Before the fix the counted figures
+# were net 167102, net2x 105861, mean 431, sd 3552, t 2.39. Same 388 trades, same rule.
 REFERENCE = {
     "trades": 388,
-    "net": 167102,
-    "net2x": 105861,
-    "mean": 431,
-    "sd": 3552,
-    "t": 2.39,
+    "net": 171325,
+    "net2x": 110290,
+    "mean": 442,
+    "sd": 3525,
+    "t": 2.47,
     "worst": -8935,
     "dd": 43723,
 }

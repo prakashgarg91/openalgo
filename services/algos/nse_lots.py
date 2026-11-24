@@ -41,6 +41,16 @@ NIFTY_LOTS: tuple[tuple[str, int, str], ...] = (
     ),
 )
 FIRST_DOCUMENTED = pd.Timestamp(NIFTY_LOTS[0][0])
+# Single expiries that kept the old lot past a start date above. The October 2024 change moved weeklies
+# to 75 from 2 Jan 2025, but the January 2025 MONTHLY (expiring 30 Jan 2025, also that week's weekly) was
+# listed before the change and kept 25; the first monthly on 75 expired 27 Feb 2025 (NSE/FAOP/64625, as
+# quoted by broker bulletins; checked 24 Nov 2026, docs/algos/validation-week1-2026-11.md).
+KEPT_OLD_LOT: dict[str, tuple[int, str]] = {
+    "2025-01-30": (
+        25,
+        "NSE/FAOP/64625: January 2025 monthly keeps 25; first monthly on 75 is 27 Feb 2025",
+    ),
+}
 # Not opened yet: the August 2015 revision (press reports 25 to 75, effective 28 August 2015). Until its
 # circular is read and added above, no expiry before FIRST_DOCUMENTED has a lot and none is guessed.
 
@@ -48,6 +58,9 @@ FIRST_DOCUMENTED = pd.Timestamp(NIFTY_LOTS[0][0])
 def nifty_lot(expiry: pd.Timestamp | str) -> int | None:
     """Units per Nifty lot for a contract expiring on ``expiry``, or None if it is not documented."""
     when = pd.Timestamp(expiry).normalize()
+    kept = KEPT_OLD_LOT.get(when.strftime("%Y-%m-%d"))
+    if kept is not None:
+        return kept[0]
     lot = None
     for start, size, _source in NIFTY_LOTS:
         if when >= pd.Timestamp(start):

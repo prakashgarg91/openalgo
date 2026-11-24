@@ -57,3 +57,11 @@ def test_the_replay_lot_function_uses_the_circular_table_before_october_2024():
         ("2024-09-26", 25),
     ):
         assert intraday.lot_size_for_expiry(pd.Timestamp(expiry)) == lot
+
+
+def test_the_january_2025_monthly_kept_the_old_lot_of_25():
+    from services.algos.nse_lots import nifty_lot
+
+    assert nifty_lot("2025-01-30") == 25
+    assert nifty_lot("2025-01-23") == 75  # weeklies moved to 75 from 2 Jan 2025
+    assert nifty_lot("2025-02-27") == 75
