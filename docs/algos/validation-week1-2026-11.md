@@ -46,7 +46,28 @@ Report each beside the base result. The base result stays the frozen reference; 
 - Caveats: the NSE circular PDF could not be parsed (figure from the Upstox page); some rates rest on search snippets.
 - Verdict: costs are not a source of error in the replay.
 
-## 5. Still open in week 1
+## 5. Sizing note (24 Nov)
+
+The largest possible loss of one lot is the spread width less the credit, times the lot: (200 - credit) x 65.
+
+| Credit (points) | Largest loss of one lot | Share of Rs 1,00,000 |
+| --- | --- | --- |
+| 100 | Rs 6,500 | 6.5 percent |
+| 76.6 (the 18 Nov Sandbox trade) | Rs 8,021 | 8.0 percent |
+| 60 | Rs 9,100 | 9.1 percent |
+| 30 (smallest seen in the replay) | Rs 11,050 | 11.1 percent |
+
+- The stop (spread value at 2.5 times the credit) sits close to the full width for most credits (191.5 against 200
+  at 76.6 points), and a gap through the stop goes to the full width; so the stop does not make a loss much smaller
+  than the largest loss. The replay's worst single trade was Rs -8,935.
+- One lot therefore risks about 6 to 11 percent of Rs 1,00,000 per trade. A common rule of thumb for a single
+  trade is 1 to 2 percent; on that rule one lot fits an account of about Rs 4 lakh to Rs 11 lakh. This is
+  information for the owner's decision, not a change to any limit.
+- The pilot pause at a cumulative loss of Rs 10,000 can be reached by one full loss plus one small loss.
+- Margin (about Rs 40,700 plus the bought premium) is what Upstox blocks; it is not the risk. The risk is the
+  largest loss above.
+
+## 6. Still open in week 1
 
 - Lot sizes against the NSE circulars.
 - Sizing note: size by the largest possible loss (200 points less credit, times lot), not by margin.
