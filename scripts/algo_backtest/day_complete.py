@@ -13,6 +13,25 @@ from datetime import date, datetime
 from pathlib import Path
 
 LABELS = ("1015", "1430", "1500")
+
+
+def market_closed(day: date) -> bool:
+    """True on a weekend or an NSE trading holiday, when there is nothing to capture.
+
+    The holiday list is the app's own market calendar. If it cannot be read, the day is treated as
+    open, so a real trading day is never waved through by a lookup failure.
+    """
+    if day.weekday() >= 5:
+        return True
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from database.market_calendar_db import is_market_holiday
+
+        return bool(is_market_holiday(day, "NSE"))
+    except Exception:
+        return False
+
+
 FAILED_ZERO = re.compile(r"'failed': 0\}")
 
 
@@ -76,6 +95,11 @@ def main() -> int:
     text = (
         log.read_text(encoding="utf-8", errors="replace").replace("\r", "") if log.exists() else ""
     )
+    if market_closed(day):
+        print(
+            f"Day {day.isoformat()}: the market was closed (holiday or weekend), so there is nothing to capture. The day counts as complete."
+        )
+        return 0
     early = "--early" in sys.argv
     problems = judge(text, day, labels_in(repo / "bidask" / f"{day.isoformat()}.csv"), early)
     if problems:

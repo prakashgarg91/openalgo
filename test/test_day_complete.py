@@ -64,3 +64,28 @@ def test_an_early_close_needs_only_the_first_snapshot_and_a_clean_capture():
     assert dc.judge(early_log, DAY, set(), early=True) != []
     bad = early_log.replace("'no_data': 0, 'failed': 0", "'no_data': 0, 'failed': 4")
     assert dc.judge(bad, DAY, {"1015"}, early=True) != []
+
+
+def test_a_market_holiday_counts_as_complete_without_any_capture(monkeypatch, tmp_path, capsys):
+    import scripts.algo_backtest.day_complete as dc
+
+    monkeypatch.setattr(dc, "market_closed", lambda day: True)
+    monkeypatch.setattr(dc.sys, "argv", ["day_complete.py", str(tmp_path), "2026-11-24"])
+    assert dc.main() == 0
+    assert "market was closed" in capsys.readouterr().out
+
+
+def test_an_open_day_with_no_capture_is_still_not_complete(monkeypatch, tmp_path):
+    import scripts.algo_backtest.day_complete as dc
+
+    monkeypatch.setattr(dc, "market_closed", lambda day: False)
+    monkeypatch.setattr(dc.sys, "argv", ["day_complete.py", str(tmp_path), "2026-11-25"])
+    assert dc.main() == 1
+
+
+def test_weekends_are_closed_without_the_calendar():
+    from datetime import date
+
+    import scripts.algo_backtest.day_complete as dc
+
+    assert dc.market_closed(date(2026, 11, 22)) is True
