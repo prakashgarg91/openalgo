@@ -33,8 +33,20 @@ d. Every exit filled one bar later than its decision.
 e. All of the above together, at realistic and at double costs.
 Report each beside the base result. The base result stays the frozen reference; none of these replaces it.
 
-## 4. Still open in week 1
+## 4. Cost table against official rates (Haiku 5.5, 24 Nov)
 
-- Cost table against today's official rates (Haiku agent running).
+- Brokerage Rs 20 an order, SEBI fee, stamp duty, GST, and STT from October 2024 (0.10 percent, 0.15 percent from
+  1 April 2026) all MATCH. The exchange charge in code (0.0345 percent) matches no official figure: 0.0495 percent
+  before October 2024, 0.03503 percent to February 2026, 0.03553 percent from March 2026. Before October 2024 STT was
+  0.0625 percent, so the code overstates STT and understates the exchange charge there; the two nearly cancel.
+- Worked example, one lot of a 160/87 call spread at April 2026 rates: our charges Rs 132.07 a round trip; the
+  official rates differ by under Rs 1 in every period checked. No difference moves a one-lot trade by Rs 10 or more.
+- STT on exercise is not modelled, but the rule always exits by 15:00 on the next session, before settlement, so no
+  leg is exercised. Immaterial for this rule.
+- Caveats: the NSE circular PDF could not be parsed (figure from the Upstox page); some rates rest on search snippets.
+- Verdict: costs are not a source of error in the replay.
+
+## 5. Still open in week 1
+
 - Lot sizes against the NSE circulars.
 - Sizing note: size by the largest possible loss (200 points less credit, times lot), not by margin.
