@@ -82,3 +82,27 @@ The largest possible loss of one lot is the spread width less the credit, times 
 
 - Lot sizes against the NSE circulars.
 - Sizing note: size by the largest possible loss (200 points less credit, times lot), not by margin.
+
+## 8. Timing stress runs (run 25 Nov 2026, owner-approved early; settings fixed on 24 Nov)
+
+Script: scripts/algo_backtest/atm200_timing_stress.py (built by GPT-6-Luna; two bugs fixed before use: an exit priced
+above the 200-point width was possible, and the combined run let the next-bar fill overwrite intrabar stop fills).
+Same 388 trades, same rule; the base reproduces the frozen replay exactly.
+
+| Run | Net, realistic costs | Net, double costs | Per trade | t | Worst trade | Deepest fall |
+| --- | --- | --- | --- | --- | --- | --- |
+| base (10:15 close, stops on closes) | 1,71,325 | 1,10,290 | 442 | 2.47 | -8,935 | 43,723 |
+| a. entry at the 10:15 open | 1,61,657 | 1,00,667 | 417 | 2.32 | -8,589 | 45,227 |
+| b. entry one bar later (10:20 close) | 1,69,954 | 1,08,870 | 438 | 2.46 | -9,066 | 43,708 |
+| c. stop checked inside each bar | 1,01,539 | 40,459 | 262 | 1.37 | -9,006 | 51,871 |
+| d. every exit one bar later | 1,72,851 | 1,11,814 | 445 | 2.49 | -9,111 | 44,206 |
+| e. b + c + d together | 1,16,092 | 54,956 | 299 | 1.59 | -9,175 | 51,947 |
+
+Reading:
+- Entry and exit timing (a, b, d) move the result by under 6 percent. The rule does not depend on a lucky minute.
+- The stop check (c) is the one that matters: checking the stop inside each bar takes about 40 percent of the profit.
+  Its test uses the sold call's HIGH minus the bought call's LOW in the same bar, which can be reached at different
+  moments, so it is a pessimistic bound: the truth lies between the base and c.
+- Owner's rule of 25 Nov (no-go if e loses money at realistic costs): e is +1,16,092, so the rule is NOT marked no-go.
+  But at double costs it keeps only Rs 54,956, t 1.59 is far below the register bar, and the deepest fall grows to
+  about Rs 52,000 at the replay's lots. Evidence is weaker than the base suggested.
