@@ -118,7 +118,12 @@ def replay_trade(
 def _daily_vix(repo: Path) -> dict[pd.Timestamp, float]:
     frame = pd.read_csv(repo / "context" / "daily" / "_INDIAVIX.csv")
     date_column = next(
-        (name for name in ("date", "timestamp", "Date", "Timestamp") if name in frame), None
+        (
+            name
+            for name in ("date", "timestamp", "timestamp_utc", "Date", "Timestamp")
+            if name in frame
+        ),
+        None,
     )
     close_column = next((name for name in ("close", "Close") if name in frame), None)
     if date_column is None or close_column is None:
