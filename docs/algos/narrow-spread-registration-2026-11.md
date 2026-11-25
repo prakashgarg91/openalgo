@@ -1,7 +1,10 @@
-# DRAFT pre-registration: ATM 100-wide call credit spread (25 November 2026)
+# Pre-registration: ATM 100-wide call credit spread (frozen 25 November 2026)
 
-Status: DRAFT for the owner's yes. Nothing run, no trial counted yet. When approved, this file and its code are
-frozen by one commit and not changed; a defect found later may be fixed, but the re-run counts as a new trial.
+STATUS: FROZEN
+
+Approved by the owner on 25 Nov 2026 ("Yes, freeze it"). This file and its code (services/algos/atm100_rule.py,
+scripts/algo_backtest/atm100_replay.py, scripts/algo_backtest/atm100_shadow_ledger.py, test/test_atm100.py) are frozen
+by the commit that adds this line. A defect found later may be fixed, but the re-run counts as a new trial.
 
 ## Why
 
@@ -31,8 +34,12 @@ DESCRIPTION, with the five timing settings of 24 Nov (base, a, b, c, d, e), and 
 1. Replay once on the past data (one counted trial): report trades, net at realistic and doubled costs, t, worst
    trade, deepest fall, and the five timing settings. It is NOT a pass or fail. It is a stop sign only if the
    combined timing run (e) loses money at realistic costs; then the idea is retired and step 2 never starts.
-2. Forward Sandbox ledger from the first trading day after the freeze: the same bot code with the width set to 100
-   and its own strategy name, files and ledger, separate from the 200-wide bot. Judged after 60 completed trades
+2. Forward SHADOW ledger from 26 Nov 2026 (the first trading day after the freeze), computed each evening by
+   scripts/algo_backtest/atm100_shadow_ledger.py from the one-minute candles the nightly capture stores: entry on the
+   10:15 one-minute close, exits on one-minute closes, costs by leg_cost, one position at a time, written to
+   research/atm100_forward/ledger.csv in the data repo. Change made before the freeze, with the reason: a second
+   Sandbox bot would sell the same at-the-money call as the counted 200-wide bot, and Sandbox positions are pooled by
+   contract, so the two bots would block or tangle each other. The shadow ledger places no order and cannot interfere. Judged after 60 completed trades
    (about four months) at realistic costs: pass needs net positive, t of at least 2.0, worst day better than
    Rs -5,000, deepest fall under Rs 10,000, and every entry inside the pilot limits. Anything else is a fail.
 3. A pass makes the 100-wide spread eligible for the one-lot manual pilot under the 25 Nov limits. Never Live from
@@ -44,5 +51,5 @@ Search widths, targets, stops, entry times or gates; replace the 200-wide rule o
 
 ## Cost and risk
 
-Cost: one worker job for the replay (about an hour) and the existing bot run under a second name. Risk: low; the
+Cost: one worker job (done) and a few seconds each evening for the ledger. Risk: low; the
 forward ledger is slow (about four months to 60 trades) and cannot be hurried honestly.
