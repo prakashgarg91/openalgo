@@ -53,3 +53,21 @@ Search widths, targets, stops, entry times or gates; replace the 200-wide rule o
 
 Cost: one worker job (done) and a few seconds each evening for the ledger. Risk: low; the
 forward ledger is slow (about four months to 60 trades) and cannot be hurried honestly.
+
+## Result (25 November 2026): RETIRED
+
+One run (trial 360) after the VIX-column fix (74ba1b54a; the first attempt stopped before any result was seen):
+
+| Run | Net, realistic | Net, doubled | Per trade | t | Worst trade | Deepest fall |
+| --- | --- | --- | --- | --- | --- | --- |
+| base | 65,570 | 3,064 | 169 | 1.69 | -4,609 | 24,863 |
+| a. entry at 10:15 open | 58,984 | -3,497 | 152 | 1.51 | -4,673 | 25,329 |
+| b. entry one bar later | 68,719 | 6,193 | 177 | 1.78 | -4,571 | 23,572 |
+| c. stop inside each bar | -1,18,273 | -1,80,970 | -305 | -2.59 | -4,593 | 1,24,803 |
+| d. exit one bar later | 69,279 | 6,779 | 179 | 1.77 | -4,491 | 24,994 |
+| e. b + c + d | -1,23,412 | -1,86,023 | -318 | -2.68 | -4,632 | 1,26,907 |
+
+The registered stop sign is met: the combined run (e) loses money at realistic costs, so the idea is retired and the
+forward shadow ledger does not start. The intrabar-stop setting (c) is a pessimistic bound (sold high minus bought
+low within a bar), and it bites a narrower spread harder because its stop sits only about 2.5 credits from entry;
+that is noted, not used to rescue the idea. Even without it, the base keeps only Rs 3,064 at double costs.
