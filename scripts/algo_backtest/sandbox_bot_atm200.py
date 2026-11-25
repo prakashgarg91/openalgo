@@ -38,6 +38,9 @@ from services.algos import sandbox_bot_atm200 as bot_mod  # noqa: E402
 
 STATE = ROOT / "db" / "sandbox_bot_atm200" / "state.json"
 TRADES = ROOT / "db" / "sandbox_bot_atm200" / "trades.csv"
+DRILL_DIR = ROOT / "db" / "sandbox_bot_atm200_drill"
+DRILL_STATE = DRILL_DIR / "state.json"
+DRILL_TRADES = DRILL_DIR / "trades.csv"
 DEFAULT_VIX = Path("D:/Github/openalgo-data/context/daily/_INDIAVIX.csv")
 
 
@@ -75,10 +78,10 @@ def api_key() -> str | None:
 TRANSPORT_EXIT = 3
 
 
-def failure_alert(command: str, why: BaseException) -> str:
+def failure_alert(command: str, why: BaseException, prefix: str = "Sandbox") -> str:
     """The Telegram text for an unexpected failure. It names the command and says what to look at."""
     return (
-        f"Sandbox: ATM 200 ERROR during {command} ({type(why).__name__}). The run stopped there. "
+        f"{prefix}: ATM 200 ERROR during {command} ({type(why).__name__}). The run stopped there. "
         r"Look at the positions and log\errors.jsonl before running again."
     )
 
@@ -95,20 +98,30 @@ def latest_vix(today: date) -> tuple[date, float] | None:
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     command = args[0] if args else ""
+    drill = "--drill" in sys.argv
+    state_path = DRILL_STATE if drill else STATE
+    trades_path = DRILL_TRADES if drill else TRADES
+    strategy = "ATM200-drill" if drill else bot_mod.STRATEGY
+    alert_prefix = "Sandbox DRILL:" if drill else bot_mod.PREFIX
+    strike_offset = 300 if drill else 0
     if command == "status":
-        recorded = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
+        if drill:
+            DRILL_DIR.mkdir(parents=True, exist_ok=True)
+        recorded = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
         print(json.dumps(recorded, indent=2, default=str))
         return 0
     if command not in ("entry", "check", "flatten"):
         print(__doc__)
         return 1
+    if drill:
+        DRILL_DIR.mkdir(parents=True, exist_ok=True)
     key = api_key()
     if not key:
         print("Set OPENALGO_API_KEY to your OpenAlgo API key first.")
         return 1
     dry = "--dry-run" in sys.argv
     now = datetime.now()
-    if command == "entry" and not dry and "--force" not in sys.argv:
+    if command == "entry" and not dry and "--force" not in sys.argv and not drill:
         if not (clock(10, 10) <= now.time() <= clock(10, 45)):
             print(
                 "The entry runs only between 10:10 and 10:45. Use --force to override on purpose."
@@ -116,7 +129,16 @@ def main() -> int:
             return 2
     with httpx.Client(timeout=15.0) as http:
         api = _Api(http, os.getenv("OPENALGO_HOST", "http://127.0.0.1:5000"), key)
-        bot = bot_mod.ATM200Bot(api, STATE, TRADES, notify=fa.notify, sleep=time.sleep)
+        bot = bot_mod.ATM200Bot(
+            api,
+            state_path,
+            trades_path,
+            notify=fa.notify,
+            sleep=time.sleep,
+            strategy=strategy,
+            alert_prefix=alert_prefix,
+            strike_offset=strike_offset,
+        )
         try:
             if command == "flatten":
                 result = bot.flatten(yes="--yes" in sys.argv)
@@ -131,7 +153,11 @@ def main() -> int:
             print(str(why))
             return 2
         except Exception as why:  # noqa: BLE001 - a network or other failure must alert, never end silently
-            bot_mod.safe_send(fa.notify, failure_alert(command, why))
+            bot_mod.safe_send(
+                fa.notify,
+                failure_alert(command, why, "Sandbox DRILL" if drill else "Sandbox"),
+                alert_prefix,
+            )
             print(f"{type(why).__name__}: {why}")
             return TRANSPORT_EXIT
     print(json.dumps(result, indent=2, default=str))

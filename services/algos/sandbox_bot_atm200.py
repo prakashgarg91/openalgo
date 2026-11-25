@@ -326,9 +326,11 @@ class ATM200Bot(sb.Bot):
         strategy: str = STRATEGY,
         alert_prefix: str = PREFIX,
         venue: str = VENUE,
+        strike_offset: int = 0,
     ):
         # Set before the base constructor: the client wrapper and the alerts read them from here on.
         self.strategy, self.alert_prefix, self.venue = strategy, alert_prefix, venue
+        self.strike_offset = strike_offset
         super().__init__(
             _StrategyClient(client, strategy),
             state_path,
@@ -610,7 +612,7 @@ class ATM200Bot(sb.Bot):
         if not spot:
             raise sb.Refused("The Nifty quote is missing, so no order was placed.")
         vix_prev, note = vix_gate_input(today, vix_latest)
-        sold_strike = rule.atm_strike(spot)
+        sold_strike = rule.atm_strike(spot) + self.strike_offset
         bought_strike = sold_strike + rule.WIDTH
         sold_sym = sb.contract_symbol(expiry, sold_strike)
         long_sym = sb.contract_symbol(expiry, bought_strike)

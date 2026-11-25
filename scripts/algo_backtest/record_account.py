@@ -121,7 +121,7 @@ DAY_COLUMNS = [
 
 
 #: Trades made to test the machinery, not to trade: kept out of the account's own record.
-REHEARSAL_STRATEGIES = ("kill-switch-test",)
+REHEARSAL_STRATEGIES = ("kill-switch-test", "ATM200-drill")
 REHEARSAL_BOT = "ATM200-sandbox"
 REHEARSAL_BOT_FIRST_REAL_DAY = "2026-11-18"
 
