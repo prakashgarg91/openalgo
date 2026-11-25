@@ -45,3 +45,12 @@ The Live gate (`ALGO_LIVE_REQUIRES_FORWARD_PASS`, on by default) refuses a Live 
 - Live gate: confirmed ON with a MANUAL pilot from 1 December and NO waiver. The executor stays unused until a forward pass exists or the owner writes a waiver in the approval file later.
 - gthread suite: an exception is recorded for the `live_only` order-API change until a Linux environment exists (see the changelog).
 - Daily cap: the structural check (width x lot x lots must not exceed Rs 27,000) replaces any profit-and-loss tracking for the pilot; one lot and one position bound a day's loss at about Rs 13,000.
+
+## Owner decision of 25 November 2026: pilot limits (GPT-6-Astra's advice, adopted)
+
+Daily loss budget Rs 5,000 (costs and open losses included); pilot pause at Rs 10,000 cumulative net loss and at
+Rs 10,000 peak-to-trough; skip any trade whose largest possible loss plus a cost allowance does not fit what is left of
+both budgets; at most 3 entries a week, one a day, no same-day re-entry; pause after 2 losses in a row or after one
+full-stop or maximum-loss trade; one hedged lot, one position. One lot's largest loss (Rs 6,500 to 9,100 at credits
+of 60 to 100) exceeds the Rs 5,000 daily budget, so the live pilot waits for more capital. The executor's constants
+(DAILY_CAP 27,000) must be brought to these values before it is ever used; it is not in use.
