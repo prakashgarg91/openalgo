@@ -38,13 +38,13 @@
 <body>
 <main>
   <h1>Algo plan board</h1>
-  <p class="sub">For the owner (vibe trader) and Claude (vibe coder). Updated 24 Nov 2026, 09:30. Sandbox mode only for everything automatic; the AI never places a real order.</p>
+  <p class="sub">For the owner (vibe trader) and Claude (vibe coder). Updated 25 Nov 2026, 11:15. Sandbox mode only for everything automatic; the AI never places a real order.</p>
 
   <section class="grid">
     <div class="card"><div class="muted">Target (owner, 23 Nov)</div><div class="big">40% a year</div>
       <div class="muted">after losses and costs: about Rs 770 a week on Rs 1 lakh. Rs 6,000 a week is the same 40% on about Rs 7.8 lakh.</div></div>
     <div class="card"><div class="muted">Main rule, Sandbox ledger</div><div class="big">Rs -2,954</div>
-      <div class="muted">1 trade closed (18 to 19 Nov, time exit). Machinery worked end to end.</div></div>
+      <div class="muted">1 trade closed (18 to 19 Nov). Cycle 2 open since 25 Nov 10:16 (credit 91.7). Drills passed 25 Nov.</div></div>
     <div class="card"><div class="muted">Funds for one real lot</div><div class="big">Rs 57,250</div>
       <div class="muted">cash Rs 32,041, short by Rs 25,209 (Algos page card, 23 Nov).</div></div>
     <div class="card"><div class="muted">Ideas tried so far</div><div class="big">about 359</div>
@@ -54,9 +54,9 @@
   <h2 style="margin-top:22px">The road</h2>
   <div class="road">
     <div class="step done"><b>1. Research</b><small>Ideas tested on past data. Best: ATM 200-wide call credit spread.</small></div>
-    <div class="step now"><b>2. Sandbox</b><small>The bot trades simulated money daily. 1 of 4 clean cycles done.</small></div>
-    <div class="step next"><b>3. Validation</b><small>Astra's 4 weeks: prove the numbers and the execution. Starts today.</small></div>
-    <div class="step later"><b>4. Pilot</b><small>One real lot, you approve each trade. Needs funds and your word.</small></div>
+    <div class="step now"><b>2. Sandbox</b><small>The bot trades simulated money. Cycle 2 of 4 running; failure drills passed.</small></div>
+    <div class="step next"><b>3. Validation</b><small>Week 1 done; timing stress run early: still positive but weaker (t 1.59).</small></div>
+    <div class="step later"><b>4. Pilot</b><small>Limits adopted 25 Nov: Rs 5,000 a day. One 200-wide lot does not fit yet; a 100-wide version is drafted.</small></div>
     <div class="step later"><b>5. Grow</b><small>More lots only if real results after costs beat 40% a year.</small></div>
   </div>
 
@@ -64,22 +64,24 @@
     <h2>4-week validation (GPT-6-Astra's direction, adopted 23 Nov)</h2>
     <table>
       <tr><th>Week</th><th>What</th><th>Who</th><th>State</th></tr>
-      <tr><td>1 (24 to 28 Nov)</td><td>Re-check every past trade of the main rule, the cost table and the margins; write the sizing note (size by the largest possible loss, not by margin).</td><td>Claude, Luna or Haiku for bulk</td><td><span class="tag t-now">now</span></td></tr>
-      <tr><td>2 (1 to 5 Dec)</td><td>Finish 3 more clean Sandbox cycles; failure drills: restart mid-trade, stale price, hedge order fails, emergency exit.</td><td>Bot, Claude</td><td><span class="tag t-wait">next</span></td></tr>
-      <tr><td>3 (8 to 12 Dec)</td><td>Stress test with worse fills; compare the rule with the same spread traded without its filters. No retuning.</td><td>Claude, workers</td><td><span class="tag">later</span></td></tr>
+      <tr><td>1 (24 to 28 Nov)</td><td>Re-check every past trade of the main rule, the cost table and the margins; write the sizing note (size by the largest possible loss, not by margin).</td><td>Claude, Luna or Haiku for bulk</td><td><span class="tag t-ok">done</span></td></tr>
+      <tr><td>2 (1 to 5 Dec)</td><td>Finish 3 more clean Sandbox cycles; failure drills: restart mid-trade, stale price, hedge order fails, emergency exit.</td><td>Bot, Claude</td><td><span class="tag t-now">drills done; cycles running</span></td></tr>
+      <tr><td>3 (8 to 12 Dec)</td><td>Stress test with worse fills; compare the rule with the same spread traded without its filters. No retuning.</td><td>Claude, workers</td><td><span class="tag t-ok">timing done early (25 Nov)</span></td></tr>
       <tr><td>4 (15 to 19 Dec)</td><td>Go or no-go file: capital, largest loss, costs, failures, forward ledger.</td><td>Claude, then you decide</td><td><span class="tag">later</span></td></tr>
     </table>
   </section>
 
   <div class="two">
     <section class="card">
-      <h2>Today, Tue 24 Nov</h2>
+      <h2>Today, Wed 25 Nov</h2>
       <ul>
-        <li>09:16 app up, Upstox signed in, Analyze mode on <span class="tag t-ok">done</span></li>
-        <li>10:16 Sandbox entry (01 Dec expiry, first chance since 19 Nov) <span class="tag t-wait">waiting</span></li>
-        <li>10:30 margin check: picker and funds card against the Upstox calculator <span class="tag t-wait">waiting</span></li>
-        <li>Validation week 1 starts <span class="tag t-now">now</span></li>
-        <li>16:00 capture, save and shutdown (weekday task) <span class="tag">set</span></li>
+        <li>Upstox signed in, Analyze mode on <span class="tag t-ok">done</span></li>
+        <li>10:16 Sandbox entry, sold 25750 / bought 25950 call, credit 91.7 <span class="tag t-ok">done</span></li>
+        <li>10:31 funds for one lot: Rs 55,401 needed, short Rs 23,360 <span class="tag t-ok">done</span></li>
+        <li>11:00 failure drills on a separate test bot: all passed <span class="tag t-ok">done</span></li>
+        <li>Timing stress runs: positive (Rs 1,16,092), weaker evidence <span class="tag t-ok">done</span></li>
+        <li>100-wide spread test drafted <span class="tag t-wait">your yes</span></li>
+        <li>16:00 capture, save and shutdown <span class="tag">set</span></li>
       </ul>
     </section>
     <section class="card">
@@ -90,7 +92,7 @@
         <li>Install the Stratzy app on the phone; sign in yourself (I never type passwords or codes)</li>
         <li>Fresh Zen trade file (41 days old)</li>
         <li>New OpenCode key in a terminal (free workers), if wanted</li>
-        <li>Decide: pilot trades approved in Action Center, or placed by hand</li>
+        <li>Yes or no on the 100-wide spread draft</li>
       </ul>
     </section>
   </div>
@@ -101,7 +103,7 @@
       <ul>
         <li>Everything automatic runs in Sandbox mode; Live gate on.</li>
         <li>One lot, one position; pilot pause at Rs 10,000 cumulative loss (Astra: one spread can exceed this, so size by largest loss).</li>
-        <li>Daily cap Rs 27,000 (Astra calls it too large for Rs 1 lakh; changes only on your word).</li>
+        <li>Pilot: daily loss budget Rs 5,000, pause at Rs 10,000, max 3 entries a week, skip any trade whose largest loss does not fit (adopted 25 Nov). Sandbox cap stays Rs 27,000.</li>
         <li>Nothing tuned and re-run; every idea counted.</li>
       </ul>
     </section>
