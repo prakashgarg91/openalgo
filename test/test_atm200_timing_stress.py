@@ -44,4 +44,20 @@ def test_next_bar_fill_and_last_bar_fallback():
 
 
 def test_an_exit_is_never_priced_above_the_spread_width():
-    pass
+    # The bar after entry opens with the spread at 260 points, more than a 200-wide spread can cost.
+    sold = bars([(100, 102, 98, 100), (300, 310, 290, 300), (130, 135, 125, 130)])
+    long_ = bars([(20, 22, 18, 20), (40, 41, 39, 40), (20, 22, 18, 20)])
+    end = sold.index[-1]
+    stress = replay_trade(sold, long_, sold.index[0], end, 80, "c_intrabar_stop")
+    assert stress["why"] == "stop"
+    assert stress["exit"] == 200
+
+
+def test_combined_run_keeps_the_intrabar_stop_fill():
+    # Entry fills one bar late (bar 1 close: credit 80); bar 2 spikes through the stop; bar 3 is calm.
+    sold = bars([(100, 102, 98, 100), (100, 102, 98, 100), (100, 270, 99, 130), (90, 92, 88, 90)])
+    long_ = bars([(20, 22, 18, 20), (20, 22, 18, 20), (20, 21, 19, 20), (20, 22, 18, 20)])
+    end = sold.index[-1]
+    combined = replay_trade(sold, long_, sold.index[0], end, 80, "e_all")
+    assert combined["why"] == "stop"
+    assert combined["exit"] == 200  # not replaced by the next bar's close
