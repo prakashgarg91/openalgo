@@ -106,3 +106,14 @@ Reading:
 - Owner's rule of 25 Nov (no-go if e loses money at realistic costs): e is +1,16,092, so the rule is NOT marked no-go.
   But at double costs it keeps only Rs 54,956, t 1.59 is far below the register bar, and the deepest fall grows to
   about Rs 52,000 at the replay's lots. Evidence is weaker than the base suggested.
+
+## 9. Failure drills on the separate test bot (25 Nov 2026, 11:00, Sandbox mode)
+
+Bot copy "ATM200-drill" (own files, strikes 300 points out: sold 26200, bought 26400 call, 01 Dec expiry), while the
+counted bot held its 25750/25950 spread. Log: log/drill_2026-11-25.log.
+- Entry: both legs filled, hedge first; credit 53.2 points. PASS.
+- Duplicate entry: "A trade is still recorded (open), so nothing new was placed." PASS.
+- Restart: a fresh process picked up the open trade from its state file and reported it held (value 54.0). PASS.
+- Emergency exit (flatten): both legs closed; the drill's positions are 0 and 0 in the Sandbox book. PASS.
+- Isolation: the counted bot stayed open with its own positions (-65 at 25750, +65 at 25950) untouched. PASS.
+Not drilled live (covered only by unit tests): a stale quote, a refused hedge order, a reply lost mid-order.
