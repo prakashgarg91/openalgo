@@ -54,3 +54,10 @@ both budgets; at most 3 entries a week, one a day, no same-day re-entry; pause a
 full-stop or maximum-loss trade; one hedged lot, one position. One lot's largest loss (Rs 6,500 to 9,100 at credits
 of 60 to 100) exceeds the Rs 5,000 daily budget, so the live pilot waits for more capital. The executor's constants
 (DAILY_CAP 27,000) must be brought to these values before it is ever used; it is not in use.
+
+## Owner decision of 25 November 2026 (evening): when the daily budget rises
+
+Fixed before any result is seen: the pilot's daily loss budget rises from Rs 5,000 to Rs 10,000, for one lot of the
+200-wide spread only, when at least 10 closed trades of the counted Sandbox bot (ATM200-sandbox, from 18 Nov 2026;
+drill and rehearsal trades excluded) are net positive in total after charges, with no machinery failure among them,
+and the go/no-go file says go. Ten trades are a weak signal; this is the owner's chosen bar, not a statistical proof.
