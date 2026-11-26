@@ -23,7 +23,7 @@ owner's; this file states the evidence and a recommendation.
 | Trade | Entry | Exit | Reason | Net after charges |
 | --- | --- | --- | --- | --- |
 | 1 | 18 Nov | 19 Nov 15:00 | time | Rs -2,954 |
-| 2 | 25 Nov | (26 Nov) | | |
+| 2 | 25 Nov | 26 Nov 15:00 | time | Rs -1,820 |
 
 Machinery: first cycle end to end clean; failure drills passed on a separate test bot (25 Nov). Missed days:
 20 Nov (PC off), 24 Nov (holiday, correct), 23 Nov (expiry day, correct skip).
