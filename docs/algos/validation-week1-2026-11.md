@@ -131,3 +131,20 @@ Run by GLM 5.3 Flash workers on the stored 5-minute bars (October 2024 to Octobe
    10:15 close against the absolute Nifty move from 10:15 to the expiry close. Report the share of days the straddle
    exceeded the move, the average ratio, and the same split by previous VIX below or above its 60-session median.
    Descriptive; not a trial.
+
+### Results of section 10 (26 Nov 2026)
+
+1. One constant lot of 65 for every trade (descriptive). Base: net Rs 1,82,171 realistic, Rs 1,21,022 doubled, mean
+   Rs 470, t 2.72, worst trade Rs -7,756, deepest fall Rs 38,032. Combined timing (e): net Rs 1,22,474, Rs 61,226
+   doubled, t 1.72, worst Rs -8,322, deepest fall Rs 45,386. So in today's lot size the deepest fall of the past
+   replay is about Rs 38,000 to 45,000, roughly four to five full losses in a row.
+2. The filters (trial 361). Gated 388 trades against ungated 409. The 21 days the gate skipped: base net Rs -13,241
+   (mean Rs -631); combined timing net Rs -16,036 (mean Rs -764). Gated beats ungated at both timings (base 1,71,325
+   against 1,58,084; e 1,16,092 against 1,00,057). Reading fixed beforehand: the gate does add something. With only
+   21 skipped trades this is a weak signal, not proof. The frozen rule is unchanged.
+3. Weekly premium against the move (descriptive, 409 days, costs not included). The 10:15 ATM straddle exceeded the
+   move to the expiry close on 64 percent of days; the median straddle was 27 percent above the move (mean straddle
+   270 points, mean move 243). When the previous VIX was at or above its 60-session median: 71 percent of days, mean
+   straddle 313 against a move of 250. Below the median: 59 percent, 235 against 235. So option sellers were paid a
+   premium on most days, mostly in the nervous half; in the calm half it roughly matched the move before costs.
+   This agrees with the public study noted on 23 Nov (the premium fades in calm markets).
