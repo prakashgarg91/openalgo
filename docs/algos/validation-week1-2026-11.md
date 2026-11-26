@@ -117,3 +117,17 @@ counted bot held its 25750/25950 spread. Log: log/drill_2026-11-25.log.
 - Emergency exit (flatten): both legs closed; the drill's positions are 0 and 0 in the Sandbox book. PASS.
 - Isolation: the counted bot stayed open with its own positions (-65 at 25750, +65 at 25950) untouched. PASS.
 Not drilled live (covered only by unit tests): a stale quote, a refused hedge order, a reply lost mid-order.
+
+## 10. Research fixed before running (26 Nov 2026, morning; GPT-6-Astra's open questions)
+
+Run by GLM 5.3 Flash workers on the stored 5-minute bars (October 2024 to October 2026), reviewed with GLM 5.4 advice.
+1. The main rule at one constant lot of 65 for every trade (base and the six timing settings), so the deepest fall and
+   worst trade are stated in today's money. Descriptive; not a trial.
+2. Do the filters earn their keep? The same 200-wide spread entered on EVERY eligible day (no VIX gate, no credit
+   floor), with everything else identical, against the gated rule, both at base and combined timing (e), realistic
+   and doubled costs. Counted as one trial (361). Reading fixed now: if the ungated version does as well or better at
+   e, the gate adds nothing and is noted as such; the frozen rule is not changed either way.
+3. Weekly option premium against the move that followed: for each entry day, the ATM straddle (call + put) at the
+   10:15 close against the absolute Nifty move from 10:15 to the expiry close. Report the share of days the straddle
+   exceeded the move, the average ratio, and the same split by previous VIX below or above its 60-session median.
+   Descriptive; not a trial.
