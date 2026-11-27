@@ -54,3 +54,51 @@ otherwise slab. Confirm with a chartered accountant.
 - Feb 2027: 10 closed trades net positive and a go: only then one lot (needs Rs 60k funded), 3 entries a week at most.
 - Mar 2027: first honest quarter; pay the 15 Mar installment; continue only if real trades are clean and net better
   than Rs -5,000. Kill line: forward loss above Rs 15,000 stops F&O for the year; the ETF core continues.
+
+## Round 2 (GPT-6-Astra, 27 Nov 2026, 13:10): where it disagrees with round 1, and the final plan
+
+1. A — I disagree with the proposed Rs 60k F&O/Rs 40k ETF split. Margin affordability is not loss affordability. One spread’s observed Rs 9,100 loss exceeds your Rs 5,000 budget; therefore the permitted size is zero lots, even with Rs 1 lakh funded. Its contractual expiry loss is (200 minus net credit) × applicable lot size, plus costs; historical losses are not a ceiling.
+
+Neither 8–15% blended nor 30–40% is established by your evidence. Use 6–10% nominal annually after costs, before personal tax, as a provisional long-term planning assumption for an ETF/cash portfolio—not a forecast. Budget zero trading income through March. After approximately 361 trials, the selected t-statistic is not independent confirmation. Ten profitable trades should not automatically double risk. Keep the owner’s Rs 10,000 pause, not Round 1’s Rs 15,000.
+
+2. B — Automatically unwind an abandoned hedge; waiting 2h45m for a person is an execution-control failure. Start unwinding immediately after confirmed entry abandonment, rather than deliberately waiting minutes.
+
+Use fresh executable quotes and depth; buy the hedge first and verify filled quantity. Submit the short using a marketable limit, constrained by minimum acceptable spread credit. Allow bounded repricing within a proposed 30-second entry deadline. No order type guarantees both execution and price.
+
+On timeout, cancel the short and reconcile cancellations, late fills and actual positions before selling any hedge. Retain protection for any short quantity; flatten confirmed orphan quantity automatically. During ordinary exits, close the short first.
+
+Use marketable DAY limits with explicit cancellation; IOC only if supported for your broker’s F&O API route. Do not assume raw market orders are permitted: [NSE requires algorithmic market-price protection](https://nsearchives.nseindia.com/content/circulars/FAOP69296.pdf). Protected orders can still remain unfilled, so monitor, reprice within approved emergency bounds, alert immediately and disable new entries. [Broker explanation](https://support.zerodha.com/category/trading-and-markets/charts-and-orders/order/articles/market-price-protection-on-the-order-window).
+
+3. C — The ETF core is the strongest candidate you have, conditional on those “never-seen” years genuinely remaining outside selection. Fifteen forward sessions cannot establish expected return.
+
+On Rs 32k, provisionally allocate Rs 25k to the existing monthly rule and Rs 7k to bank cash. At Rs 1 lakh, use Rs 80k for that rule and Rs 20k cash; zero live F&O. These are allocation recommendations, not tested optima.
+
+Freeze the existing lookback, ranking and cash filter. Calculate signals after month-end close; trade next session using liquid ETFs and limit orders, whole units only. Allow the strategy allocation itself to remain in cash. Record costs, spreads, distributions and tax from switches; compare against simple fixed-allocation benchmarks. The 6–10% planning assumption applies here too; losing years remain possible.
+
+4. D — Final plan, ten lines:
+
+1) The two controlling numbers are Rs 5,000 daily risk budget and Rs 9,100 observed one-lot loss: incompatible.
+2) November: freeze live F&O and retain today’s orphan loss in the execution ledger.
+3) December: test rejected orders, partial fills, late fills, disconnects and automatic recovery.
+4) December: start the small ETF allocation only after fixing the monthly rule in writing.
+5) January: reconcile every real ETF fill, charge and position against broker records.
+6) January: continue frozen spread Sandbox; stop variant searches and vendor-driven selection.
+7) February: require zero unresolved positions or unexplained ledger differences before any progression.
+8) F&O remains no-go until contractual loss plus costs fits explicitly approved risk limits.
+9) March: review forward results against benchmarks; insufficient evidence means continue observing, not scale.
+10) Pause at Rs 10,000 cumulative pilot loss; reserve actual tax liabilities before considering withdrawals.
+## Reconciled plan (Claude, for the owner's decision)
+
+- Target: 30 to 40 percent a year is not established; Astra plans 6 to 10 percent nominal after costs for an ETF and cash
+  portfolio and zero trading income through March. The owner's 40 percent stays the aspiration, judged only by real results.
+- F&O: zero live lots while the largest loss of one lot (Rs 6,500 to 9,100) exceeds the approved daily risk budget.
+  The owner may raise the budget to Rs 10,000 under the 10-trade condition; Astra advises that ten profitable trades must
+  not automatically double risk and keeps the Rs 10,000 pause (not Rs 15,000).
+- Core: the monthly Nifty ETF / gold ETF / cash rule. Rs 25,000 of the Rs 32,041 and Rs 7,000 cash now; Rs 80,000 and
+  Rs 20,000 cash at Rs 1 lakh. Freeze lookback, ranking and cash filter in writing first; signals after month-end close,
+  next-session limit orders, whole units, record every cost and tax. A 6 to 10 percent planning range, losing years possible.
+- Execution fix (27 Nov failure): buy the hedge first and verify the quantity; sell the call with a marketable limit and a
+  minimum credit; reprice within a 30-second deadline; on timeout cancel, reconcile, then automatically unwind the hedge
+  at once (not wait for a person); alert; disable new entries. Test rejected, partial and late fills in December.
+- Process: stop variant searches and vendor-driven selection; keep the frozen spread in Sandbox; reconcile every real
+  ETF fill and charge; withdraw nothing before actual tax liabilities are reserved.
