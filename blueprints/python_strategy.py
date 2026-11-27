@@ -791,7 +791,13 @@ def start_strategy_process(strategy_id):
         if not config:
             return False, "Strategy configuration not found"
 
-        file_path = Path(config["file_path"])
+        # A schedule can outlive its script (the file or the rest of the config was deleted). Refuse that
+        # plainly: a KeyError here was raised inside the scheduler on every trading morning.
+        file_path_text = config.get("file_path")
+        if not file_path_text:
+            logger.warning(f"Strategy {strategy_id} has a schedule but no script file, so it was not started")
+            return False, "Strategy has no script file. Upload the script again or delete this schedule."
+        file_path = Path(file_path_text)
         if not file_path.exists():
             return False, f"Strategy file not found: {file_path}"
 

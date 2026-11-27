@@ -816,3 +816,17 @@ def test_strategy_without_schedule_days_field(ps_module, tmp_path):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+def test_a_schedule_with_no_script_file_is_refused_not_raised(ps_module, monkeypatch):
+    """A config that kept its schedule but lost its file_path used to raise KeyError inside the scheduler."""
+    ps_module.STRATEGY_CONFIGS["orphan"] = {
+        "exchange": "MCX",
+        "schedule_start": "09:00",
+        "schedule_stop": "23:55",
+        "is_scheduled": True,
+    }
+    monkeypatch.setattr(ps_module, "check_master_contract_ready", lambda: (True, "ok"))
+    success, msg = ps_module.start_strategy_process("orphan")
+    assert success is False
+    assert "no script file" in msg
