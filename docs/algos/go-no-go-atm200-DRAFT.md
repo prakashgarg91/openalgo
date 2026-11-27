@@ -25,6 +25,13 @@ owner's; this file states the evidence and a recommendation.
 | 1 | 18 Nov | 19 Nov 15:00 | time | Rs -2,954 |
 | 2 | 25 Nov | 26 Nov 15:00 | time | Rs -1,820 |
 
+| 3 | 27 Nov 10:16 | none | ENTRY FAILED: the hedge bought at 83.40, the limit sell of the sold call (163.55) did not fill and was cancelled by the bot's timeout; flattened by hand at 13:02, hedge sold at 39.65 | not booked in trades.csv; the stranded hedge cost 43.75 points, about Rs -2,844 before charges |
+
+Machinery event, 27 Nov: the safety design worked (alert at 10:17, nothing re-sent, state flagged) but the lone hedge sat
+open for 2 hours 45 minutes because the owner was away; a live run would have carried a one-sided long call for the same
+time. Counts as an execution failure for the owner's "no machinery failure" condition. Lesson to decide: should the bot
+unwind a lone hedge at market after a few minutes instead of waiting for a person (owner decision, not changed).
+
 Machinery: first cycle end to end clean; failure drills passed on a separate test bot (25 Nov). Missed days:
 20 Nov (PC off), 24 Nov (holiday, correct), 23 Nov (expiry day, correct skip).
 
